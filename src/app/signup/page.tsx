@@ -1,12 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { useFormStatus } from "react-dom"
 import Link from "next/link"
 import { signup } from "@/app/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Check, Zap, Shield } from "lucide-react"
+import { FileText, Check, Zap, Shield, Loader2 } from "lucide-react"
 import MedicalGrid from "@/components/MedicalGrid"
 import { LumaLogo } from "@/components/LumaLogo"
 import SignInDialog from "@/components/SignInDialog"
@@ -17,6 +18,27 @@ const benefits = [
   "Audit-proof medical necessity letters",
   "Export to Word, PDF, or EHR",
 ]
+
+function SubmitButton() {
+  const { pending } = useFormStatus()
+  
+  return (
+    <Button
+      type="submit"
+      className="w-full h-11 text-base"
+      disabled={pending}
+    >
+      {pending ? (
+        <>
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          Creating account...
+        </>
+      ) : (
+        "Get started free"
+      )}
+    </Button>
+  )
+}
 
 export default function SignupPage() {
   const [signInOpen, setSignInOpen] = useState(false)
@@ -80,7 +102,7 @@ export default function SignupPage() {
                   </p>
                 </div>
 
-                <form className="space-y-5">
+                <form action={signup} className="space-y-5">
                   <div>
                     <Label htmlFor="email" className="text-dark-bg font-medium">
                       Work email
@@ -114,12 +136,7 @@ export default function SignupPage() {
                     </p>
                   </div>
 
-                  <Button
-                    formAction={signup}
-                    className="w-full h-11 text-base"
-                  >
-                    Get started free
-                  </Button>
+                  <SubmitButton />
 
                   <p className="text-xs text-gray-500 text-center">
                     By signing up, you agree to our{" "}

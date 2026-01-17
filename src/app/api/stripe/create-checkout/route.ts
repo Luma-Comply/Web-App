@@ -5,10 +5,16 @@ import { stripe } from "@/lib/stripe";
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error("Session error:", sessionError);
+      return NextResponse.json({ error: "Authentication error" }, { status: 401 });
+    }
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      console.error("No session found");
+      return NextResponse.json({ error: "Please sign in to continue" }, { status: 401 });
     }
 
     // Get user data

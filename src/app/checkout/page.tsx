@@ -1,13 +1,52 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { LumaLogo } from "@/components/LumaLogo"
 import { SubscribeButton } from "@/components/SubscribeButton"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Check, Shield, CreditCard, Zap } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 export default function CheckoutPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  useEffect(() => {
+    async function checkAuth() {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        // Redirect to login if not authenticated
+        router.push('/login?redirect=/checkout')
+        return
+      }
+      
+      setIsAuthenticated(true)
+      setLoading(false)
+    }
+    
+    checkAuth()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mint mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-light-gray to-white">
       {/* Header */}

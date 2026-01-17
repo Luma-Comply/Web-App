@@ -15,20 +15,28 @@ export function SubscribeButton({ className }: { className?: string }) {
       const response = await fetch("/api/stripe/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", // Include cookies for session
       })
 
       const data = await response.json()
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Unauthorized - redirect to login
+          window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`
+          return
+        }
         throw new Error(data.error || "Failed to create checkout session")
       }
 
       if (data.url) {
         window.location.href = data.url
+      } else {
+        throw new Error("No checkout URL received")
       }
     } catch (error: any) {
       console.error("Checkout error:", error)
-      alert(error.message || "Failed to start checkout")
+      alert(error.message || "Failed to start checkout. Please try again.")
       setLoading(false)
     }
   }
