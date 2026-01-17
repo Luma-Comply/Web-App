@@ -2,28 +2,34 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
-    const { searchParams, origin } = new URL(request.url)
+    const { searchParams } = new URL(request.url)
     const code = searchParams.get('code')
-    // if "next" is in param, use it as the redirect URL, default to checkout for new signups
-    const next = searchParams.get('next') ?? '/checkout'
+    const type = searchParams.get('type') // Supabase adds this for email confirmations
+    
+    // Get the redirect URL - prioritize "next" param, then default to checkout for email confirmations
+    let next = searchParams.get('next')
+    if (!next) {
+        // If it's an email confirmation (type=signup or recovery), go to checkout
+        // Otherwise, default to dashboard for other auth flows
+        next = (type === 'signup' || type === 'recovery') ? '/checkout' : '/dashboard'
+    }
+
+    // Use the app URL from env to ensure correct domain
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
     if (code) {
         const supabase = await createClient()
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (!error) {
-            const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer
-            const isLocalEnv = process.env.NODE_ENV === 'development'
-            if (isLocalEnv) {
-                // we can be sure that there is no load balancer in between, so no need to watch for X-Forwarded-Host
-                return NextResponse.redirect(`${origin}${next}`)
-            } else if (forwardedHost) {
-                return NextResponse.redirect(`https://${forwardedHost}${next}`)
-            } else {
-                return NextResponse.redirect(`${origin}${next}`)
-            }
+            // Always use the app URL from env to ensure correct redirect
+            return NextResponse.redirect(`${appUrl}${next}`)
+        } else {
+            console.error('Auth code exchange error:', error)
+            // Still redirect to checkout even on error, but log it
+            return NextResponse.redirect(`${appUrl}/checkout?error=auth_error`)
         }
     }
 
-    // return the user to an error page with instructions
-    return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+    // No code provided - redirect to checkout anyway (might be a direct visit)
+    return NextResponse.redirect(`${appUrl}/checkout`)
 }
