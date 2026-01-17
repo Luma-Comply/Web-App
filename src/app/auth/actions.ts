@@ -29,6 +29,10 @@ export async function signup(formData: FormData) {
     const email = formData.get('email') as string
     const password = formData.get('password') as string
 
+    if (!email || !password) {
+        redirect('/signup?error=Please%20fill%20in%20all%20fields')
+    }
+
     const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -37,12 +41,11 @@ export async function signup(formData: FormData) {
         },
     })
 
-    if (error) {
-        redirect('/login?error=Could%20not%20authenticate%20user')
-    }
-
+    // Even if there's an error (like user already exists), still show confirm email page
+    // The user might need to check their email or resend confirmation
     revalidatePath('/', 'layout')
     
-    // Redirect to confirmation page - user needs to verify email first
-    redirect(`/signup/confirm-email?email=${encodeURIComponent(email)}`)
+    // Always redirect to confirmation page - user needs to verify email first
+    // If signup failed, they'll see the error on the confirm page or can resend
+    redirect(`/signup/confirm-email?email=${encodeURIComponent(email)}${error ? `&error=${encodeURIComponent(error.message)}` : ''}`)
 }

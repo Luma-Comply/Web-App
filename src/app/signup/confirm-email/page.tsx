@@ -10,6 +10,7 @@ import MedicalGrid from "@/components/MedicalGrid"
 function ConfirmEmailContent() {
   const searchParams = useSearchParams()
   const email = searchParams.get("email")
+  const error = searchParams.get("error")
   const [resendCooldown, setResendCooldown] = useState(0)
 
   useEffect(() => {
@@ -60,6 +61,17 @@ function ConfirmEmailContent() {
                   </p>
                 )}
               </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-left">
+                  <p className="text-sm text-red-800">
+                    <strong>Note:</strong> {error}
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">
+                    If you already have an account, please check your email for the confirmation link or try signing in.
+                  </p>
+                </div>
+              )}
 
               <div className="bg-mint/5 border border-mint/20 rounded-lg p-4 mb-6">
                 <div className="flex items-start gap-3 text-left">
