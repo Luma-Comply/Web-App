@@ -29,9 +29,12 @@ export async function signup(formData: FormData) {
     const email = formData.get('email') as string
     const password = formData.get('password') as string
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+            emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback?next=/checkout`,
+        },
     })
 
     if (error) {
@@ -39,6 +42,7 @@ export async function signup(formData: FormData) {
     }
 
     revalidatePath('/', 'layout')
-    // Redirect to checkout page to start trial + payment
-    redirect('/checkout')
+    
+    // Redirect to confirmation page - user needs to verify email first
+    redirect(`/signup/confirm-email?email=${encodeURIComponent(email)}`)
 }
