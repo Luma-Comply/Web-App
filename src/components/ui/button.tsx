@@ -5,24 +5,26 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-mint text-white hover:bg-mint/90",
+        default: "bg-mint text-white hover:bg-mint/90 hover:scale-[1.02] hover:shadow-lg",
         destructive:
-          "bg-coral text-white hover:bg-coral/90",
+          "bg-coral text-white hover:bg-coral/90 hover:scale-[1.02]",
         outline:
-          "border border-sage-medium bg-transparent hover:bg-sage-light hover:text-dark-bg",
+          "border border-sage-medium bg-transparent hover:bg-sage-light hover:text-dark-bg hover:-translate-y-0.5",
         secondary:
-          "bg-sage-light text-dark-bg hover:bg-sage-medium",
+          "bg-sage-light text-dark-bg hover:bg-sage-medium hover:scale-[1.02]",
         ghost: "hover:bg-sage-light hover:text-dark-bg",
         link: "text-mint underline-offset-4 hover:underline",
+        glass: "glass-card text-dark-bg border border-white/20 hover:bg-white/80 hover:shadow-lg",
+        glow: "bg-mint text-white hover:bg-mint/90 animate-glow-pulse hover:scale-[1.02]",
       },
       size: {
         default: "h-10 px-4 py-2",
         sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
+        lg: "h-11 rounded-md px-8 text-base",
         icon: "h-10 w-10",
       },
     },

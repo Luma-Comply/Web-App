@@ -27,6 +27,10 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Luma - Medical Necessity Documentation",
   description: "HIPAA-compliant AI-powered medical necessity documentation for biologics",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

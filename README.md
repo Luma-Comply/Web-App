@@ -278,11 +278,9 @@ Generate compliant documentation with:
 
 ## 💳 Pricing Tiers
 
-| Tier | Price | Cases/Month | Seats |
+| Plan | Price | Cases/Month | Seats |
 |------|-------|-------------|-------|
-| Solo | $149/mo | 50 | 1 |
-| Practice | $249/mo | 200 | 5 |
-| Group | $599/mo | 1000 | 20 |
+| Professional | $149/mo | 50 | 3 |
 
 ## 🤝 Contributing
 

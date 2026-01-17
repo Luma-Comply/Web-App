@@ -56,7 +56,8 @@ const config: Config = {
         "sage-light": "#B7D0C1",
         "sage-medium": "#AFC6B9",
         "sage-dark": "#B5CDB9",
-        mint: "#7EA18D",
+        mint: "#5A8270", // Darkened from #7EA18D for ADA compliance (4.5:1 contrast on white)
+        "mint-light": "#7EA18D", // Original lighter mint for backgrounds
         tan: "#BB966D",
         "tan-light": "#A4784A",
         coral: "#EC624F",
@@ -70,6 +71,15 @@ const config: Config = {
         serif: ["var(--font-serif)", "Georgia", "serif"],
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "monospace"],
+      },
+      keyframes: {
+        "logo-pulse-red": {
+          "0%, 100%": { fill: "#ABC5B6" },
+          "50%": { fill: "#D68F85" }, // Softer/muted red (was #EC624F)
+        },
+      },
+      animation: {
+        "logo-pulse-red": "logo-pulse-red 2s ease-in-out infinite",
       },
     },
   },

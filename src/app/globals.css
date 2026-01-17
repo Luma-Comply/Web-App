@@ -232,3 +232,50 @@
     }
   }
 }
+
+/* Logo Animation Keyframes - Random Red and Green with Fade */
+@keyframes logo-shimmer {
+  0% {
+    opacity: 0.4;
+    fill: #ABC5B6; /* Base Gray/Green */
+  }
+  20% {
+    opacity: 1;
+    fill: #7FA68F; /* Brighter Green */
+  }
+  35% {
+    opacity: 0.5;
+    fill: #94B7A3; /* Medium Green */
+  }
+  50% {
+    opacity: 0.4;
+    fill: #ABC5B6; /* Base Gray/Green */
+  }
+  65% {
+    opacity: 1;
+    fill: #7FA68F; /* Brighter Green */
+  }
+  80% {
+    opacity: 1;
+    fill: #EC624F; /* Red/Coral */
+  }
+  100% {
+    opacity: 0.4;
+    fill: #ABC5B6; /* Base Gray/Green */
+  }
+}
+
+/* Logo Animation Utility Classes */
+.animate-logo-dot {
+  /* 
+     Runs the shimmer animation over 4 seconds endlessly.
+     Each dot has its own delay creating a wave/random effect.
+  */
+  animation: logo-shimmer 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-logo-pulse-fast {
+  /* Faster version for loading states - each dot pulses independently with random timing */
+  animation: logo-shimmer 1.5s ease-in-out infinite;
+  /* Keep individual delays for random effect - don't override */
+}
