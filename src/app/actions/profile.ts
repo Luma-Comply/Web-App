@@ -78,6 +78,22 @@ export async function updateProfile({ firstName, lastName, email }: UpdateProfil
         // We don't throw here as the main auth update succeeded
     }
 
+    // Send notification email (manually since Admin API suppresses it)
+    if (emailChanged && currentEmail) {
+        try {
+            // Import dynamically to avoid circular dependencies if any (though unlikely here)
+            const { sendEmailChangeNotification } = await import("@/lib/email-service")
+            await sendEmailChangeNotification({
+                to: email, // Send to new email
+                oldEmail: currentEmail,
+                newEmail: email
+            })
+        } catch (emailError) {
+            console.error("Failed to send email change notification:", emailError)
+            // Don't fail the request if email sending fails
+        }
+    }
+
     revalidatePath('/settings/profile')
     return { success: true, emailChanged }
 }
