@@ -73,71 +73,28 @@ export default function ProfilePage() {
   async function handleSaveProfile() {
     setSaving(true)
     try {
-      const emailChanged = email !== originalEmail
-      
-      // Update user metadata (name)
-      const updateData: any = {
-        data: {
-          first_name: firstName,
-          last_name: lastName,
-        },
-      }
+      // Import the server action dynamically or ensure it's imported at top
+      // We'll assume it's imported as `updateProfile`
 
-      // Only update email if it changed
-      if (emailChanged) {
-        updateData.email = email
-        // Set redirect URL for email change confirmation
-        // This ensures the custom email template's redirect link works correctly
-        updateData.options = {
-          emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback?type=email_change&next=/settings/profile`,
-        }
-      }
+      const { updateProfile } = await import("@/app/actions/profile")
 
-      const { data: updateResponse, error: updateError } = await supabase.auth.updateUser(updateData)
+      const result = await updateProfile({
+        firstName,
+        lastName,
+        email
+      })
 
-      if (updateError) throw updateError
-
-      // Get current user to check email status
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        throw new Error("User not found")
-      }
-
-      // Update public.users table with new email (if changed) and metadata
-      const { error: dbError } = await supabase
-        .from('users')
-        .update({
-          email: user.email || email, // Use confirmed email or new email
-        })
-        .eq('id', user.id)
-
-      if (dbError) {
-        console.error("Error updating users table:", dbError)
-        // Don't throw - auth update succeeded, DB update is secondary
-      }
-
-      // If email changed, check if confirmation is required
-      if (emailChanged) {
-        // Check if email was actually updated or is pending confirmation
-        if (user.email === originalEmail) {
-          // Email change is pending confirmation - Supabase will send confirmation email
-          toast({
-            title: "Email change pending",
-            description: `A confirmation email has been sent to ${email}. Please check your inbox and click the link to complete the change.`,
-            variant: "default",
-          })
+      if (result.success) {
+        // Update local state
+        const { data: { session } } = await supabase.auth.refreshSession()
+        if (session?.user) {
+          setEmail(session.user.email || email)
+          setOriginalEmail(session.user.email || email)
         } else {
-          // Email was updated immediately (secure email change is disabled)
-          setOriginalEmail(user.email || email)
-          toast({
-            title: "Success",
-            description: "Profile updated successfully",
-          })
+          // Fallback if refresh doesn't immediately reflect
+          setOriginalEmail(email)
         }
-      } else {
-        // Only metadata changed, no email change
-        setOriginalEmail(user.email || email)
+
         toast({
           title: "Success",
           description: "Profile updated successfully",
@@ -188,7 +145,7 @@ export default function ProfilePage() {
     try {
       // First, verify the current password by attempting to sign in
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user || !user.email) {
         throw new Error("User not found")
       }

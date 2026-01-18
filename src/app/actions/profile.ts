@@ -1,0 +1,83 @@
+'use server'
+
+import { createClient } from "@/lib/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { revalidatePath } from "next/cache"
+
+interface UpdateProfileParams {
+    firstName: string
+    lastName: string
+    email: string
+}
+
+export async function updateProfile({ firstName, lastName, email }: UpdateProfileParams) {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+        throw new Error("Unauthorized")
+    }
+
+    // Check if anything changed
+    const currentEmail = user.email
+    const currentMetaData = user.user_metadata || {}
+
+    const emailChanged = email !== currentEmail
+    const nameChanged = firstName !== currentMetaData.first_name || lastName !== currentMetaData.last_name
+
+    if (!emailChanged && !nameChanged) {
+        return { success: true }
+    }
+
+    // Create admin client for privileged operations
+    const adminAuth = createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+            auth: {
+                autoRefreshToken: false,
+                persistSession: false
+            }
+        }
+    )
+
+    const updateData: any = {
+        user_metadata: {
+            first_name: firstName,
+            last_name: lastName
+        }
+    }
+
+    if (emailChanged) {
+        updateData.email = email
+        updateData.email_confirm = true // Bypass confirmation
+    }
+
+    // Update user via admin api
+    const { data: updatedUser, error: updateError } = await adminAuth.auth.admin.updateUserById(
+        user.id,
+        updateData
+    )
+
+    if (updateError) {
+        console.error("Error updating user:", updateError)
+        throw new Error(updateError.message)
+    }
+
+    // Update public.users table to keep in sync
+    const { error: dbError } = await adminAuth
+        .from('users')
+        .update({
+            email: email, // Always ensure email is correct
+            // We could also update names here if you have columns for them in public.users
+        })
+        .eq('id', user.id)
+
+    if (dbError) {
+        console.error("Error updating public.users:", dbError)
+        // We don't throw here as the main auth update succeeded
+    }
+
+    revalidatePath('/settings/profile')
+    return { success: true, emailChanged }
+}
