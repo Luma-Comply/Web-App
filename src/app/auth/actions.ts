@@ -10,13 +10,26 @@ export async function login(formData: FormData) {
     const email = formData.get('email') as string
     const password = formData.get('password') as string
 
+    if (!email || !password) {
+        redirect('/login?error=' + encodeURIComponent('Please enter both email and password'))
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
     })
 
     if (error) {
-        redirect('/login?error=Could%20not%20authenticate%20user')
+        // Provide more specific error messages
+        let errorMessage = 'Invalid email or password'
+        if (error.message.includes('Invalid login credentials')) {
+            errorMessage = 'Invalid email or password'
+        } else if (error.message.includes('Email not confirmed')) {
+            errorMessage = 'Please confirm your email address before signing in'
+        } else {
+            errorMessage = error.message || 'Could not sign in. Please try again.'
+        }
+        redirect('/login?error=' + encodeURIComponent(errorMessage))
     }
 
     revalidatePath('/', 'layout')

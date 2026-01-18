@@ -1,17 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { login } from "@/app/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Shield, Lock, Eye, EyeOff } from "lucide-react"
+import { FileText, Shield, Lock, Eye, EyeOff, AlertCircle } from "lucide-react"
 import MedicalGrid from "@/components/MedicalGrid"
 import { LumaLogo } from "@/components/LumaLogo"
 
-export default function LoginPage() {
+function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
+  const searchParams = useSearchParams()
+  const error = searchParams.get('error')
   return (
     <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white relative overflow-hidden">
       <MedicalGrid intensity="light" />
@@ -70,6 +73,13 @@ export default function LoginPage() {
                   </p>
                 </div>
 
+                {error && (
+                  <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-800">{error}</p>
+                  </div>
+                )}
+
                 <form className="space-y-5">
                   <div>
                     <Label htmlFor="email" className="text-dark-bg font-medium">
@@ -81,7 +91,7 @@ export default function LoginPage() {
                       type="email"
                       autoComplete="email"
                       required
-                      className="mt-2 h-11"
+                      className={`mt-2 h-11 ${error ? 'border-red-300 focus:border-red-500' : ''}`}
                       placeholder="your@email.com"
                     />
                   </div>
@@ -105,7 +115,7 @@ export default function LoginPage() {
                         type={showPassword ? "text" : "password"}
                         autoComplete="current-password"
                         required
-                        className="h-11 pr-10"
+                        className={`h-11 pr-10 ${error ? 'border-red-300 focus:border-red-500' : ''}`}
                         placeholder="Enter your password"
                       />
                       <button
@@ -147,5 +157,20 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mint mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
