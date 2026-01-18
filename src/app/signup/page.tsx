@@ -7,16 +7,16 @@ import { signup } from "@/app/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Check, Zap, Shield, Loader2 } from "lucide-react"
+import { FileText, Check, Zap, Shield, Loader2, Eye, EyeOff } from "lucide-react"
 import MedicalGrid from "@/components/MedicalGrid"
 import { LumaLogo } from "@/components/LumaLogo"
 import SignInDialog from "@/components/SignInDialog"
 
 const benefits = [
-  "Generate documentation in seconds",
+  "Secure approvals faster for your patients",
   "HIPAA-compliant from day one",
-  "Audit-proof medical necessity letters",
-  "Export to Word, PDF, or EHR",
+  "Spend more time on care, less on paperwork",
+  "Audit-proof documentation you can trust",
 ]
 
 function SubmitButton() {
@@ -42,6 +42,7 @@ function SubmitButton() {
 
 export default function SignupPage() {
   const [signInOpen, setSignInOpen] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   return (
     <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white relative overflow-hidden">
       <MedicalGrid intensity="light" />
@@ -58,11 +59,11 @@ export default function SignupPage() {
             {/* Left Side - Branding */}
             <div className="hidden lg:block animate-fade-in-up">
               <h1 className="text-5xl font-serif text-dark-bg mb-6 leading-tight">
-                Start protecting your
-                <span className="text-mint block">revenue today</span>
+                Focus on patients,
+                <span className="text-mint block">not paperwork</span>
               </h1>
               <p className="text-xl text-gray-700 mb-8 leading-relaxed">
-                Join healthcare providers who are preventing audit clawbacks with AI-powered documentation.
+                Join providers who are getting treatments approved faster while protecting their practice.
               </p>
 
               {/* Benefits */}
@@ -122,15 +123,28 @@ export default function SignupPage() {
                     <Label htmlFor="password" className="text-dark-bg font-medium">
                       Password
                     </Label>
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                      autoComplete="new-password"
-                      required
-                      className="mt-2 h-11"
-                      placeholder="Create a strong password"
-                    />
+                    <div className="relative mt-2">
+                      <Input
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        required
+                        className="h-11 pr-10"
+                        placeholder="Create a strong password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                     <p className="text-xs text-gray-500 mt-2">
                       Must be at least 8 characters
                     </p>

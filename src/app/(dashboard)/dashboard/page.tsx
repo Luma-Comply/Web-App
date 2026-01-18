@@ -36,6 +36,10 @@ import {
   RefreshCw,
   Trash2,
   Eye,
+  User,
+  Users,
+  CreditCard,
+  ChevronDown,
 } from "lucide-react"
 import {
   Dialog,
@@ -269,11 +273,52 @@ export default function DashboardPage() {
             <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600 hidden md:block">{userEmail}</span>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600 hidden md:block">{userEmail}</span>
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-white border border-sage-medium/30">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{userEmail}</p>
+                    <p className="text-xs leading-none text-gray-500">Account settings</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => router.push('/settings/profile')}
+                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => router.push('/settings/team')}
+                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Team
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => router.push('/settings/billing')}
+                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Billing
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="focus:bg-coral/10 focus:text-coral cursor-pointer"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>

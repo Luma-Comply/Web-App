@@ -1,13 +1,17 @@
+"use client"
+
+import { useState } from "react"
 import Link from "next/link"
 import { login } from "@/app/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Shield, Lock } from "lucide-react"
+import { FileText, Shield, Lock, Eye, EyeOff } from "lucide-react"
 import MedicalGrid from "@/components/MedicalGrid"
 import { LumaLogo } from "@/components/LumaLogo"
 
 export default function LoginPage() {
+  const [showPassword, setShowPassword] = useState(false)
   return (
     <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white relative overflow-hidden">
       <MedicalGrid intensity="light" />
@@ -94,15 +98,28 @@ export default function LoginPage() {
                         Forgot password?
                       </Link>
                     </div>
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                      autoComplete="current-password"
-                      required
-                      className="h-11"
-                      placeholder="Enter your password"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        required
+                        className="h-11 pr-10"
+                        placeholder="Enter your password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   <Button

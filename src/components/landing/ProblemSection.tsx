@@ -3,26 +3,26 @@ import { AlertTriangle, DollarSign, Clock } from "lucide-react"
 
 const problems = [
   {
-    icon: DollarSign,
-    title: "$100B+ Lost Annually",
+    icon: Clock,
+    title: "12-16 Hours Weekly",
     description:
-      "Medicare/Medicaid improper payments due to documentation issues. One audit can wipe out months of revenue.",
+      "Spent fighting paperwork instead of treating patients. Every hour on documentation is an hour away from care.",
     color: "from-coral/10 to-coral/5",
     borderColor: "border-l-coral",
   },
   {
     icon: AlertTriangle,
-    title: "HIPAA Violations",
+    title: "Treatment Delays",
     description:
-      "Providers using ChatGPT with PHI face $1.5M+ fines. Standard AI tools aren't built for healthcare compliance.",
+      "Patients wait weeks for approvals due to incomplete documentation. Delayed care means delayed healing—or worse.",
     color: "from-coral/10 to-coral/5",
     borderColor: "border-l-coral",
   },
   {
-    icon: Clock,
-    title: "12-16 Hours Weekly",
+    icon: DollarSign,
+    title: "Audit Clawbacks",
     description:
-      "Wasted on prior authorization paperwork. Time that could be spent on patient care instead of documentation.",
+      "Insufficient documentation leads to denials and revenue loss—threatening your ability to keep doors open for patients who need you.",
     color: "from-coral/10 to-coral/5",
     borderColor: "border-l-coral",
   },
@@ -39,8 +39,7 @@ export default function ProblemSection() {
                 The Problem
               </h2>
               <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Healthcare providers are risking HIPAA violations and losing
-                millions to audit clawbacks due to insufficient documentation.
+                Documentation shouldn't stand between you and your patients. But right now, it does.
               </p>
             </div>
           </ScrollReveal>

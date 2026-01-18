@@ -13,11 +13,10 @@ export default function CTASection() {
         <ScrollReveal>
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-4xl md:text-5xl font-serif text-white mb-6">
-              Ready to Stop Losing Money to Audits?
+              Get Back to What Matters: Patient Care
             </h2>
             <p className="text-xl text-white/90 mb-10 leading-relaxed">
-              Join healthcare providers who are protecting their revenue with
-              compliant AI documentation. Start your 14-day free trial today.
+              Join providers who've reclaimed their time and ensured their patients get the treatments they need. Start your 14-day free trial today.
             </p>
             <Link href="/signup">
               <Button

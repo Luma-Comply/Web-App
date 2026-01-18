@@ -64,12 +64,12 @@ export default function Hero() {
             {/* Headline with Staggered Animation */}
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif font-normal leading-tight text-dark-bg mb-8 text-shadow-soft">
               <span className="block animate-fade-in-up opacity-0 [animation-fill-mode:forwards]">
-                AI Documentation
+                Keep Your Patients
               </span>
               <span className="block animate-fade-in-up opacity-0 [animation-fill-mode:forwards] animation-delay-200">
-                That{" "}
+                On{" "}
                 <span className="text-mint relative">
-                  Protects Revenue
+                  Life-Saving Therapies
                   <svg
                     className="absolute -bottom-2 left-0 w-full h-3 text-mint opacity-30"
                     viewBox="0 0 300 12"
@@ -88,7 +88,7 @@ export default function Hero() {
 
             {/* Subheadline */}
             <p className="text-xl md:text-2xl text-gray-700 mb-12 max-w-3xl leading-relaxed animate-fade-in-up opacity-0 [animation-fill-mode:forwards] animation-delay-400">
-              Generate compliant medical necessity documentation in seconds for prior authorizations, appeals, and specialty medications. Protect your practice from audit clawbacks while keeping patient data safe.
+              Generate compliant medical necessity documentation in seconds—so you can secure approvals faster and ensure your patients get the treatments they need. Audit-proof, HIPAA-compliant, and built for care.
             </p>
 
             {/* CTA Buttons */}

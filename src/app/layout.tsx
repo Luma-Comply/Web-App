@@ -26,10 +26,65 @@ const ibmPlexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Luma - Medical Necessity Documentation",
-  description: "HIPAA-compliant AI-powered medical necessity documentation for biologics",
+  description: "Keep your patients on life-saving therapies. HIPAA-compliant AI documentation that secures approvals faster and protects your practice from audits.",
+  metadataBase: new URL("https://useluma.io"),
+  keywords: [
+    "medical necessity documentation",
+    "biologics prior authorization",
+    "HIPAA compliant",
+    "medical necessity letters",
+    "prior authorization automation",
+    "healthcare documentation",
+    "audit protection",
+  ],
+  authors: [{ name: "Luma" }],
+  creator: "Luma",
+  publisher: "Luma",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://useluma.io",
+    title: "Luma - Medical Necessity Documentation",
+    description: "Keep your patients on life-saving therapies. HIPAA-compliant AI documentation that secures approvals faster and protects your practice from audits.",
+    siteName: "Luma",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Luma - Medical Necessity Documentation Platform",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Luma - Medical Necessity Documentation",
+    description: "Keep your patients on life-saving therapies. Secure approvals faster with HIPAA-compliant AI documentation.",
+    images: ["/og-image.png"],
+    creator: "@useluma",
+  },
   icons: {
-    icon: "/icon.svg",
-    apple: "/icon.svg",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  manifest: "/manifest.json",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
 };
 
