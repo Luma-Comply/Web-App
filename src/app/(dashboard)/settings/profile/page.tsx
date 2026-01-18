@@ -73,24 +73,71 @@ export default function ProfilePage() {
   async function handleSaveProfile() {
     setSaving(true)
     try {
-      // Always update user metadata (name and email together)
-      const { error: updateError } = await supabase.auth.updateUser({
-        email: email,
+      const emailChanged = email !== originalEmail
+      
+      // Update user metadata (name)
+      const updateData: any = {
         data: {
           first_name: firstName,
           last_name: lastName,
         },
-      })
+      }
+
+      // Only update email if it changed
+      if (emailChanged) {
+        updateData.email = email
+      }
+
+      const { data: updateResponse, error: updateError } = await supabase.auth.updateUser(updateData)
 
       if (updateError) throw updateError
 
-      // Update the original email to the new one
-      setOriginalEmail(email)
+      // Get current user to check email status
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        throw new Error("User not found")
+      }
 
-      toast({
-        title: "Success",
-        description: "Profile updated successfully",
-      })
+      // Update public.users table with new email (if changed) and metadata
+      const { error: dbError } = await supabase
+        .from('users')
+        .update({
+          email: user.email || email, // Use confirmed email or new email
+        })
+        .eq('id', user.id)
+
+      if (dbError) {
+        console.error("Error updating users table:", dbError)
+        // Don't throw - auth update succeeded, DB update is secondary
+      }
+
+      // If email changed, check if confirmation is required
+      if (emailChanged) {
+        // Check if email was actually updated or is pending confirmation
+        if (user.email === originalEmail) {
+          // Email change is pending confirmation - Supabase will send confirmation email
+          toast({
+            title: "Email change pending",
+            description: `A confirmation email has been sent to ${email}. Please check your inbox and click the link to complete the change.`,
+            variant: "default",
+          })
+        } else {
+          // Email was updated immediately (secure email change is disabled)
+          setOriginalEmail(user.email || email)
+          toast({
+            title: "Success",
+            description: "Profile updated successfully",
+          })
+        }
+      } else {
+        // Only metadata changed, no email change
+        setOriginalEmail(user.email || email)
+        toast({
+          title: "Success",
+          description: "Profile updated successfully",
+        })
+      }
     } catch (error: any) {
       console.error("Error updating profile:", error)
       toast({
