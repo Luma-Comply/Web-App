@@ -1,15 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react"
 import { LumaLogo } from "@/components/LumaLogo"
 
-export default function AuthConfirmPage() {
+function AuthConfirmContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
   const [message, setMessage] = useState("")
@@ -20,12 +21,26 @@ export default function AuthConfirmPage() {
 
   async function handleEmailConfirmation() {
     try {
-      // Get the current session after email confirmation
-      const { data: { session }, error } = await supabase.auth.getSession()
+      // Get the token hash and type from URL
+      const token_hash = searchParams.get('token_hash')
+      const type = searchParams.get('type')
 
-      if (error) throw error
+      console.log("Confirmation params:", { token_hash, type })
 
-      if (session) {
+      // If we have a token hash, verify it with Supabase
+      if (token_hash && type) {
+        const { data, error } = await supabase.auth.verifyOtp({
+          token_hash,
+          type: type as any,
+        })
+
+        if (error) {
+          console.error("OTP verification error:", error)
+          throw error
+        }
+
+        console.log("OTP verification success:", data)
+
         setStatus("success")
         setMessage("Your email has been successfully verified!")
 
@@ -34,7 +49,21 @@ export default function AuthConfirmPage() {
           router.push("/settings/profile")
         }, 2000)
       } else {
-        throw new Error("No session found")
+        // No token in URL, just check if user has a session
+        const { data: { session }, error } = await supabase.auth.getSession()
+
+        if (error) throw error
+
+        if (session) {
+          setStatus("success")
+          setMessage("Your email has been successfully verified!")
+
+          setTimeout(() => {
+            router.push("/settings/profile")
+          }, 2000)
+        } else {
+          throw new Error("No verification token found in URL")
+        }
       }
     } catch (error: any) {
       console.error("Email confirmation error:", error)
@@ -94,5 +123,17 @@ export default function AuthConfirmPage() {
         </div>
       </Card>
     </div>
+  )
+}
+
+export default function AuthConfirmPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-center justify-center">
+        <Loader2 className="w-16 h-16 text-mint animate-spin" />
+      </div>
+    }>
+      <AuthConfirmContent />
+    </Suspense>
   )
 }
