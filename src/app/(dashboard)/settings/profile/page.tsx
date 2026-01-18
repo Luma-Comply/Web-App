@@ -113,59 +113,15 @@ export default function ProfilePage() {
   }
 
   async function handleUpdatePassword() {
-    // Validate current password is provided
-    if (!currentPassword) {
-      toast({
-        title: "Error",
-        description: "Please enter your current password",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (newPassword.length < 8) {
-      toast({
-        title: "Error",
-        description: "Password must be at least 8 characters",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match",
-        variant: "destructive",
-      })
-      return
-    }
-
     setUpdatingPassword(true)
     try {
-      // First, verify the current password by attempting to sign in
-      const { data: { user } } = await supabase.auth.getUser()
+      const { updatePassword } = await import("@/app/actions/profile")
 
-      if (!user || !user.email) {
-        throw new Error("User not found")
-      }
-
-      // Verify current password by attempting to sign in
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
+      await updatePassword({
+        currentPassword,
+        newPassword,
+        confirmPassword
       })
-
-      if (verifyError) {
-        throw new Error("Current password is incorrect")
-      }
-
-      // Current password is correct, now update to new password
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      })
-
-      if (error) throw error
 
       toast({
         title: "Success",

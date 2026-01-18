@@ -97,3 +97,59 @@ export async function updateProfile({ firstName, lastName, email }: UpdateProfil
     revalidatePath('/settings/profile')
     return { success: true, emailChanged }
 }
+
+interface UpdatePasswordParams {
+    currentPassword: string
+    newPassword: string
+    confirmPassword: string
+}
+
+export async function updatePassword({ currentPassword, newPassword, confirmPassword }: UpdatePasswordParams) {
+    if (newPassword !== confirmPassword) {
+        throw new Error("Passwords do not match")
+    }
+
+    if (newPassword.length < 8) {
+        throw new Error("Password must be at least 8 characters")
+    }
+
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user || !user.email) {
+        throw new Error("Unauthorized")
+    }
+
+    // 1. Verify current password
+    // We do this by trying to sign in with the expected credentials
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+    })
+
+    if (verifyError) {
+        throw new Error("Current password is incorrect")
+    }
+
+    // 2. Update to new password
+    const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+    })
+
+    if (updateError) {
+        throw new Error(updateError.message)
+    }
+
+    // 3. Send notification
+    try {
+        const { sendPasswordChangeNotification } = await import("@/lib/email-service")
+        await sendPasswordChangeNotification({
+            to: user.email,
+            email: user.email
+        })
+    } catch (emailError) {
+        console.error("Failed to send password change notification:", emailError)
+    }
+
+    return { success: true }
+}
