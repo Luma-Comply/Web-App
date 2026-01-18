@@ -250,7 +250,7 @@ export default function ProfilePage() {
                   className="pl-10 bg-white border-sage-medium/30"
                 />
               </div>
-              <p className="text-xs text-gray-500">Changing your email will require verification at the new address.</p>
+
             </div>
           </div>
 
