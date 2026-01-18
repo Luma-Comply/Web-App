@@ -35,6 +35,24 @@ export default function ProfilePage() {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
+  // Password Requirements State
+  const [hasMinLength, setHasMinLength] = useState(false)
+  const [hasUpperCase, setHasUpperCase] = useState(false)
+  const [hasNumber, setHasNumber] = useState(false)
+  const [hasSpecialChar, setHasSpecialChar] = useState(false)
+  const [passwordsMatch, setPasswordsMatch] = useState(false)
+
+  // Real-time validation effect
+  useEffect(() => {
+    setHasMinLength(newPassword.length >= 8)
+    setHasUpperCase(/[A-Z]/.test(newPassword))
+    setHasNumber(/[0-9]/.test(newPassword))
+    setHasSpecialChar(/[!@#$%^&*(),.?":{}|<>]/.test(newPassword))
+    setPasswordsMatch(newPassword === confirmPassword && newPassword !== "")
+  }, [newPassword, confirmPassword])
+
+  const isPasswordValid = hasMinLength && hasUpperCase && hasNumber && hasSpecialChar && passwordsMatch
+
   useEffect(() => {
     loadUserProfile()
   }, [])
@@ -117,26 +135,34 @@ export default function ProfilePage() {
     try {
       const { updatePassword } = await import("@/app/actions/profile")
 
-      await updatePassword({
+      const result = await updatePassword({
         currentPassword,
         newPassword,
         confirmPassword
       })
 
-      toast({
-        title: "Success",
-        description: "Password updated successfully",
-      })
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Password updated successfully",
+        })
 
-      // Clear password fields
-      setCurrentPassword("")
-      setNewPassword("")
-      setConfirmPassword("")
+        // Clear password fields
+        setCurrentPassword("")
+        setNewPassword("")
+        setConfirmPassword("")
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update password",
+          variant: "destructive",
+        })
+      }
     } catch (error: any) {
       console.error("Error updating password:", error)
       toast({
         title: "Error",
-        description: error.message || "Failed to update password",
+        description: "An unexpected error occurred",
         variant: "destructive",
       })
     } finally {
@@ -308,7 +334,8 @@ export default function ProfilePage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="bg-white border-sage-medium/30 pr-10"
+                  className={`bg-white border-sage-medium/30 pr-10 ${confirmPassword && !passwordsMatch ? "border-coral focus-visible:ring-coral" : ""
+                    }`}
                 />
                 <button
                   type="button"
@@ -322,6 +349,33 @@ export default function ProfilePage() {
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* Validation Checklist */}
+            <div className="space-y-2 pt-2 text-sm">
+              <p className="font-medium text-gray-700">Password requirements:</p>
+              <ul className="space-y-1 text-xs sm:text-sm">
+                <li className={`flex items-center gap-2 ${hasMinLength ? "text-green-600" : "text-gray-500"}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${hasMinLength ? "bg-green-600" : "bg-gray-300"}`} />
+                  At least 8 characters
+                </li>
+                <li className={`flex items-center gap-2 ${hasUpperCase ? "text-green-600" : "text-gray-500"}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${hasUpperCase ? "bg-green-600" : "bg-gray-300"}`} />
+                  At least one uppercase letter (A-Z)
+                </li>
+                <li className={`flex items-center gap-2 ${hasNumber ? "text-green-600" : "text-gray-500"}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${hasNumber ? "bg-green-600" : "bg-gray-300"}`} />
+                  At least one number (0-9)
+                </li>
+                <li className={`flex items-center gap-2 ${hasSpecialChar ? "text-green-600" : "text-gray-500"}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${hasSpecialChar ? "bg-green-600" : "bg-gray-300"}`} />
+                  At least one special character (!@#$...)
+                </li>
+                <li className={`flex items-center gap-2 ${passwordsMatch ? "text-green-600" : "text-gray-500"}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${passwordsMatch ? "bg-green-600" : "bg-gray-300"}`} />
+                  Passwords match
+                </li>
+              </ul>
             </div>
           </div>
 
@@ -340,8 +394,8 @@ export default function ProfilePage() {
             </Button>
             <Button
               onClick={handleUpdatePassword}
-              disabled={updatingPassword || !currentPassword || !newPassword || !confirmPassword}
-              className="bg-dark-bg text-white hover:bg-dark-bg/90"
+              disabled={updatingPassword || !isPasswordValid || !currentPassword}
+              className="bg-dark-bg text-white hover:bg-dark-bg/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {updatingPassword ? "Updating..." : "Update password"}
             </Button>

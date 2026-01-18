@@ -106,18 +106,18 @@ interface UpdatePasswordParams {
 
 export async function updatePassword({ currentPassword, newPassword, confirmPassword }: UpdatePasswordParams) {
     if (newPassword !== confirmPassword) {
-        throw new Error("Passwords do not match")
+        return { success: false, error: "Passwords do not match" }
     }
 
     if (newPassword.length < 8) {
-        throw new Error("Password must be at least 8 characters")
+        return { success: false, error: "Password must be at least 8 characters" }
     }
 
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user || !user.email) {
-        throw new Error("Unauthorized")
+        return { success: false, error: "Unauthorized" }
     }
 
     // 1. Verify current password
@@ -128,7 +128,7 @@ export async function updatePassword({ currentPassword, newPassword, confirmPass
     })
 
     if (verifyError) {
-        throw new Error("Current password is incorrect")
+        return { success: false, error: "Current password is incorrect" }
     }
 
     // 2. Update to new password
@@ -137,7 +137,7 @@ export async function updatePassword({ currentPassword, newPassword, confirmPass
     })
 
     if (updateError) {
-        throw new Error(updateError.message)
+        return { success: false, error: updateError.message }
     }
 
     // 3. Send notification
