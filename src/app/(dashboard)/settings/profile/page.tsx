@@ -86,6 +86,11 @@ export default function ProfilePage() {
       // Only update email if it changed
       if (emailChanged) {
         updateData.email = email
+        // Set redirect URL for email change confirmation
+        // This ensures the custom email template's redirect link works correctly
+        updateData.options = {
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback?type=email_change&next=/settings/profile`,
+        }
       }
 
       const { data: updateResponse, error: updateError } = await supabase.auth.updateUser(updateData)
