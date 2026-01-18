@@ -73,39 +73,24 @@ export default function ProfilePage() {
   async function handleSaveProfile() {
     setSaving(true)
     try {
-      const emailChanged = email && originalEmail && email.trim().toLowerCase() !== originalEmail.trim().toLowerCase()
-
-      // Always update user metadata (name)
-      const { error: metadataError } = await supabase.auth.updateUser({
+      // Always update user metadata (name and email together)
+      const { error: updateError } = await supabase.auth.updateUser({
+        email: email,
         data: {
           first_name: firstName,
           last_name: lastName,
         },
       })
 
-      if (metadataError) throw metadataError
+      if (updateError) throw updateError
 
-      // Update email if changed (requires verification)
-      if (emailChanged) {
-        const { error: emailError } = await supabase.auth.updateUser({
-          email: email,
-        })
+      // Update the original email to the new one
+      setOriginalEmail(email)
 
-        if (emailError) throw emailError
-
-        toast({
-          title: "Verification Required",
-          description: "A verification email has been sent to your new email address. Please check your inbox to confirm the change.",
-        })
-
-        // Update the original email to the new one after successful update
-        setOriginalEmail(email)
-      } else {
-        toast({
-          title: "Success",
-          description: "Profile updated successfully",
-        })
-      }
+      toast({
+        title: "Success",
+        description: "Profile updated successfully",
+      })
     } catch (error: any) {
       console.error("Error updating profile:", error)
       toast({

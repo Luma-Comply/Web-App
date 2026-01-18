@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
@@ -19,8 +20,46 @@ export async function GET(request: Request) {
 
     if (code) {
         const supabase = await createClient()
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (!error) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+        
+        if (!error && data.session) {
+            // Ensure user record exists in public.users table
+            // The trigger should create it, but let's make sure it exists
+            const userId = data.session.user.id
+            const userEmail = data.session.user.email
+
+            if (userId && userEmail) {
+                // Use service role client to bypass RLS and ensure user record exists
+                const serviceClient = createServiceClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                    {
+                        auth: {
+                            autoRefreshToken: false,
+                            persistSession: false
+                        }
+                    }
+                )
+
+                // Check if user exists, if not create it
+                const { data: existingUser } = await serviceClient
+                    .from('users')
+                    .select('id')
+                    .eq('id', userId)
+                    .single()
+
+                if (!existingUser) {
+                    // User doesn't exist in public.users, create it
+                    await serviceClient
+                        .from('users')
+                        .insert({
+                            id: userId,
+                            email: userEmail,
+                        })
+                        .select()
+                }
+            }
+
             // Always use the app URL from env to ensure correct redirect
             return NextResponse.redirect(`${appUrl}${next}`)
         } else {
