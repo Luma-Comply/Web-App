@@ -28,6 +28,7 @@ import { motion, AnimatePresence } from "framer-motion"
 
 interface CaseData {
   id: string
+  user_id: string
   doc_type: string
   patient_first_name: string
   patient_last_name: string
@@ -47,6 +48,12 @@ interface CaseData {
   edited_output: string | null
   status: string
   created_at: string
+  metadata?: {
+    manually_edited?: boolean
+    creation_method?: string
+    original_pasted_text?: string
+    [key: string]: any
+  }
 }
 
 // --- Tidbits Component logic moved inside component ---
