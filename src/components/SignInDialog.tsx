@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LumaLogo } from "@/components/LumaLogo"
+import { Eye, EyeOff } from "lucide-react"
 
 interface SignInDialogProps {
   open: boolean
@@ -21,6 +22,7 @@ interface SignInDialogProps {
 }
 
 export default function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
+  const [showPassword, setShowPassword] = useState(false)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-sage-medium/30">
@@ -73,15 +75,29 @@ export default function SignInDialog({ open, onOpenChange }: SignInDialogProps) 
                   Forgot?
                 </Link>
               </div>
-              <Input
-                id="dialog-password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="h-11 border-sage-medium/40 focus:border-mint"
-                placeholder="Enter your password"
-              />
+              <div className="relative">
+                <Input
+                  id="dialog-password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  className="h-11 border-sage-medium/40 focus:border-mint pr-10"
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Sign In Button - innermost radius 12px */}

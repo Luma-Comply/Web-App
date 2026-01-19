@@ -57,8 +57,67 @@ export async function signup(formData: FormData) {
     // Even if there's an error (like user already exists), still show confirm email page
     // The user might need to check their email or resend confirmation
     revalidatePath('/', 'layout')
-    
+
     // Always redirect to confirmation page - user needs to verify email first
     // If signup failed, they'll see the error on the confirm page or can resend
     redirect(`/signup/confirm-email?email=${encodeURIComponent(email)}${error ? `&error=${encodeURIComponent(error.message)}` : ''}`)
+}
+
+export async function forgotPassword(formData: FormData) {
+    const supabase = await createClient()
+
+    const email = formData.get('email') as string
+
+    if (!email) {
+        redirect('/forgot-password?error=Email is required')
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback?type=recovery`,
+    })
+
+    if (error) {
+        redirect('/forgot-password?error=' + encodeURIComponent(error.message))
+    }
+
+    redirect('/forgot-password?success=Check your email for a password reset link')
+}
+
+export async function updatePassword(formData: FormData) {
+    const supabase = await createClient()
+
+    const password = formData.get('password') as string
+
+    if (!password) {
+        redirect('/update-password?error=Password is required')
+    }
+
+    const { error } = await supabase.auth.updateUser({
+        password: password
+    })
+
+    if (error) {
+        redirect('/update-password?error=' + encodeURIComponent(error.message))
+    }
+
+    revalidatePath('/', 'layout')
+    redirect('/dashboard')
+}
+
+export async function resendVerificationEmail(email: string) {
+    const supabase = await createClient()
+
+    const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+            emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback?next=/checkout`,
+        }
+    })
+
+    if (error) {
+        return { success: false, error: error.message }
+    }
+
+    return { success: true }
 }

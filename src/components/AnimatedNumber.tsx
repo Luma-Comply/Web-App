@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import gsap from "gsap"
 
 interface AnimatedNumberProps {
   value: number
@@ -8,18 +9,23 @@ interface AnimatedNumberProps {
   prefix?: string
   suffix?: string
   className?: string
+  decimals?: number
 }
 
 export default function AnimatedNumber({
   value,
-  duration = 2000,
+  duration = 2, // GSAP uses seconds by default for duration
   prefix = "",
   suffix = "",
   className = "",
+  decimals = 0,
 }: AnimatedNumberProps) {
   const [displayValue, setDisplayValue] = useState(0)
   const [hasAnimated, setHasAnimated] = useState(false)
-  const ref = useRef<HTMLSpanElement>(null)
+  const elementRef = useRef<HTMLSpanElement>(null)
+
+  // Use a ref to hold the animating value so GSAP can target it
+  const valueRef = useRef({ val: 0 })
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -27,26 +33,15 @@ export default function AnimatedNumber({
         if (entry.isIntersecting && !hasAnimated) {
           setHasAnimated(true)
 
-          const startTime = Date.now()
-          const startValue = 0
+          gsap.to(valueRef.current, {
+            val: value,
+            duration: duration,
+            ease: "power2.out",
+            onUpdate: () => {
+              setDisplayValue(valueRef.current.val)
+            },
+          })
 
-          const animate = () => {
-            const now = Date.now()
-            const elapsed = now - startTime
-            const progress = Math.min(elapsed / duration, 1)
-
-            // Easing function for smooth animation
-            const easeOutQuad = 1 - (1 - progress) * (1 - progress)
-            const currentValue = Math.floor(startValue + (value - startValue) * easeOutQuad)
-
-            setDisplayValue(currentValue)
-
-            if (progress < 1) {
-              requestAnimationFrame(animate)
-            }
-          }
-
-          requestAnimationFrame(animate)
           observer.disconnect()
         }
       },
@@ -55,16 +50,22 @@ export default function AnimatedNumber({
       }
     )
 
-    if (ref.current) {
-      observer.observe(ref.current)
+    if (elementRef.current) {
+      observer.observe(elementRef.current)
     }
 
     return () => observer.disconnect()
   }, [value, duration, hasAnimated])
 
+  // Format the number with commas and specified decimals
+  const formattedValue = displayValue.toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+
   return (
-    <span ref={ref} className={className}>
-      {prefix}{displayValue}{suffix}
+    <span ref={elementRef} className={className}>
+      {prefix}{formattedValue}{suffix}
     </span>
   )
 }

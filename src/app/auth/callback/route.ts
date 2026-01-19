@@ -6,15 +6,17 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const code = searchParams.get('code')
     const type = searchParams.get('type') // Supabase adds this for email confirmations
-    
+
     // Get the redirect URL - prioritize "next" param, then default based on type
     let next = searchParams.get('next')
     if (!next) {
         // If it's an email confirmation (type=signup or recovery), go to checkout
         // If it's an email change confirmation, go to profile
         // Otherwise, default to dashboard for other auth flows
-        if (type === 'signup' || type === 'recovery') {
+        if (type === 'signup') {
             next = '/checkout'
+        } else if (type === 'recovery') {
+            next = '/update-password'
         } else if (type === 'email_change') {
             next = '/settings/profile?email_confirmed=true'
         } else {
@@ -28,7 +30,7 @@ export async function GET(request: Request) {
     if (code) {
         const supabase = await createClient()
         const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-        
+
         if (!error && data.session) {
             // Ensure user record exists in public.users table and email is up to date
             const userId = data.session.user.id

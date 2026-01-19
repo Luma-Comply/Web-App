@@ -7,6 +7,8 @@ import { LumaLogo } from "@/components/LumaLogo"
 import { Mail, CheckCircle } from "lucide-react"
 import MedicalGrid from "@/components/MedicalGrid"
 
+import { resendVerificationEmail } from "@/app/auth/actions"
+
 function ConfirmEmailContent() {
   const searchParams = useSearchParams()
   const email = searchParams.get("email")
@@ -22,10 +24,14 @@ function ConfirmEmailContent() {
 
   const handleResend = async () => {
     if (resendCooldown > 0 || !email) return
-    
+
     try {
-      // TODO: Add resend email API endpoint if needed
-      setResendCooldown(60) // 60 second cooldown
+      const result = await resendVerificationEmail(email)
+      if (result.success) {
+        setResendCooldown(60)
+      } else {
+        console.error("Failed to resend email:", result.error)
+      }
     } catch (error) {
       console.error("Failed to resend email:", error)
     }
