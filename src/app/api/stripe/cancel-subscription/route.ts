@@ -27,9 +27,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (user.subscription_status !== "active") {
+    // Allow cancellation for active or trialing subscriptions
+    if (user.subscription_status !== "active" && user.subscription_status !== "trialing") {
       return NextResponse.json(
-        { error: "Subscription is not active" },
+        { error: "Subscription is not active or trialing" },
         { status: 400 }
       )
     }

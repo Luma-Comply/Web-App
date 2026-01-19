@@ -1,13 +1,13 @@
 "use client"
 
-import { Suspense } from "react"
+import { Suspense, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { forgotPassword } from "@/app/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Mail, ArrowLeft, AlertCircle, CheckCircle } from "lucide-react"
+import { Mail, ArrowLeft, AlertCircle, CheckCircle, Loader2 } from "lucide-react"
 import MedicalGrid from "@/components/MedicalGrid"
 import { LumaLogo } from "@/components/LumaLogo"
 
@@ -15,6 +15,13 @@ function ForgotPasswordForm() {
     const searchParams = useSearchParams()
     const error = searchParams.get('error')
     const success = searchParams.get('success')
+    const [isLoading, setIsLoading] = useState(false)
+
+    async function handleSubmit(formData: FormData) {
+        setIsLoading(true)
+        await forgotPassword(formData)
+        setIsLoading(false)
+    }
 
     return (
         <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white relative overflow-hidden">
@@ -56,7 +63,7 @@ function ForgotPasswordForm() {
                                 </div>
                             )}
 
-                            <form className="space-y-5">
+                            <form action={handleSubmit} className="space-y-5">
                                 <div>
                                     <Label htmlFor="email" className="text-dark-bg font-medium">
                                         Email address
@@ -73,10 +80,17 @@ function ForgotPasswordForm() {
                                 </div>
 
                                 <Button
-                                    formAction={forgotPassword}
+                                    disabled={isLoading}
                                     className="w-full h-11 text-base"
                                 >
-                                    Send reset link
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Sending...
+                                        </>
+                                    ) : (
+                                        "Send reset link"
+                                    )}
                                 </Button>
                             </form>
 

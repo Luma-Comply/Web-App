@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Mail, Eye, EyeOff } from "lucide-react"
+import { updateProfile, updatePassword } from "@/app/actions/profile"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -91,11 +92,6 @@ export default function ProfilePage() {
   async function handleSaveProfile() {
     setSaving(true)
     try {
-      // Import the server action dynamically or ensure it's imported at top
-      // We'll assume it's imported as `updateProfile`
-
-      const { updateProfile } = await import("@/app/actions/profile")
-
       const result = await updateProfile({
         firstName,
         lastName,
@@ -133,8 +129,6 @@ export default function ProfilePage() {
   async function handleUpdatePassword() {
     setUpdatingPassword(true)
     try {
-      const { updatePassword } = await import("@/app/actions/profile")
-
       const result = await updatePassword({
         currentPassword,
         newPassword,

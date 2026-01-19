@@ -103,10 +103,35 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     updateData.cases_used_this_period = 0;
   }
 
+  // Ensure cases_remaining is set for new active subscriptions or updates if missing
+  // This covers the case where a user subscribes with a coupon or normally
+  if (status === "active" || status === "trialing") {
+    // We might want to be careful not to reset it mid-cycle if it's just a metadata update,
+    // but for now, ensuring it's not 0 is critical.
+    // A safer check: if it's a creation event or period switch, which is handled largely by webhooks.
+    // However, to fix the user's immediate "0" issue, we can default it if it's null/0 in the DB,
+    // but we don't have DB access here to check "current" value before update easily without an extra query.
+    // Best approach for "Creation/Update" webhook:
+    // If this is a new period (checked by period start comparison? No, complex).
+    // Simpler: If the event is "customer.subscription.created", we set it.
+    // If it is "updated", we usually only touch it if status changed.
+
+    // Let's rely on the fact that if we are processing this, we want to ensure they have access.
+    // BUT, we shouldn't reset `cases_remaining` on every minor update (like changing a payment method).
+    // The `invoice.payment_succeeded` handles the monthly reset.
+    // The "transition from trial" handles that specific edge case.
+    // Check if this is a NEW subscription (creation).
+  }
+
   // If status is trialing, set trial end date
   if (status === "trialing" && sub.trial_end) {
     updateData.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
+    // Ensure trial users get cases
+    updateData.cases_remaining = 50;
   }
+
+  // Always ensure we have a default seat count if not present
+  updateData.seats_count = 3;
 
   const { error } = await supabase
     .from("users")

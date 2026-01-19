@@ -7,7 +7,7 @@ import { updatePassword } from "@/app/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Lock, Eye, EyeOff, AlertCircle } from "lucide-react"
+import { Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
 import MedicalGrid from "@/components/MedicalGrid"
 import { LumaLogo } from "@/components/LumaLogo"
 
@@ -23,6 +23,7 @@ function UpdatePasswordForm() {
     const [hasNumber, setHasNumber] = useState(false)
     const [hasSpecialChar, setHasSpecialChar] = useState(false)
     const [passwordsMatch, setPasswordsMatch] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
 
     const searchParams = useSearchParams()
     const error = searchParams.get('error')
@@ -37,6 +38,12 @@ function UpdatePasswordForm() {
     }, [newPassword, confirmPassword])
 
     const isPasswordValid = hasMinLength && hasUpperCase && hasNumber && hasSpecialChar && passwordsMatch
+
+    async function handleSubmit(formData: FormData) {
+        setIsLoading(true)
+        await updatePassword(formData)
+        setIsLoading(false)
+    }
 
     return (
         <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white relative overflow-hidden">
@@ -71,7 +78,7 @@ function UpdatePasswordForm() {
                                 </div>
                             )}
 
-                            <form className="space-y-5">
+                            <form action={handleSubmit} className="space-y-5">
                                 <div>
                                     <Label htmlFor="password" className="text-dark-bg font-medium">
                                         New Password
@@ -160,11 +167,17 @@ function UpdatePasswordForm() {
                                 </div>
 
                                 <Button
-                                    formAction={updatePassword}
-                                    disabled={!isPasswordValid}
+                                    disabled={!isPasswordValid || isLoading}
                                     className="w-full h-11 text-base disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Update password
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Updating...
+                                        </>
+                                    ) : (
+                                        "Update password"
+                                    )}
                                 </Button>
                             </form>
                         </div>

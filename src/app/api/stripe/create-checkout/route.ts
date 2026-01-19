@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get user data
+    console.log('[Checkout] Looking for user:', session.user.id, session.user.email);
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("*")
@@ -25,8 +26,15 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (userError || !user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      console.error('[Checkout] User not found:', { userId: session.user.id, email: session.user.email, error: userError });
+      return NextResponse.json({
+        error: "User not found",
+        details: `User ID: ${session.user.id}, Email: ${session.user.email}`,
+        dbError: userError?.message
+      }, { status: 404 });
     }
+
+    console.log('[Checkout] User found:', user.email);
 
     // Check if user already has a Stripe customer ID
     let customerId = user.stripe_customer_id;

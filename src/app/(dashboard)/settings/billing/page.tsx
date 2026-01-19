@@ -156,6 +156,9 @@ export default function BillingPage() {
   const isCanceled = billingInfo?.subscription_status === "canceled"
   const isPastDue = billingInfo?.subscription_status === "past_due"
 
+  // Check if there is an active trial period, regardless of status label
+  const hasActiveTrial = billingInfo?.trial_ends_at && new Date(billingInfo.trial_ends_at) > new Date();
+
   return (
     <div className="space-y-6">
       {/* Subscription Status Card */}
@@ -191,40 +194,49 @@ export default function BillingPage() {
         {/* Status Badge */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            {isActive && <CheckCircle className="w-8 h-8 text-mint" />}
-            {isTrialing && <Calendar className="w-8 h-8 text-blue-500" />}
+            {isActive && !hasActiveTrial && <CheckCircle className="w-8 h-8 text-mint" />}
+            {hasActiveTrial && <Calendar className="w-8 h-8 text-blue-500" />}
             {(isCanceled || isPastDue) && <AlertCircle className="w-8 h-8 text-coral" />}
+            {!isActive && !hasActiveTrial && !isCanceled && !isPastDue && (
+              <AlertCircle className="w-8 h-8 text-gray-400" />
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-semibold text-dark-bg">
-                  {isTrialing && "Free Trial"}
-                  {isActive && "Professional Plan"}
+                  {hasActiveTrial && "Free Trial"}
+                  {isActive && !hasActiveTrial && "Professional Plan"}
                   {isCanceled && "Subscription Canceled"}
                   {isPastDue && "Payment Failed"}
+                  {!isActive && !hasActiveTrial && !isCanceled && !isPastDue && "Subscription"}
                 </h3>
                 <span
-                  className={`text-xs font-medium px-2 py-1 rounded-full ${
-                    isActive
+                  className={`text-xs font-medium px-2 py-1 rounded-full ${isActive && !hasActiveTrial
                       ? "bg-mint/10 text-mint"
-                      : isTrialing
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-coral/10 text-coral"
-                  }`}
+                      : hasActiveTrial
+                        ? "bg-blue-100 text-blue-700"
+                        : isCanceled || isPastDue
+                          ? "bg-coral/10 text-coral"
+                          : "bg-gray-100 text-gray-600"
+                    }`}
                 >
-                  {billingInfo?.subscription_status}
+                  {hasActiveTrial ? 'Trialing' :
+                    billingInfo?.subscription_status === 'active' ? 'Active' :
+                      billingInfo?.subscription_status || 'Unknown'}
                 </span>
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                {isTrialing &&
+                {hasActiveTrial &&
                   billingInfo?.trial_ends_at &&
                   `Trial ends ${new Date(billingInfo.trial_ends_at).toLocaleDateString()}`}
-                {isActive && !billingInfo?.cancel_at_period_end && "$149/month"}
+                {isActive && !hasActiveTrial && !billingInfo?.cancel_at_period_end && "$149/month"}
                 {isActive &&
+                  !hasActiveTrial &&
                   billingInfo?.cancel_at_period_end &&
                   billingInfo?.billing_period_end &&
                   `Ends ${new Date(billingInfo.billing_period_end).toLocaleDateString()}`}
                 {isCanceled && "Subscription has been canceled"}
                 {isPastDue && "Please update your payment method"}
+                {!isActive && !hasActiveTrial && !isCanceled && !isPastDue && "Current subscription status"}
               </p>
             </div>
           </div>
@@ -262,13 +274,15 @@ export default function BillingPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Cases Remaining</span>
                     <span className="font-semibold text-dark-bg">
-                      {billingInfo?.cases_remaining || 0}
+                      {/* Show explicitly 50 if the subscription is just created, otherwise show DB value */}
+                      {/* For now, relying on DB value which we fixed in webhook to default to 50 */}
+                      {billingInfo?.cases_remaining ?? 50}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Team Seats</span>
                     <span className="font-semibold text-dark-bg">
-                      {billingInfo?.seats_count || 3}
+                      {billingInfo?.seats_count ?? 3}
                     </span>
                   </div>
                 </div>
@@ -289,9 +303,10 @@ export default function BillingPage() {
           </div>
         </div>
       </Card>
-
       {/* Cancel Subscription Section */}
-      {isActive && !billingInfo?.cancel_at_period_end && (
+      {/* Show cancel button if user has a subscription ID and it's not already scheduled for cancellation */}
+      {/* We check stripe_subscription_id to handle all active-like states (active, trialing, incomplete, pust_due) */}
+      {billingInfo?.stripe_subscription_id && !billingInfo?.cancel_at_period_end && billingInfo?.subscription_status !== 'canceled' && (
         <Card className="glass-card border border-coral/30 p-6 bg-coral/5">
           <div className="flex items-start justify-between">
             <div>

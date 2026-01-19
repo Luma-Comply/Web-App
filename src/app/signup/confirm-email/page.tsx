@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { LumaLogo } from "@/components/LumaLogo"
-import { Mail, CheckCircle } from "lucide-react"
+import { Mail, CheckCircle, Loader2 } from "lucide-react"
 import MedicalGrid from "@/components/MedicalGrid"
 
 import { resendVerificationEmail } from "@/app/auth/actions"
@@ -14,6 +14,7 @@ function ConfirmEmailContent() {
   const email = searchParams.get("email")
   const error = searchParams.get("error")
   const [resendCooldown, setResendCooldown] = useState(0)
+  const [isResending, setIsResending] = useState(false)
 
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -23,8 +24,9 @@ function ConfirmEmailContent() {
   }, [resendCooldown])
 
   const handleResend = async () => {
-    if (resendCooldown > 0 || !email) return
+    if (resendCooldown > 0 || !email || isResending) return
 
+    setIsResending(true)
     try {
       const result = await resendVerificationEmail(email)
       if (result.success) {
@@ -34,6 +36,8 @@ function ConfirmEmailContent() {
       }
     } catch (error) {
       console.error("Failed to resend email:", error)
+    } finally {
+      setIsResending(false)
     }
   }
 
@@ -97,10 +101,15 @@ function ConfirmEmailContent() {
                 {email && (
                   <button
                     onClick={handleResend}
-                    disabled={resendCooldown > 0}
-                    className="text-sm text-mint hover:text-mint/80 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                    disabled={resendCooldown > 0 || isResending}
+                    className="flex items-center justify-center gap-2 text-sm text-mint hover:text-mint/80 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors w-full"
                   >
-                    {resendCooldown > 0
+                    {isResending ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Sending...
+                      </>
+                    ) : resendCooldown > 0
                       ? `Resend email in ${resendCooldown}s`
                       : "Didn't receive the email? Resend"}
                   </button>

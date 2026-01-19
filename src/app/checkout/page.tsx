@@ -86,7 +86,6 @@ export default function CheckoutPage() {
           {/* Pricing Card */}
           <Card className="p-8 glass-card border-2 border-mint/30">
             <div className="text-center mb-6">
-              <div className="text-sm text-gray-600 mb-2">Professional Plan</div>
               <div className="flex items-baseline justify-center gap-2 mb-2">
                 <span className="text-5xl font-serif text-dark-bg">$149</span>
                 <span className="text-gray-600">/month</span>
