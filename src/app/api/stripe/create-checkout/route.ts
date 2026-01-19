@@ -7,12 +7,34 @@ export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // Use getUser() instead of getSession() for security
+    // First try to get the session to ensure we have valid cookies
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error("[Checkout] Session error:", sessionError);
+      return NextResponse.json({
+        error: "Session error",
+        details: sessionError.message
+      }, { status: 403 });
+    }
+
+    if (!session) {
+      console.error("[Checkout] No session found");
+      return NextResponse.json({
+        error: "No active session. Please sign in again.",
+        redirect: "/login"
+      }, { status: 403 });
+    }
+
+    // Use getUser() for additional security verification
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
     if (authError) {
       console.error("[Checkout] Auth error:", authError);
-      return NextResponse.json({ error: "Authentication error" }, { status: 401 });
+      return NextResponse.json({
+        error: "Authentication error",
+        details: authError.message
+      }, { status: 401 });
     }
 
     if (!authUser) {

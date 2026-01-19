@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Loader2, CreditCard } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
 export function SubscribeButton({ className }: { className?: string }) {
   const [loading, setLoading] = useState(false)
@@ -12,6 +13,16 @@ export function SubscribeButton({ className }: { className?: string }) {
   const handleSubscribe = async () => {
     setLoading(true)
     try {
+      // Verify we have an active session before calling the API
+      const supabase = createClient()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError || !session) {
+        console.error("No active session:", sessionError)
+        window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`
+        return
+      }
+
       const response = await fetch("/api/stripe/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -21,8 +32,9 @@ export function SubscribeButton({ className }: { className?: string }) {
       const data = await response.json()
 
       if (!response.ok) {
-        if (response.status === 401) {
-          // Unauthorized - redirect to login
+        if (response.status === 401 || response.status === 403) {
+          // Session expired or auth issue - redirect to login
+          console.error("Auth error:", data)
           window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`
           return
         }
