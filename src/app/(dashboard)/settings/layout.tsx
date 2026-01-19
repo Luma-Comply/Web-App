@@ -3,8 +3,18 @@
 import { usePathname, useRouter } from "next/navigation"
 import { LumaLogo } from "@/components/LumaLogo"
 import { Button } from "@/components/ui/button"
-import { User, Users, CreditCard, ChevronLeft, Plus } from "lucide-react"
+import { User, Users, CreditCard, ChevronLeft, Plus, ChevronDown, LogOut } from "lucide-react"
 import Link from "next/link"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export default function SettingsLayout({
   children,
@@ -13,6 +23,25 @@ export default function SettingsLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const supabase = createClient()
+  const [userEmail, setUserEmail] = useState("")
+
+  useEffect(() => {
+    async function loadUser() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (session) {
+        setUserEmail(session.user.email || "")
+      }
+    }
+    loadUser()
+  }, [])
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    router.push("/")
+  }
 
   const tabs = [
     { name: "Profile", href: "/settings/profile", icon: User },
@@ -25,16 +54,9 @@ export default function SettingsLayout({
       {/* Header */}
       <header className="border-b border-sage-medium/50 glass-card sticky top-0 z-40">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push("/dashboard")}
-              className="flex items-center gap-2"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Back to Dashboard
-            </Button>
+          <div className="flex items-center gap-2">
+            <LumaLogo className="w-8 h-8" />
+            <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
           </div>
           <div className="flex items-center gap-4">
             <Button
@@ -45,12 +67,53 @@ export default function SettingsLayout({
               <Plus className="w-4 h-4 mr-2" />
               New Case
             </Button>
-            <div className="flex items-center gap-2">
-              <LumaLogo className="w-8 h-8" />
-              <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600 hidden md:block">{userEmail}</span>
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-white border border-sage-medium/30">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{userEmail}</p>
+                    <p className="text-xs leading-none text-gray-500">Account settings</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => router.push('/settings/profile')}
+                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => router.push('/settings/team')}
+                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Team
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => router.push('/settings/billing')}
+                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Billing
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="focus:bg-coral/10 focus:text-coral cursor-pointer"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <div className="w-32"></div> {/* Spacer for centering */}
         </div>
       </header>
 
