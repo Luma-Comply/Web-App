@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 
 export interface AutocompleteProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
-  suggestions: string[]
+  suggestions?: string[]
   onValueChange?: (value: string) => void
   onSearch?: (query: string) => string[]
   maxSuggestions?: number
@@ -50,7 +50,7 @@ export const Autocomplete = React.forwardRef<HTMLInputElement, AutocompleteProps
       if (value.length > 0) {
         const filtered = onSearch
           ? onSearch(value)
-          : suggestions.filter(suggestion =>
+          : (suggestions || []).filter(suggestion =>
               suggestion.toLowerCase().includes(value.toLowerCase())
             ).slice(0, maxSuggestions)
 
