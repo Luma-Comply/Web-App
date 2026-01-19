@@ -273,6 +273,14 @@ export default function DashboardPage() {
             <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
           </div>
           <div className="flex items-center gap-4">
+            <Button
+              onClick={() => router.push("/cases/new")}
+              size="sm"
+              className="bg-mint hover:bg-mint/90 text-dark-bg"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Case
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center gap-2">

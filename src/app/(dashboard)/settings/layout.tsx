@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation"
 import { LumaLogo } from "@/components/LumaLogo"
 import { Button } from "@/components/ui/button"
-import { User, Users, CreditCard, ChevronLeft } from "lucide-react"
+import { User, Users, CreditCard, ChevronLeft, Plus } from "lucide-react"
 import Link from "next/link"
 
 export default function SettingsLayout({
@@ -36,9 +36,19 @@ export default function SettingsLayout({
               Back to Dashboard
             </Button>
           </div>
-          <div className="flex items-center gap-2">
-            <LumaLogo className="w-8 h-8" />
-            <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
+          <div className="flex items-center gap-4">
+            <Button
+              onClick={() => router.push("/cases/new")}
+              size="sm"
+              className="bg-mint hover:bg-mint/90 text-dark-bg"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Case
+            </Button>
+            <div className="flex items-center gap-2">
+              <LumaLogo className="w-8 h-8" />
+              <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
+            </div>
           </div>
           <div className="w-32"></div> {/* Spacer for centering */}
         </div>
