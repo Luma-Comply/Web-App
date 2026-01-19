@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { LumaLogo } from "@/components/LumaLogo"
 import { SuggestedForms } from "@/components/dashboard/SuggestedForms"
-import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X } from "lucide-react"
+import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X, Plus } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 interface CaseData {
@@ -618,9 +618,9 @@ export default function CaseDetailPage() {
             <Button
               onClick={() => router.push("/cases/new")}
               size="sm"
-              className="bg-mint hover:bg-mint/90 text-dark-bg"
+              className="relative overflow-hidden bg-dark-bg hover:bg-dark-bg/90 text-white transition-all duration-300 hover:scale-105 before:content-[''] before:absolute before:top-0 before:left-[-100%] before:w-full before:h-full before:bg-white/20 before:transition-all before:duration-300 hover:before:left-[100%] active:scale-100"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4 mr-2" />
               New Case
             </Button>
             <div className="flex items-center gap-2">

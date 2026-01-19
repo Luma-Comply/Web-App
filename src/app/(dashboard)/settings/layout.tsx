@@ -40,7 +40,7 @@ export default function SettingsLayout({
             <Button
               onClick={() => router.push("/cases/new")}
               size="sm"
-              className="bg-mint hover:bg-mint/90 text-dark-bg"
+              className="relative overflow-hidden bg-dark-bg hover:bg-dark-bg/90 text-white transition-all duration-300 hover:scale-105 before:content-[''] before:absolute before:top-0 before:left-[-100%] before:w-full before:h-full before:bg-white/20 before:transition-all before:duration-300 hover:before:left-[100%] active:scale-100"
             >
               <Plus className="w-4 h-4 mr-2" />
               New Case
