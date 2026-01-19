@@ -359,17 +359,8 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-500 mt-1">Includes archived cases</p>
           </Card>
           <Card className="p-6 glass-card border border-sage-medium/30">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Cases Remaining</p>
-                <p className="text-3xl font-mono font-bold text-dark-bg">{stats.cases_remaining}</p>
-              </div>
-              <Link href="/cases/new">
-                <Button size="sm" className="bg-dark-bg text-white hover:bg-dark-bg/90">
-                  <Plus className="w-4 h-4 mr-1" /> New Case
-                </Button>
-              </Link>
-            </div>
+            <p className="text-sm text-gray-600 mb-1">Cases Remaining</p>
+            <p className="text-3xl font-mono font-bold text-dark-bg">{stats.cases_remaining}</p>
           </Card>
         </div>
 
