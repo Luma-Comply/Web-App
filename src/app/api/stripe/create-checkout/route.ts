@@ -5,31 +5,33 @@ import { stripe } from "@/lib/stripe";
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    if (sessionError) {
-      console.error("Session error:", sessionError);
+    // Use getUser() instead of getSession() for security
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error("[Checkout] Auth error:", authError);
       return NextResponse.json({ error: "Authentication error" }, { status: 401 });
     }
 
-    if (!session) {
-      console.error("No session found");
+    if (!authUser) {
+      console.error("[Checkout] No authenticated user");
       return NextResponse.json({ error: "Please sign in to continue" }, { status: 401 });
     }
 
-    // Get user data
-    console.log('[Checkout] Looking for user:', session.user.id, session.user.email);
+    // Get user data from database
+    console.log('[Checkout] Looking for user:', authUser.id, authUser.email);
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("*")
-      .eq("id", session.user.id)
+      .eq("id", authUser.id)
       .single();
 
     if (userError || !user) {
-      console.error('[Checkout] User not found:', { userId: session.user.id, email: session.user.email, error: userError });
+      console.error('[Checkout] User not found:', { userId: authUser.id, email: authUser.email, error: userError });
       return NextResponse.json({
         error: "User not found",
-        details: `User ID: ${session.user.id}, Email: ${session.user.email}`,
+        details: `User ID: ${authUser.id}, Email: ${authUser.email}`,
         dbError: userError?.message
       }, { status: 404 });
     }
@@ -42,9 +44,9 @@ export async function POST(req: NextRequest) {
     if (!customerId) {
       // Create new Stripe customer
       const customer = await stripe.customers.create({
-        email: session.user.email,
+        email: authUser.email,
         metadata: {
-          supabase_user_id: session.user.id,
+          supabase_user_id: authUser.id,
         },
       });
       customerId = customer.id;
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
       await supabase
         .from("users")
         .update({ stripe_customer_id: customerId })
-        .eq("id", session.user.id);
+        .eq("id", authUser.id);
     }
 
     // Create Checkout Session
@@ -70,7 +72,7 @@ export async function POST(req: NextRequest) {
       subscription_data: {
         trial_period_days: 14,
         metadata: {
-          supabase_user_id: session.user.id,
+          supabase_user_id: authUser.id,
         },
       },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
