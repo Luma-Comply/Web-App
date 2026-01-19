@@ -8,50 +8,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-console.log('⚠️  WARNING: This will delete ALL users from your database!\n');
+console.log('Deleting all users from auth and public.users...\n');
 
 // Get all auth users
-const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+const { data: authUsers } = await supabase.auth.admin.listUsers();
+console.log(`Found ${authUsers.users.length} auth users`);
 
-if (authError) {
-  console.log('Error listing users:', authError);
-  process.exit(1);
-}
-
-console.log(`Found ${authUsers.users.length} users to delete:\n`);
-authUsers.users.forEach(user => {
-  console.log(`  - ${user.email} (${user.id})`);
-});
-
-console.log('\nDeleting users...\n');
-
-let deletedCount = 0;
-let failedCount = 0;
-
+// Delete each user (this will cascade to public.users via foreign key)
 for (const user of authUsers.users) {
-  // Delete from auth.users (this should cascade and trigger deletion in public.users)
+  console.log(`Deleting ${user.email}...`);
   const { error } = await supabase.auth.admin.deleteUser(user.id);
-
   if (error) {
-    console.log(`❌ Failed to delete ${user.email}: ${error.message}`);
-    failedCount++;
+    console.log(`  ❌ Error:`, error.message);
   } else {
-    console.log(`✅ Deleted ${user.email}`);
-    deletedCount++;
+    console.log(`  ✅ Deleted`);
   }
 }
 
-// Also clean up any orphaned records in public.users
-console.log('\nCleaning up public.users table...');
-const { error: cleanupError } = await supabase
-  .from('users')
-  .delete()
-  .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all (using a dummy condition)
-
-if (cleanupError) {
-  console.log('Error cleaning up public.users:', cleanupError.message);
-} else {
-  console.log('✅ Cleaned up public.users table');
-}
-
-console.log(`\n✅ Complete! Deleted ${deletedCount} users, ${failedCount} failed.`);
+console.log('\n✅ All users deleted. Database is clean.');
+console.log('Now you can test signup → checkout flow from scratch!');

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { stripe } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
@@ -19,9 +20,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Please sign in to continue" }, { status: 401 });
     }
 
-    // Get user data from database
+    // Get user data from database using service role to bypass RLS
+    // We've already verified auth above, so it's safe to use service role here
     console.log('[Checkout] Looking for user:', authUser.id, authUser.email);
-    const { data: user, error: userError } = await supabase
+    const adminClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: user, error: userError } = await adminClient
       .from("users")
       .select("*")
       .eq("id", authUser.id)
@@ -51,8 +58,8 @@ export async function POST(req: NextRequest) {
       });
       customerId = customer.id;
 
-      // Save customer ID to database
-      await supabase
+      // Save customer ID to database using admin client
+      await adminClient
         .from("users")
         .update({ stripe_customer_id: customerId })
         .eq("id", authUser.id);
