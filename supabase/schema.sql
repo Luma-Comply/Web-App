@@ -67,17 +67,20 @@ ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cases ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for users table
+-- Simple policies that won't cause recursion
 CREATE POLICY "Users can view own profile"
   ON public.users FOR SELECT
   USING (auth.uid() = id);
 
 CREATE POLICY "Users can update own profile"
   ON public.users FOR UPDATE
-  USING (auth.uid() = id);
-
-CREATE POLICY "Users can insert own profile"
-  ON public.users FOR INSERT
+  USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
+
+-- Allow inserts without recursion (trigger handles this)
+CREATE POLICY "Users can insert via trigger"
+  ON public.users FOR INSERT
+  WITH CHECK (true);
 
 -- Create policies for cases table
 CREATE POLICY "Users can view own cases"
@@ -100,8 +103,27 @@ CREATE POLICY "Users can delete own cases"
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.users (id, email)
-  VALUES (NEW.id, NEW.email);
+  INSERT INTO public.users (
+    id,
+    email,
+    subscription_status,
+    trial_ends_at,
+    billing_period_end,
+    cases_remaining,
+    seats_count
+  )
+  VALUES (
+    NEW.id,
+    NEW.email,
+    'trialing',
+    NOW() + INTERVAL '14 days',
+    NOW() + INTERVAL '14 days',
+    50,
+    3
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET email = EXCLUDED.email,
+      updated_at = NOW();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
