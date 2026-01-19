@@ -28,14 +28,34 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const { data: user, error: userError } = await adminClient
-      .from("users")
-      .select("*")
-      .eq("id", authUser.id)
-      .single();
+    // Retry mechanism: Sometimes the trigger hasn't created the public.users record yet
+    // when a user signs up and immediately goes to checkout
+    let user = null;
+    let userError = null;
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const { data, error } = await adminClient
+        .from("users")
+        .select("*")
+        .eq("id", authUser.id)
+        .single();
+
+      if (data) {
+        user = data;
+        break;
+      }
+
+      userError = error;
+
+      if (attempt < maxRetries) {
+        console.log(`[Checkout] User not found on attempt ${attempt}, retrying in 500ms...`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
 
     if (userError || !user) {
-      console.error('[Checkout] User not found:', { userId: authUser.id, email: authUser.email, error: userError });
+      console.error('[Checkout] User not found after retries:', { userId: authUser.id, email: authUser.email, error: userError });
       return NextResponse.json({
         error: "User not found",
         details: `User ID: ${authUser.id}, Email: ${authUser.email}`,
