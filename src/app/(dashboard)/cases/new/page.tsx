@@ -10,7 +10,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Autocomplete } from "@/components/ui/autocomplete"
 import { LumaLogo } from "@/components/LumaLogo"
+import { searchPayers } from "@/lib/payers"
 import {
   ArrowLeft,
   Loader2,
@@ -310,17 +312,20 @@ export default function NewCasePage() {
               {/* Insurance Payer - CRITICAL for AI */}
               <div className="md:col-span-2">
                 <Label htmlFor="payer_name">Insurance Payer (Required for Research)</Label>
-                <Input
+                <Autocomplete
                   id="payer_name"
                   name="payer_name"
                   value={formData.payer_name}
-                  onChange={handleChange}
-                  placeholder="e.g. Blue Cross Blue Shield, Aetna, Cigna"
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, payer_name: value }))
+                  }
+                  onSearch={searchPayers}
+                  placeholder="Start typing... e.g. Tradi, Blue Cross, Aetna"
                   className="mt-2"
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  The AI will research the specific policy for this payer.
+                  The AI will research the specific policy for this payer. Start typing to see suggestions.
                 </p>
               </div>
 

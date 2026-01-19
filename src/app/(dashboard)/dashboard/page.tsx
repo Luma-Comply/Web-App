@@ -26,10 +26,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
   Plus,
-  FileText,
-  Clock,
-  CheckCircle,
-  XCircle,
   LogOut,
   MoreHorizontal,
   Archive,
@@ -231,21 +227,6 @@ export default function DashboardPage() {
   })
 
   // --- Helpers ---
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "draft":
-        return <Clock className="w-4 h-4 text-gray-500" />
-      case "submitted":
-        return <CheckCircle className="w-4 h-4 text-mint" />
-      case "approved":
-        return <CheckCircle className="w-4 h-4 text-mint" />
-      case "denied":
-        return <XCircle className="w-4 h-4 text-coral" />
-      default:
-        return <FileText className="w-4 h-4 text-gray-500" />
-    }
-  }
-
   const getDocTypeLabel = (docType: string) => {
     switch (docType) {
       case "biologics_pa": return "Biologics PA"
@@ -386,7 +367,7 @@ export default function DashboardPage() {
                 <TableHeader>
                   <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
                     <TableHead className="w-[300px]">Patient & Document</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Payer</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead className="text-right">Claim Value</TableHead>
                     <TableHead className="w-[80px]"></TableHead>
@@ -411,20 +392,11 @@ export default function DashboardPage() {
                             </div>
                             <div className="text-xs text-gray-500 flex items-center gap-1">
                               <span className="capitalize">{getDocTypeLabel(c.doc_type)}</span>
-                              {c.payer_name && `• ${c.payer_name}`}
                             </div>
                           </Link>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(c.status)}
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${c.status === 'approved' ? 'bg-mint/10 text-mint' :
-                                c.status === 'denied' ? 'bg-coral/10 text-coral' :
-                                  'bg-gray-100 text-gray-600'
-                              }`}>
-                              {c.status}
-                            </span>
-                          </div>
+                        <TableCell className="text-gray-700 text-sm">
+                          {c.payer_name || '-'}
                         </TableCell>
                         <TableCell className="text-gray-500 text-sm">
                           {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}

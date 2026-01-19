@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -10,6 +10,9 @@ import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Autocomplete } from "@/components/ui/autocomplete"
+import { searchPayers } from "@/lib/payers"
+import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
   DialogContent,
@@ -52,12 +55,18 @@ export default function CaseDetailPage() {
   const params = useParams()
   const router = useRouter()
   const supabase = createClient()
+  const { toast } = useToast()
   const [caseData, setCaseData] = useState<CaseData | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [editedOutput, setEditedOutput] = useState("")
   const [copied, setCopied] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [isSavingEdits, setIsSavingEdits] = useState(false)
+  const hasAutoExtracted = useRef(false) // Track if auto-extraction has run
+
+  // Check if user has manually edited (from database metadata)
+  const hasManuallyEdited = caseData?.metadata?.manually_edited === true
   const [editFormData, setEditFormData] = useState({
     patient_first_name: "",
     patient_last_name: "",
@@ -102,8 +111,30 @@ export default function CaseDetailPage() {
     loadCase()
   }, [params.id])
 
-  // Common words to exclude from name extraction
-  const excludedWords = new Set(['the', 'last', 'first', 'patient', 'this', 'that', 'these', 'those', 'with', 'from', 'for', 'and', 'or', 'but', 'see', 'clinical', 'notes'])
+  // Common words and medical terms to exclude from name extraction
+  const excludedWords = new Set([
+    'the', 'last', 'first', 'patient', 'this', 'that', 'these', 'those', 'with', 'from', 'for', 'and', 'or', 'but', 'see', 'clinical', 'notes',
+    // Medical/pharmaceutical terms
+    'amniotic', 'membrane', 'simplimax', 'biologic', 'therapy', 'treatment', 'medication', 'drug', 'infusion', 'injection',
+    'humira', 'remicade', 'enbrel', 'stelara', 'cosentyx', 'taltz', 'skyrizi', 'rinvoq', 'xeljanz', 'orencia', 'actemra',
+    'methotrexate', 'prednisone', 'sulfasalazine', 'plaquenil', 'hydroxychloroquine',
+    // Common medical words that appear capitalized
+    'medicare', 'medicaid', 'insurance', 'diagnosis', 'medical', 'hospital', 'clinic', 'doctor', 'physician', 'nurse'
+  ])
+
+  // Medical/pharmaceutical naming patterns to exclude
+  const medicalPatterns = [
+    /max$/i,           // SimpliMax, EpiMax, etc.
+    /^bio/i,          // BioSkin, BioMembrane, etc.
+    /mab$/i,          // -mab (monoclonal antibodies)
+    /^anti/i,         // Anti-TNF, etc.
+    /tinib$/i,        // -tinib (tyrosine kinase inhibitors)
+    /olimus$/i,       // -olimus (immunosuppressants)
+    /parin$/i,        // Heparin derivatives
+    /mycin$/i,        // Antibiotics
+    /cillin$/i,       // Penicillin derivatives
+    /^\d/,            // Starts with number
+  ]
 
   // Validate if extracted text looks like a real name
   const isValidName = (name: string): boolean => {
@@ -114,10 +145,18 @@ export default function CaseDetailPage() {
     if (!/^[A-Z]/.test(name)) return false
     // Must not be in excluded words
     if (excludedWords.has(name.toLowerCase())) return false
+    // Check against medical naming patterns
+    for (const pattern of medicalPatterns) {
+      if (pattern.test(name)) return false
+    }
     // Must contain only letters (no numbers, special chars except hyphens/apostrophes)
     if (!/^[A-Za-z'-]+$/.test(name)) return false
     // Must have at least 2 letters (not just one letter)
     if (name.replace(/[^A-Za-z]/g, '').length < 2) return false
+    // Reject names that are all caps (often medical abbreviations or product names)
+    if (name === name.toUpperCase() && name.length > 1) return false
+    // Reject names longer than 20 characters (likely product names or descriptions)
+    if (name.length > 20) return false
     return true
   }
 
@@ -147,23 +186,64 @@ export default function CaseDetailPage() {
       caseData.lab_values
     ].filter(Boolean).join(' ')
 
-    // Pattern 2: "[FirstName] [LastName] is a X-year-old" - most reliable in notes
-    const namePattern1 = /([A-Z][a-z]{2,})\s+([A-Z][a-z]{2,})(?:\s+is\s+a|\s+is\s+an|,\s+a|\s+who\s+is|\s+who\s+has|\s+has\s+been)/i
-    const match1 = notes.match(namePattern1)
-    if (match1) {
-      const first = match1[1].trim()
-      const last = match1[2].trim()
+    // Pattern 2: "Patient: [FirstName] [LastName]" or "Name: [FirstName] [LastName]"
+    const labelPattern = /(?:patient|name|pt):\s*([A-Z][a-z]{2,})\s+([A-Z][a-z]{2,})/i
+    const labelMatch = notes.match(labelPattern)
+    if (labelMatch) {
+      const first = labelMatch[1].trim()
+      const last = labelMatch[2].trim()
       if (isValidName(first) && isValidName(last)) {
         return { first, last }
       }
     }
 
-    // Pattern 3: "for [FirstName] [LastName]" - common in letters
-    const namePattern2 = /for\s+([A-Z][a-z]{2,})\s+([A-Z][a-z]{2,})(?:\s|,|\.|who|is|has)/i
-    const match2 = notes.match(namePattern2)
-    if (match2) {
-      const first = match2[1].trim()
-      const last = match2[2].trim()
+    // Pattern 3: "Patient [FirstName] [LastName]" - explicit mention
+    const patientPattern = /(?:patient|pt\.?)\s+([A-Z][a-z]{2,})\s+([A-Z][a-z]{2,})/i
+    const patientMatch = notes.match(patientPattern)
+    if (patientMatch) {
+      const first = patientMatch[1].trim()
+      const last = patientMatch[2].trim()
+      if (isValidName(first) && isValidName(last)) {
+        return { first, last }
+      }
+    }
+
+    // Pattern 4: "[FirstName] [LastName] is a X-year-old" - very reliable in clinical notes
+    const agePattern = /([A-Z][a-z]{2,})\s+([A-Z][a-z]{2,})(?:\s+is\s+a|\s+is\s+an|,\s+a)\s+\d+[-\s]?(?:year|yr|yo)/i
+    const ageMatch = notes.match(agePattern)
+    if (ageMatch) {
+      const first = ageMatch[1].trim()
+      const last = ageMatch[2].trim()
+      if (isValidName(first) && isValidName(last)) {
+        return { first, last }
+      }
+    }
+
+    // Pattern 5: "[FirstName]'s" possessive form - common in clinical narratives
+    const possessivePattern = /([A-Z][a-z]{2,})'s\s+(?:wounds|condition|treatment|case|history)/i
+    const possessiveMatch = notes.match(possessivePattern)
+    if (possessiveMatch) {
+      // Found first name, now look for last name nearby
+      const firstName = possessiveMatch[1].trim()
+      if (isValidName(firstName)) {
+        // Look for "[FirstName] [LastName]" pattern in the text
+        const fullNamePattern = new RegExp(`${firstName}\\s+([A-Z][a-z]{2,})`, 'i')
+        const fullMatch = notes.match(fullNamePattern)
+        if (fullMatch) {
+          const last = fullMatch[1].trim()
+          if (isValidName(last)) {
+            return { first: firstName, last }
+          }
+        }
+      }
+    }
+
+    // Pattern 6: "for [FirstName] [LastName]" - common in letters
+    const forPattern = /for\s+(?:patient\s+)?([A-Z][a-z]{2,})\s+([A-Z][a-z]{2,})(?:\s|,|\.|who|is|has)/i
+    const forMatch = notes.match(forPattern)
+    if (forMatch) {
+      const first = forMatch[1].trim()
+      const last = forMatch[2].trim()
       if (isValidName(first) && isValidName(last)) {
         return { first, last }
       }
@@ -230,11 +310,22 @@ export default function CaseDetailPage() {
   }, [caseData])
 
   // AUTO-UPDATE PATIENT NAME AND PAYER FROM NOTES
+  // Only runs once after generation completes, not after manual edits
   useEffect(() => {
     if (!caseData) return
+    if (hasManuallyEdited) {
+      console.log("Skipping auto-extraction: User has manually edited")
+      return // Skip auto-extraction if user has manually edited
+    }
+    if (hasAutoExtracted.current) {
+      console.log("Skipping auto-extraction: Already extracted once")
+      return // Only run once per case
+    }
 
     const hasGenerated = Boolean(caseData.generated_output || editedOutput)
     if (!hasGenerated) return // Only update after generation is complete
+
+    console.log("Running auto-extraction...")
 
     // Update patient name
     const extractedName = extractPatientNameFromNotes()
@@ -296,7 +387,12 @@ export default function CaseDetailPage() {
 
       updatePayer()
     }
-  }, [caseData?.generated_output, editedOutput, caseData?.id, caseData?.patient_first_name, caseData?.patient_last_name, caseData?.payer_name])
+
+    // Mark that auto-extraction has run
+    hasAutoExtracted.current = true
+    // Removed patient_first_name and patient_last_name from deps to prevent infinite loop
+    // Only trigger on generation completion
+  }, [caseData?.generated_output, editedOutput, caseData?.id, hasManuallyEdited])
 
   async function loadCase() {
     try {
@@ -310,6 +406,9 @@ export default function CaseDetailPage() {
 
       setCaseData(data)
       setEditedOutput(data.edited_output || data.generated_output || "")
+
+      // Reset auto-extraction flag when loading a new case
+      hasAutoExtracted.current = false
     } catch (error) {
       console.error("Error loading case:", error)
     } finally {
@@ -337,7 +436,11 @@ export default function CaseDetailPage() {
       setEditedOutput(result.documentation)
     } catch (error) {
       console.error("Error generating documentation:", error)
-      alert("Failed to generate documentation. Please try again.")
+      toast({
+        variant: "destructive",
+        title: "Generation Failed",
+        description: "Failed to generate documentation. Please try again.",
+      })
     } finally {
       setGenerating(false)
     }
@@ -356,10 +459,17 @@ export default function CaseDetailPage() {
 
       if (error) throw error
 
-      alert("Changes saved successfully!")
+      toast({
+        title: "Changes Saved",
+        description: "Your changes have been saved successfully.",
+      })
     } catch (error) {
       console.error("Error saving edits:", error)
-      alert("Failed to save changes")
+      toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: "Failed to save changes. Please try again.",
+      })
     }
   }
 
@@ -380,44 +490,142 @@ export default function CaseDetailPage() {
 
   // Save all edits from modal
   async function saveAllEdits() {
-    if (!caseData) return
+    if (!caseData) {
+      console.error("No case data available")
+      return
+    }
+
+    if (isSavingEdits) {
+      console.log("Already saving, skipping duplicate request")
+      return
+    }
+
+    console.log("Saving edits...", editFormData)
+    setIsSavingEdits(true)
 
     try {
+      // Validate required fields
+      if (!editFormData.patient_first_name.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "First name is required.",
+        })
+        setIsSavingEdits(false)
+        return
+      }
+
+      if (!editFormData.patient_last_name.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Last name is required.",
+        })
+        setIsSavingEdits(false)
+        return
+      }
+
+      if (!editFormData.patient_age || isNaN(parseInt(editFormData.patient_age))) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Valid age is required.",
+        })
+        setIsSavingEdits(false)
+        return
+      }
+
+      if (!editFormData.patient_state.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "State is required.",
+        })
+        setIsSavingEdits(false)
+        return
+      }
+
+      if (!editFormData.payer_name.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Payer name is required.",
+        })
+        setIsSavingEdits(false)
+        return
+      }
+
       const updateData: any = {
         patient_first_name: editFormData.patient_first_name.trim(),
         patient_last_name: editFormData.patient_last_name.trim(),
-        patient_age: parseInt(editFormData.patient_age) || caseData.patient_age,
-        patient_state: editFormData.patient_state.trim(),
+        patient_age: parseInt(editFormData.patient_age),
+        patient_state: editFormData.patient_state.trim().toUpperCase(),
         payer_name: editFormData.payer_name.trim(),
-        disease_activity: editFormData.disease_activity.trim(),
+        disease_activity: editFormData.disease_activity.trim() || "",
+        // Mark that user has manually edited this case
+        metadata: {
+          ...(caseData.metadata || {}),
+          manually_edited: true,
+        }
       }
 
       // Only update claim_amount if it's provided and valid
-      if (editFormData.claim_amount.trim()) {
+      if (editFormData.claim_amount && editFormData.claim_amount.trim()) {
         const claimAmount = parseFloat(editFormData.claim_amount.replace(/[^0-9.]/g, ''))
-        if (!isNaN(claimAmount)) {
+        if (!isNaN(claimAmount) && claimAmount > 0) {
           updateData.claim_amount = claimAmount
         }
       }
 
-      const { error } = await supabase
+      console.log("Updating with data:", updateData)
+      console.log("Case ID:", caseData.id)
+
+      // Check authentication
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log("Current session:", session?.user?.id)
+      console.log("Case user_id:", caseData.user_id)
+
+      if (!session) {
+        throw new Error("Not authenticated. Please refresh the page and try again.")
+      }
+
+      const { data, error } = await supabase
         .from("cases")
         .update(updateData)
         .eq("id", caseData.id)
+        .select()
 
-      if (error) throw error
+      if (error) {
+        console.error("Supabase error details:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw new Error(error.message || "Database update failed")
+      }
 
-      // Update local state
-      setCaseData({
-        ...caseData,
-        ...updateData
-      })
+      console.log("Update successful:", data)
+
+      // Update local state with returned data (includes the manually_edited flag)
+      const updatedCase = data && data.length > 0 ? data[0] : { ...caseData, ...updateData }
+      setCaseData(updatedCase)
 
       setEditModalOpen(false)
-      alert("Case details updated successfully!")
-    } catch (error) {
+
+      toast({
+        title: "Case Updated",
+        description: "Case details have been updated successfully.",
+      })
+    } catch (error: any) {
       console.error("Error saving case details:", error)
-      alert("Failed to save changes")
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error?.message || "Failed to save changes. Please try again.",
+      })
+    } finally {
+      setIsSavingEdits(false)
     }
   }
 
@@ -554,20 +762,44 @@ export default function CaseDetailPage() {
   const hasGenerated = Boolean(caseData?.generated_output || editedOutput)
   const needsGeneration = caseData && !caseData.generated_output && caseData.status === 'draft'
 
-  const extractedName = extractPatientNameFromNotes()
-  const extractedPayer = extractPayerFromNotes()
+  // If user has manually edited, always use database values - don't auto-extract
+  let displayFirstName = caseData?.patient_first_name || ''
+  let displayLastName = caseData?.patient_last_name || ''
+  let displayPayer = caseData?.payer_name || ''
+  let showExtractedNameLabel = false
+  let showExtractedPayerLabel = false
 
-  // Only use extracted name if it's different from form input and valid
-  const shouldUseExtractedName = extractedName &&
-    (extractedName.first !== caseData?.patient_first_name || extractedName.last !== caseData?.patient_last_name) &&
-    isValidName(extractedName.first) && isValidName(extractedName.last)
+  console.log("Display logic - hasManuallyEdited:", hasManuallyEdited)
+  console.log("Display logic - DB values:", {
+    first: caseData?.patient_first_name,
+    last: caseData?.patient_last_name,
+    payer: caseData?.payer_name,
+    metadata: caseData?.metadata
+  })
 
-  const displayFirstName = shouldUseExtractedName ? extractedName.first : (caseData?.patient_first_name || '')
-  const displayLastName = shouldUseExtractedName ? extractedName.last : (caseData?.patient_last_name || '')
+  // Only run extraction logic if user hasn't manually edited
+  if (!hasManuallyEdited) {
+    const extractedName = extractPatientNameFromNotes()
+    const extractedPayer = extractPayerFromNotes()
 
-  // Only use extracted payer if it's different from form input
-  const shouldUseExtractedPayer = extractedPayer && extractedPayer !== caseData?.payer_name
-  const displayPayer = shouldUseExtractedPayer ? extractedPayer : (caseData?.payer_name || '')
+    // Only use extracted name if it's different from form input and valid
+    const shouldUseExtractedName = extractedName &&
+      (extractedName.first !== caseData?.patient_first_name || extractedName.last !== caseData?.patient_last_name) &&
+      isValidName(extractedName.first) && isValidName(extractedName.last)
+
+    if (shouldUseExtractedName && extractedName) {
+      displayFirstName = extractedName.first
+      displayLastName = extractedName.last
+      showExtractedNameLabel = true
+    }
+
+    // Only use extracted payer if it's different from form input
+    const shouldUseExtractedPayer = extractedPayer && extractedPayer !== caseData?.payer_name
+    if (shouldUseExtractedPayer && extractedPayer) {
+      displayPayer = extractedPayer
+      showExtractedPayerLabel = true
+    }
+  }
 
   // Show full-screen loading when generating OR when case needs generation (before any output exists)
   if ((generating || needsGeneration) && !hasGenerated) {
@@ -614,19 +846,9 @@ export default function CaseDetailPage() {
               </Button>
             </Link>
           </div>
-          <div className="flex items-center gap-4">
-            <Button
-              onClick={() => router.push("/cases/new")}
-              size="sm"
-              className="relative overflow-hidden bg-dark-bg hover:bg-dark-bg/90 text-white transition-all duration-300 hover:scale-105 before:content-[''] before:absolute before:top-0 before:left-[-100%] before:w-full before:h-full before:bg-white/20 before:transition-all before:duration-300 hover:before:left-[100%] active:scale-100"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              New Case
-            </Button>
-            <div className="flex items-center gap-2">
-              <LumaLogo className="w-8 h-8" />
-              <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <LumaLogo className="w-8 h-8" />
+            <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
           </div>
         </div>
       </header>
@@ -640,7 +862,7 @@ export default function CaseDetailPage() {
                 <h2 className="text-xl font-serif text-dark-bg">Case Details</h2>
                 <button
                   onClick={openEditModal}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-sage-medium/50 bg-white hover:bg-sage-light/30 transition-colors px-3 py-1.5 h-7 text-xs text-sage-dark"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors px-3 py-1.5 h-7 text-xs text-gray-700 hover:text-gray-900 font-medium"
                   title="Edit case details"
                 >
                   <Pencil className="w-3 h-3" />
@@ -653,7 +875,7 @@ export default function CaseDetailPage() {
                   <p className="text-gray-500 mb-1">First Name</p>
                   <p className="font-semibold text-dark-bg">
                     {displayFirstName}
-                    {extractedName && extractedName.first !== caseData.patient_first_name && (
+                    {showExtractedNameLabel && (
                       <span className="text-xs text-gray-500 ml-2 font-normal">(from notes)</span>
                     )}
                   </p>
@@ -663,7 +885,7 @@ export default function CaseDetailPage() {
                   <p className="text-gray-500 mb-1">Last Name</p>
                   <p className="font-semibold text-dark-bg">
                     {displayLastName}
-                    {extractedName && extractedName.last !== caseData.patient_last_name && (
+                    {showExtractedNameLabel && (
                       <span className="text-xs text-gray-500 ml-2 font-normal">(from notes)</span>
                     )}
                   </p>
@@ -687,7 +909,7 @@ export default function CaseDetailPage() {
                   <p className="text-gray-500 mb-1">Payer</p>
                   <p className="text-dark-bg">
                     {displayPayer}
-                    {shouldUseExtractedPayer && (
+                    {showExtractedPayerLabel && (
                       <span className="text-xs text-gray-500 ml-2 font-normal">(from notes)</span>
                     )}
                   </p>
@@ -906,12 +1128,14 @@ export default function CaseDetailPage() {
 
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="payer">Payer</Label>
-                <Input
+                <Autocomplete
                   id="payer"
                   value={editFormData.payer_name}
-                  onChange={(e) =>
-                    setEditFormData({ ...editFormData, payer_name: e.target.value })
+                  onValueChange={(value) =>
+                    setEditFormData({ ...editFormData, payer_name: value })
                   }
+                  onSearch={searchPayers}
+                  placeholder="Start typing... e.g. Traditional Medicare, Blue Cross"
                 />
               </div>
 
@@ -945,11 +1169,25 @@ export default function CaseDetailPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditModalOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setEditModalOpen(false)}
+              disabled={isSavingEdits}
+            >
               Cancel
             </Button>
-            <Button onClick={saveAllEdits}>
-              Save Changes
+            <Button
+              onClick={saveAllEdits}
+              disabled={isSavingEdits}
+            >
+              {isSavingEdits ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
