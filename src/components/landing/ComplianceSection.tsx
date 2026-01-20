@@ -105,33 +105,6 @@ export function ComplianceSection() {
             </p>
           </Card>
 
-          {/* AI Models Section */}
-          <Card className="p-6 glass-card border border-mint/20 mt-6">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="w-6 h-6 text-mint flex-shrink-0 mt-1" />
-              <div>
-                <h3 className="text-lg font-serif text-dark-bg mb-3">
-                  HIPAA-Compliant AI Models
-                </h3>
-                <p className="text-gray-700 mb-3">
-                  Luma uses two HIPAA-compliant AI providers with signed Business Associate Agreements:
-                </p>
-                <ul className="space-y-2 text-gray-700">
-                  <li className="flex items-start">
-                    <span className="text-mint mr-3 mt-1">✓</span>
-                    <span><strong>OpenAI GPT-4o</strong> for clinical documentation generation with zero data retention</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="text-mint mr-3 mt-1">✓</span>
-                    <span><strong>Perplexity AI</strong> for research-driven tasks like payer policy lookups and medical literature search</span>
-                  </li>
-                </ul>
-                <p className="text-sm text-gray-600 mt-3">
-                  Both providers maintain SOC 2 Type II certification and meet all HIPAA security and privacy requirements.
-                </p>
-              </div>
-            </div>
-          </Card>
         </div>
       </div>
     </section>

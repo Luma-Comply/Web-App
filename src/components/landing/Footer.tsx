@@ -62,6 +62,13 @@ export default function Footer() {
           {/* Links */}
           <div className="flex gap-8">
             <Link
+              href="/blog"
+              className="text-gray-600 hover:text-mint transition-colors relative group text-sm"
+            >
+              Blog
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-mint transition-all duration-200 group-hover:w-full" />
+            </Link>
+            <Link
               href="/privacy"
               className="text-gray-600 hover:text-mint transition-colors relative group text-sm"
             >
