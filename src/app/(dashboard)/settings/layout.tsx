@@ -25,6 +25,7 @@ export default function SettingsLayout({
   const router = useRouter()
   const supabase = createClient()
   const [userEmail, setUserEmail] = useState("")
+  const [practiceName, setPracticeName] = useState("")
 
   useEffect(() => {
     async function loadUser() {
@@ -33,6 +34,27 @@ export default function SettingsLayout({
       } = await supabase.auth.getSession()
       if (session) {
         setUserEmail(session.user.email || "")
+
+        // Load practice name from users table
+        const { data: userData } = await supabase
+          .from("users")
+          .select("practice_name, team_owner_id")
+          .eq("id", session.user.id)
+          .single()
+
+        if (userData) {
+          // If user is a team member, fetch owner's practice name
+          if (userData.team_owner_id) {
+            const { data: ownerData } = await supabase
+              .from("users")
+              .select("practice_name")
+              .eq("id", userData.team_owner_id)
+              .single()
+            setPracticeName(ownerData?.practice_name || "")
+          } else {
+            setPracticeName(userData.practice_name || "")
+          }
+        }
       }
     }
     loadUser()
@@ -70,15 +92,15 @@ export default function SettingsLayout({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600 hidden md:block">{userEmail}</span>
+                  <span className="text-sm text-gray-600 hidden md:block">{practiceName || userEmail}</span>
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-white border border-sage-medium/30">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{userEmail}</p>
-                    <p className="text-xs leading-none text-gray-500">Account settings</p>
+                    <p className="text-sm font-medium leading-none">{practiceName || userEmail}</p>
+                    <p className="text-xs leading-none text-gray-500">{userEmail}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
