@@ -105,6 +105,21 @@ export default function SignupPage() {
 
                 <form action={signup} className="space-y-5">
                   <div>
+                    <Label htmlFor="practiceName" className="text-dark-bg font-medium">
+                      Practice / Organization Name
+                    </Label>
+                    <Input
+                      id="practiceName"
+                      name="practiceName"
+                      type="text"
+                      autoComplete="organization"
+                      required
+                      className="mt-2 h-11"
+                      placeholder="Your Practice Name"
+                    />
+                  </div>
+
+                  <div>
                     <Label htmlFor="email" className="text-dark-bg font-medium">
                       Work email
                     </Label>
@@ -177,10 +192,6 @@ export default function SignupPage() {
                 </div>
               </div>
 
-              {/* Trust Message */}
-              <p className="text-center text-sm text-gray-500 mt-6">
-                🔒 No credit card required • Cancel anytime
-              </p>
             </div>
           </div>
         </div>

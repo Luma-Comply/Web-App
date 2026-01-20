@@ -41,8 +41,9 @@ export async function signup(formData: FormData) {
 
     const email = formData.get('email') as string
     const password = formData.get('password') as string
+    const practiceName = formData.get('practiceName') as string
 
-    if (!email || !password) {
+    if (!email || !password || !practiceName) {
         redirect('/signup?error=Please%20fill%20in%20all%20fields')
     }
 
@@ -51,8 +52,19 @@ export async function signup(formData: FormData) {
         password,
         options: {
             emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback?next=/checkout`,
+            data: {
+                practice_name: practiceName,
+            },
         },
     })
+
+    // If signup succeeded, update the user profile with practice_name
+    if (data?.user && !error) {
+        await supabase
+            .from('users')
+            .update({ practice_name: practiceName })
+            .eq('id', data.user.id)
+    }
 
     // Even if there's an error (like user already exists), still show confirm email page
     // The user might need to check their email or resend confirmation

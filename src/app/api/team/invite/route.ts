@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     // Check if user is a team owner
     const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("is_team_owner, seats_count")
+      .select("is_team_owner, seats_count, practice_name")
       .eq("id", session.user.id)
       .single()
 
@@ -127,10 +127,12 @@ export async function POST(request: NextRequest) {
 
     // Send invitation email
     const invitationLink = `${process.env.NEXT_PUBLIC_APP_URL}/team/accept?token=${invitationToken}`
+    const practiceName = userData.practice_name || session.user.email || "A team"
 
     await sendInvitationEmail({
       to: email,
       inviterEmail: session.user.email || "unknown",
+      practiceName,
       invitationLink,
     })
 

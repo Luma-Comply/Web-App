@@ -8,9 +8,10 @@ interface UpdateProfileParams {
     firstName: string
     lastName: string
     email: string
+    practiceName?: string
 }
 
-export async function updateProfile({ firstName, lastName, email }: UpdateProfileParams) {
+export async function updateProfile({ firstName, lastName, email, practiceName }: UpdateProfileParams) {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
@@ -24,8 +25,9 @@ export async function updateProfile({ firstName, lastName, email }: UpdateProfil
 
     const emailChanged = email !== currentEmail
     const nameChanged = firstName !== currentMetaData.first_name || lastName !== currentMetaData.last_name
+    const practiceNameProvided = practiceName !== undefined
 
-    if (!emailChanged && !nameChanged) {
+    if (!emailChanged && !nameChanged && !practiceNameProvided) {
         return { success: true }
     }
 
@@ -65,12 +67,27 @@ export async function updateProfile({ firstName, lastName, email }: UpdateProfil
     }
 
     // Update public.users table to keep in sync
+    const usersUpdateData: any = {
+        email: email, // Always ensure email is correct
+    }
+
+    // Only update practice_name if provided (i.e., user is a team owner)
+    if (practiceNameProvided) {
+        // Verify user is actually a team owner before allowing practice_name update
+        const { data: userData } = await adminAuth
+            .from('users')
+            .select('is_team_owner')
+            .eq('id', user.id)
+            .single()
+
+        if (userData?.is_team_owner) {
+            usersUpdateData.practice_name = practiceName
+        }
+    }
+
     const { error: dbError } = await adminAuth
         .from('users')
-        .update({
-            email: email, // Always ensure email is correct
-            // We could also update names here if you have columns for them in public.users
-        })
+        .update(usersUpdateData)
         .eq('id', user.id)
 
     if (dbError) {

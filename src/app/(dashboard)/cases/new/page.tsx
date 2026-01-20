@@ -127,6 +127,7 @@ export default function NewCasePage() {
       // so the AI Generator knows to extract them from the text.
       const caseInsert: any = {
         user_id: session.user.id,
+        created_by_email: session.user.email, // Track who created the case
         status: "draft",
 
         // 1. Key Fields Input Manually

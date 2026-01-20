@@ -118,6 +118,15 @@ export default function SettingsLayout({
       </header>
 
       <div className="container mx-auto px-4 py-8 max-w-5xl">
+        {/* Back to Dashboard */}
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-1 text-gray-600 hover:text-mint transition-colors mb-6 group"
+        >
+          <ChevronLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+          <span className="text-sm">Back to Dashboard</span>
+        </Link>
+
         <h1 className="text-3xl font-serif font-bold text-dark-bg mb-2">Settings</h1>
         <p className="text-gray-600 mb-8">Manage your account settings and preferences.</p>
 

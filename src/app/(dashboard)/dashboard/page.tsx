@@ -58,7 +58,8 @@ interface Case {
   created_at: string
   payer_name: string
   claim_amount: number
-  is_archived: boolean // New field
+  is_archived: boolean
+  created_by_email?: string // Track who created the case
 }
 
 interface UserStats {
@@ -366,9 +367,10 @@ export default function DashboardPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
-                    <TableHead className="w-[300px]">Patient & Document</TableHead>
+                    <TableHead className="w-[280px]">Patient & Document</TableHead>
                     <TableHead>Payer</TableHead>
                     <TableHead>Created</TableHead>
+                    <TableHead>Created By</TableHead>
                     <TableHead className="text-right">Claim Value</TableHead>
                     <TableHead className="w-[80px]"></TableHead>
                   </TableRow>
@@ -376,7 +378,7 @@ export default function DashboardPage() {
                 <TableBody>
                   {displayCases.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-32 text-center text-gray-500">
+                      <TableCell colSpan={6} className="h-32 text-center text-gray-500">
                         {activeTab === 'active'
                           ? "No active cases found. Create a new case to get started."
                           : "No archived cases."}
@@ -400,6 +402,9 @@ export default function DashboardPage() {
                         </TableCell>
                         <TableCell className="text-gray-500 text-sm">
                           {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                        </TableCell>
+                        <TableCell className="text-gray-500 text-sm">
+                          {c.created_by_email || userEmail}
                         </TableCell>
                         <TableCell className="text-right font-mono text-gray-700">
                           {c.claim_amount ? `$${c.claim_amount.toLocaleString()}` : '-'}

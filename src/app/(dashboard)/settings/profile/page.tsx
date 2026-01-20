@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { Mail, Eye, EyeOff } from "lucide-react"
+import { Mail, Eye, EyeOff, Building2 } from "lucide-react"
 import { updateProfile, updatePassword } from "@/app/actions/profile"
 
 export default function ProfilePage() {
@@ -25,6 +25,10 @@ export default function ProfilePage() {
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [originalEmail, setOriginalEmail] = useState("")
+
+  // Organization info
+  const [practiceName, setPracticeName] = useState("")
+  const [isTeamOwner, setIsTeamOwner] = useState(false)
 
   // Password
   const [currentPassword, setCurrentPassword] = useState("")
@@ -77,6 +81,30 @@ export default function ProfilePage() {
       const metadata = session.user.user_metadata || {}
       setFirstName(metadata.first_name || "")
       setLastName(metadata.last_name || "")
+
+      // Load organization info from users table
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("practice_name, is_team_owner, team_owner_id")
+        .eq("id", session.user.id)
+        .single()
+
+      if (!userError && userData) {
+        setIsTeamOwner(userData.is_team_owner || false)
+
+        // If user is a team member (not owner), fetch owner's practice name
+        if (!userData.is_team_owner && userData.team_owner_id) {
+          const { data: ownerData } = await supabase
+            .from("users")
+            .select("practice_name")
+            .eq("id", userData.team_owner_id)
+            .single()
+
+          setPracticeName(ownerData?.practice_name || "")
+        } else {
+          setPracticeName(userData.practice_name || "")
+        }
+      }
     } catch (error) {
       console.error("Error loading profile:", error)
       toast({
@@ -95,7 +123,8 @@ export default function ProfilePage() {
       const result = await updateProfile({
         firstName,
         lastName,
-        email
+        email,
+        practiceName: isTeamOwner ? practiceName : undefined,
       })
 
       if (result.success) {
@@ -211,6 +240,32 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* Organization Name Field */}
+            <div className="space-y-2">
+              <Label htmlFor="practiceName" className="text-sm font-medium text-dark-bg">
+                Organization / Practice Name {isTeamOwner && <span className="text-coral">*</span>}
+              </Label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  id="practiceName"
+                  type="text"
+                  value={practiceName}
+                  onChange={(e) => setPracticeName(e.target.value)}
+                  disabled={!isTeamOwner}
+                  className={`pl-10 border-sage-medium/30 ${
+                    isTeamOwner ? "bg-white" : "bg-gray-100 text-gray-600 cursor-not-allowed"
+                  }`}
+                  placeholder="Your Practice Name"
+                />
+              </div>
+              {!isTeamOwner && (
+                <p className="text-xs text-gray-500">
+                  Only team owners can change the organization name.
+                </p>
+              )}
+            </div>
+
             {/* Email Field */}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-dark-bg">
@@ -226,7 +281,6 @@ export default function ProfilePage() {
                   className="pl-10 bg-white border-sage-medium/30"
                 />
               </div>
-
             </div>
           </div>
 
