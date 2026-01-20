@@ -1,27 +1,32 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { token } = await request.json()
+    const { token, password } = await request.json()
 
     if (!token) {
       return NextResponse.json({ error: "Invitation token is required" }, { status: 400 })
     }
 
+    if (!password || password.length < 8) {
+      return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 })
+    }
+
+    // Use service role client for admin operations
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    )
+
     // Fetch invitation
-    const { data: invitation, error: inviteError } = await supabase
+    const { data: invitation, error: inviteError } = await serviceClient
       .from("team_invitations")
       .select("*")
       .eq("invitation_token", token)
@@ -40,30 +45,63 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "This invitation has expired" }, { status: 400 })
     }
 
-    // Verify user's email matches invitation
-    if (session.user.email !== invitation.invitee_email) {
+    // Check if user already exists in auth
+    const { data: existingUsers } = await serviceClient.auth.admin.listUsers()
+    const existingUser = existingUsers?.users?.find(
+      (u) => u.email?.toLowerCase() === invitation.invitee_email.toLowerCase()
+    )
+
+    if (existingUser) {
       return NextResponse.json(
-        { error: "Email mismatch. Please sign in with the invited email address." },
-        { status: 403 }
+        { error: "An account with this email already exists. Please sign in instead." },
+        { status: 400 }
       )
     }
 
-    // Update user to be a team member
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({
-        team_owner_id: invitation.team_owner_id,
-        is_team_owner: false,
-      })
-      .eq("id", session.user.id)
+    // Create user with Admin API - email is pre-confirmed
+    const { data: newUser, error: createError } = await serviceClient.auth.admin.createUser({
+      email: invitation.invitee_email,
+      password: password,
+      email_confirm: true, // This skips email confirmation
+    })
+
+    if (createError || !newUser.user) {
+      console.error("Error creating user:", createError)
+      return NextResponse.json(
+        { error: createError?.message || "Failed to create account" },
+        { status: 500 }
+      )
+    }
+
+    // Double-check: explicitly update user to confirm email (belt and suspenders)
+    // Some Supabase configurations ignore email_confirm on createUser
+    const { error: updateError } = await serviceClient.auth.admin.updateUser(
+      newUser.user.id,
+      { email_confirm: true }
+    )
 
     if (updateError) {
-      console.error("Error updating user:", updateError)
-      return NextResponse.json({ error: "Failed to accept invitation" }, { status: 500 })
+      console.error("Error confirming email:", updateError)
+      // Non-fatal, continue - the email_confirm on create might have worked
+    }
+
+    // Create user record in public.users table
+    const { error: insertError } = await serviceClient.from("users").insert({
+      id: newUser.user.id,
+      email: invitation.invitee_email,
+      team_owner_id: invitation.team_owner_id,
+      is_team_owner: false,
+    })
+
+    if (insertError) {
+      console.error("Error creating user record:", insertError)
+      // Try to clean up the auth user if DB insert failed
+      await serviceClient.auth.admin.deleteUser(newUser.user.id)
+      return NextResponse.json({ error: "Failed to create user record" }, { status: 500 })
     }
 
     // Mark invitation as accepted
-    const { error: inviteUpdateError } = await supabase
+    const { error: inviteUpdateError } = await serviceClient
       .from("team_invitations")
       .update({
         status: "accepted",
@@ -77,7 +115,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Invitation accepted successfully",
+      message: "Account created successfully",
+      email: invitation.invitee_email,
     })
   } catch (error) {
     console.error("Error in accept endpoint:", error)

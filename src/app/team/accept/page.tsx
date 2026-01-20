@@ -108,44 +108,39 @@ function AcceptInvitationContent() {
     setError(null)
 
     try {
-      // 1. Create the user account
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: invitationData.inviteeEmail,
-        password: password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
-        },
-      })
-
-      if (signUpError) {
-        // Check if user already exists
-        if (signUpError.message.includes("already registered")) {
-          setError("An account with this email already exists. Please sign in instead.")
-        } else {
-          setError(signUpError.message)
-        }
-        setSubmitting(false)
-        return
-      }
-
-      if (!signUpData.user) {
-        setError("Failed to create account")
-        setSubmitting(false)
-        return
-      }
-
-      // 2. Accept the invitation (this links the user to the team)
+      // 1. Call API to create user with Admin API (email pre-confirmed)
       const response = await fetch("/api/team/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: invitationData.token }),
+        body: JSON.stringify({
+          token: invitationData.token,
+          password: password,
+        }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        // Account was created but team linking failed - still show partial success
-        console.error("Team accept error:", data.error)
+        setError(data.error || "Failed to create account")
+        setSubmitting(false)
+        return
+      }
+
+      // 2. Sign in with the newly created credentials
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: invitationData.inviteeEmail,
+        password: password,
+      })
+
+      if (signInError) {
+        console.error("Sign in error after account creation:", signInError)
+        // Account was created successfully, but sign-in failed
+        // Redirect to login page so they can sign in manually
+        setError("Account created! Please sign in with your new credentials.")
+        setTimeout(() => {
+          router.push("/login")
+        }, 2000)
+        return
       }
 
       setSuccess(true)
