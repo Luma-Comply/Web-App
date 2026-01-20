@@ -83,6 +83,7 @@ export default function DashboardPage() {
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [userEmail, setUserEmail] = useState("")
+  const [practiceName, setPracticeName] = useState("")
   const [activeTab, setActiveTab] = useState("active") // "active" | "archived"
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [caseToDelete, setCaseToDelete] = useState<Case | null>(null)
@@ -120,10 +121,10 @@ export default function DashboardPage() {
 
       setUserEmail(session.user.email || "")
 
-      // Load user profile for subscription and limits
+      // Load user profile for subscription, limits, and practice name
       const { data: userData } = await supabase
         .from("users")
-        .select("subscription_status, trial_ends_at, cases_remaining, cases_used_this_period, billing_period_end")
+        .select("subscription_status, trial_ends_at, cases_remaining, cases_used_this_period, billing_period_end, practice_name, team_owner_id")
         .eq("id", session.user.id)
         .single()
 
@@ -135,6 +136,18 @@ export default function DashboardPage() {
           cases_used_this_period: userData.cases_used_this_period || 0,
           billing_period_end: userData.billing_period_end,
         })
+
+        // Set practice name - if user is a team member, fetch owner's practice name
+        if (userData.team_owner_id) {
+          const { data: ownerData } = await supabase
+            .from("users")
+            .select("practice_name")
+            .eq("id", userData.team_owner_id)
+            .single()
+          setPracticeName(ownerData?.practice_name || "")
+        } else {
+          setPracticeName(userData.practice_name || "")
+        }
       }
 
       // Load ALL cases (active + archived) to calculate stats correctly
@@ -266,15 +279,15 @@ export default function DashboardPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600 hidden md:block">{userEmail}</span>
+                  <span className="text-sm text-gray-600 hidden md:block">{practiceName || userEmail}</span>
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-white border border-sage-medium/30">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{userEmail}</p>
-                    <p className="text-xs leading-none text-gray-500">Account settings</p>
+                    <p className="text-sm font-medium leading-none">{practiceName || userEmail}</p>
+                    <p className="text-xs leading-none text-gray-500">{userEmail}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
