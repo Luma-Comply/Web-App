@@ -49,28 +49,46 @@ export async function GET(request: Request) {
                     }
                 )
 
+                // Get practice_name from user metadata (set during signup)
+                const userMetadata = data.session.user.user_metadata || {}
+                const practiceName = userMetadata.practice_name
+
                 // Check if user exists
                 const { data: existingUser } = await serviceClient
                     .from('users')
-                    .select('id, email')
+                    .select('id, email, practice_name')
                     .eq('id', userId)
                     .single()
 
                 if (!existingUser) {
-                    // User doesn't exist in public.users, create it
+                    // User doesn't exist in public.users, create it with practice_name
                     await serviceClient
                         .from('users')
                         .insert({
                             id: userId,
                             email: userEmail,
+                            practice_name: practiceName || null,
+                            is_team_owner: true,  // New signups are team owners
                         })
                         .select()
-                } else if (existingUser.email !== userEmail) {
-                    // Email changed - update it in public.users table
-                    await serviceClient
-                        .from('users')
-                        .update({ email: userEmail })
-                        .eq('id', userId)
+                } else {
+                    // User exists - update email if changed, and set practice_name if missing
+                    const updates: any = {}
+                    if (existingUser.email !== userEmail) {
+                        updates.email = userEmail
+                    }
+                    // Only set practice_name if it's currently null and we have one from metadata
+                    if (!existingUser.practice_name && practiceName) {
+                        updates.practice_name = practiceName
+                        updates.is_team_owner = true
+                    }
+
+                    if (Object.keys(updates).length > 0) {
+                        await serviceClient
+                            .from('users')
+                            .update(updates)
+                            .eq('id', userId)
+                    }
                 }
             }
 

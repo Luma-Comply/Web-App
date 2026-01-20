@@ -60,14 +60,18 @@ export async function signup(formData: FormData) {
     })
 
     // If signup succeeded, update the user profile with practice_name and mark as team owner
+    // Use upsert to handle the case where the trigger hasn't created the record yet
     if (data?.user && !error) {
         await supabase
             .from('users')
-            .update({
+            .upsert({
+                id: data.user.id,
+                email: email,
                 practice_name: practiceName,
                 is_team_owner: true  // New signups are team owners by default
+            }, {
+                onConflict: 'id'
             })
-            .eq('id', data.user.id)
     }
 
     // Even if there's an error (like user already exists), still show confirm email page
