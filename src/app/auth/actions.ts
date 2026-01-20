@@ -9,6 +9,7 @@ export async function login(formData: FormData) {
 
     const email = formData.get('email') as string
     const password = formData.get('password') as string
+    const redirectTo = formData.get('redirect') as string || '/dashboard'
 
     if (!email || !password) {
         redirect('/login?error=' + encodeURIComponent('Please enter both email and password'))
@@ -29,11 +30,11 @@ export async function login(formData: FormData) {
         } else {
             errorMessage = error.message || 'Could not sign in. Please try again.'
         }
-        redirect('/login?error=' + encodeURIComponent(errorMessage))
+        redirect('/login?error=' + encodeURIComponent(errorMessage) + (redirectTo !== '/dashboard' ? `&redirect=${encodeURIComponent(redirectTo)}` : ''))
     }
 
     revalidatePath('/', 'layout')
-    redirect('/dashboard')
+    redirect(redirectTo)
 }
 
 export async function signup(formData: FormData) {

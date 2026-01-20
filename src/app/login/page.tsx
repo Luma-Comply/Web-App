@@ -15,6 +15,7 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
+  const redirectTo = searchParams.get('redirect') || '/dashboard'
   return (
     <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white relative overflow-hidden">
       <MedicalGrid intensity="light" />
@@ -81,6 +82,9 @@ function LoginForm() {
                 )}
 
                 <form className="space-y-5">
+                  {/* Hidden redirect field */}
+                  <input type="hidden" name="redirect" value={redirectTo} />
+
                   <div>
                     <Label htmlFor="email" className="text-dark-bg font-medium">
                       Email address

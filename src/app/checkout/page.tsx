@@ -17,26 +17,28 @@ export default function CheckoutPage() {
   useEffect(() => {
     async function checkAuth() {
       const supabase = createClient()
-      const { data: { session }, error } = await supabase.auth.getSession()
-      
-      if (!session) {
+
+      // Use getUser() instead of getSession() as it's more reliable after redirects
+      // getUser() will also refresh the session if needed
+      const { data: { user }, error } = await supabase.auth.getUser()
+
+      if (error || !user) {
         // Redirect to login if not authenticated
         router.push('/login?redirect=/checkout')
         return
       }
 
       // Check if email is confirmed
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user && !user.email_confirmed_at) {
+      if (!user.email_confirmed_at) {
         // Email not confirmed yet, redirect to confirmation page
         router.push(`/signup/confirm-email?email=${encodeURIComponent(user.email || '')}`)
         return
       }
-      
+
       setIsAuthenticated(true)
       setLoading(false)
     }
-    
+
     checkAuth()
   }, [router])
 
