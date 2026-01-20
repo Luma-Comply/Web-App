@@ -59,11 +59,14 @@ export async function signup(formData: FormData) {
         },
     })
 
-    // If signup succeeded, update the user profile with practice_name
+    // If signup succeeded, update the user profile with practice_name and mark as team owner
     if (data?.user && !error) {
         await supabase
             .from('users')
-            .update({ practice_name: practiceName })
+            .update({
+                practice_name: practiceName,
+                is_team_owner: true  // New signups are team owners by default
+            })
             .eq('id', data.user.id)
     }
 

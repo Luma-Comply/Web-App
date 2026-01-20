@@ -90,10 +90,13 @@ export default function ProfilePage() {
         .single()
 
       if (!userError && userData) {
-        setIsTeamOwner(userData.is_team_owner || false)
+        // User is considered an owner if is_team_owner=true OR if they have no team_owner_id
+        // (meaning they signed up independently and own their own account)
+        const isOwner = userData.is_team_owner || !userData.team_owner_id
+        setIsTeamOwner(isOwner)
 
-        // If user is a team member (not owner), fetch owner's practice name
-        if (!userData.is_team_owner && userData.team_owner_id) {
+        // If user is a team member (has a team_owner_id), fetch owner's practice name
+        if (userData.team_owner_id) {
           const { data: ownerData } = await supabase
             .from("users")
             .select("practice_name")
@@ -102,6 +105,7 @@ export default function ProfilePage() {
 
           setPracticeName(ownerData?.practice_name || "")
         } else {
+          // User is independent/owner - use their own practice_name
           setPracticeName(userData.practice_name || "")
         }
       }

@@ -73,14 +73,17 @@ export async function updateProfile({ firstName, lastName, email, practiceName }
 
     // Only update practice_name if provided (i.e., user is a team owner)
     if (practiceNameProvided) {
-        // Verify user is actually a team owner before allowing practice_name update
+        // Verify user is actually a team owner (or independent user) before allowing practice_name update
         const { data: userData } = await adminAuth
             .from('users')
-            .select('is_team_owner')
+            .select('is_team_owner, team_owner_id')
             .eq('id', user.id)
             .single()
 
-        if (userData?.is_team_owner) {
+        // User can edit practice_name if they're an owner OR if they have no team_owner_id
+        // (meaning they're an independent user who owns their account)
+        const canEditPracticeName = userData?.is_team_owner || !userData?.team_owner_id
+        if (canEditPracticeName) {
             usersUpdateData.practice_name = practiceName
         }
     }
