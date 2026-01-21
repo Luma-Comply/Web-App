@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { LumaLogo } from "@/components/LumaLogo"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
@@ -36,6 +37,7 @@ import {
   Users,
   CreditCard,
   ChevronDown,
+  Search,
 } from "lucide-react"
 import {
   Dialog,
@@ -86,6 +88,7 @@ export default function DashboardPage() {
   const [practiceName, setPracticeName] = useState("")
   const [isTeamOwner, setIsTeamOwner] = useState(true) // Default true to avoid flash
   const [activeTab, setActiveTab] = useState("active") // "active" | "archived"
+  const [searchQuery, setSearchQuery] = useState("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [caseToDelete, setCaseToDelete] = useState<Case | null>(null)
 
@@ -130,28 +133,50 @@ export default function DashboardPage() {
         .single()
 
       if (userData) {
-        setSubscription({
-          subscription_status: userData.subscription_status || "trialing",
-          trial_ends_at: userData.trial_ends_at,
-          cases_remaining: userData.cases_remaining || 50,
-          cases_used_this_period: userData.cases_used_this_period || 0,
-          billing_period_end: userData.billing_period_end,
-        })
-
         // Check if user is a team owner
-        setIsTeamOwner(userData.is_team_owner || !userData.team_owner_id)
+        const userIsTeamOwner = userData.is_team_owner || !userData.team_owner_id
+        setIsTeamOwner(userIsTeamOwner)
 
-        // Set practice name - if user is a team member, fetch owner's practice name
+        // For team members, fetch team owner's data for shared pool values
+        let casesRemaining = userData.cases_remaining || 50
+        let casesUsedThisPeriod = userData.cases_used_this_period || 0
+        let ownerPracticeName = userData.practice_name || ""
+
         if (userData.team_owner_id) {
           const { data: ownerData } = await supabase
             .from("users")
-            .select("practice_name")
+            .select("practice_name, cases_remaining, cases_used_this_period")
             .eq("id", userData.team_owner_id)
             .single()
-          setPracticeName(ownerData?.practice_name || "")
-        } else {
-          setPracticeName(userData.practice_name || "")
+
+          if (ownerData) {
+            ownerPracticeName = ownerData.practice_name || ""
+            // Use team owner's cases pool
+            casesRemaining = ownerData.cases_remaining || 50
+            casesUsedThisPeriod = ownerData.cases_used_this_period || 0
+          }
         }
+
+        setPracticeName(ownerPracticeName)
+
+        setSubscription({
+          subscription_status: userData.subscription_status || "trialing",
+          trial_ends_at: userData.trial_ends_at,
+          cases_remaining: casesRemaining,
+          cases_used_this_period: casesUsedThisPeriod,
+          billing_period_end: userData.billing_period_end,
+        })
+      }
+
+      // Determine shared cases pool (team owner's pool or own)
+      let sharedCasesRemaining = userData?.cases_remaining || 50
+      if (userData?.team_owner_id) {
+        const { data: ownerCases } = await supabase
+          .from("users")
+          .select("cases_remaining")
+          .eq("id", userData.team_owner_id)
+          .single()
+        sharedCasesRemaining = ownerCases?.cases_remaining || 50
       }
 
       // Load cases - RLS handles visibility (team owners see all team cases, members see only their own)
@@ -180,7 +205,7 @@ export default function DashboardPage() {
         setStats({
           total_cases: casesData.length,
           cases_this_month: casesThisMonth,
-          cases_remaining: userData?.cases_remaining || 50,
+          cases_remaining: sharedCasesRemaining,
           revenue_protected: totalRevenue,
         })
       }
@@ -239,8 +264,22 @@ export default function DashboardPage() {
 
   // Filter cases for the current view
   const displayCases = cases.filter((c) => {
-    if (activeTab === "archived") return c.is_archived === true
-    return !c.is_archived // Default to showing non-archived
+    // Filter by tab (active vs archived)
+    const matchesTab = activeTab === "archived" ? c.is_archived === true : !c.is_archived
+
+    // Filter by search query
+    if (!searchQuery.trim()) return matchesTab
+
+    const query = searchQuery.toLowerCase()
+    const matchesSearch =
+      c.patient_first_name?.toLowerCase().includes(query) ||
+      c.patient_last_name?.toLowerCase().includes(query) ||
+      c.payer_name?.toLowerCase().includes(query) ||
+      c.doc_type?.toLowerCase().includes(query) ||
+      c.created_by_email?.toLowerCase().includes(query) ||
+      `${c.patient_first_name} ${c.patient_last_name}`.toLowerCase().includes(query)
+
+    return matchesTab && matchesSearch
   })
 
   // --- Helpers ---
@@ -376,6 +415,18 @@ export default function DashboardPage() {
                   <Archive className="w-3 h-3" />
                 </TabsTrigger>
               </TabsList>
+
+              {/* Search Input */}
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search cases..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 bg-white border-sage-medium/30"
+                />
+              </div>
             </div>
 
             <Card className="glass-card border border-sage-medium/30 overflow-hidden">
@@ -394,9 +445,11 @@ export default function DashboardPage() {
                   {displayCases.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-32 text-center text-gray-500">
-                        {activeTab === 'active'
-                          ? "No active cases found. Create a new case to get started."
-                          : "No archived cases."}
+                        {searchQuery.trim()
+                          ? `No cases found matching "${searchQuery}"`
+                          : activeTab === 'active'
+                            ? "No active cases found. Create a new case to get started."
+                            : "No archived cases."}
                       </TableCell>
                     </TableRow>
                   ) : (

@@ -11,6 +11,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Autocomplete } from "@/components/ui/autocomplete"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { LumaLogo } from "@/components/LumaLogo"
 import { searchPayers } from "@/lib/payers"
 import {
@@ -22,6 +29,9 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
+  AlertTriangle,
+  Shield,
+  ExternalLink,
 } from "lucide-react"
 
 export default function NewCasePage() {
@@ -31,6 +41,8 @@ export default function NewCasePage() {
   const [error, setError] = useState("")
   const [pastedText, setPastedText] = useState("")
   const [showFileUpload, setShowFileUpload] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [showFullHipaaList, setShowFullHipaaList] = useState(false)
 
   const [formData, setFormData] = useState({
     doc_type: "biologics_pa",
@@ -71,6 +83,11 @@ export default function NewCasePage() {
     // Basic validation
     if (!pastedText || pastedText.length < 50) {
       setError("Please paste detailed clinical notes (at least 50 characters).")
+      return
+    }
+
+    if (!agreedToTerms) {
+      setError("You must agree to the compliance terms before creating a case.")
       return
     }
 
@@ -155,7 +172,13 @@ export default function NewCasePage() {
         // 4. Metadata for UI to know this was a paste-only case
         metadata: {
           creation_method: "paste_only",
-          original_pasted_text: pastedText
+          original_pasted_text: pastedText,
+          // AUDIT TRAIL - Terms Agreement
+          terms_accepted: true,
+          terms_accepted_at: new Date().toISOString(),
+          terms_accepted_by_user_id: session.user.id,
+          terms_accepted_by_email: session.user.email,
+          terms_version: "1.0",
         },
       }
 
@@ -377,19 +400,130 @@ export default function NewCasePage() {
             <Textarea
               value={pastedText}
               onChange={(e) => setPastedText(e.target.value)}
-              placeholder="PASTE HERE... 
+              placeholder="PASTE HERE...
 
 Example:
-Patient is a 45yo male with RA. 
+Patient is a 45yo male with RA.
 Failed Methotrexate (3 months) and Humira (6 months).
-Current DAS28 is 5.2. 
+Current DAS28 is 5.2.
 Requesting Rinvoq 15mg daily."
               className="min-h-[300px] font-mono text-sm mb-4 bg-white/80"
             />
           </Card>
 
+          {/* ============================================== */}
+          {/* 4. COMPLIANCE AGREEMENT                        */}
+          {/* ============================================== */}
+          <Card className="p-6 glass-card border border-amber-500/30 bg-amber-50/30">
+            <div className="flex items-center gap-2 mb-4">
+              <Shield className="w-5 h-5 text-amber-600" />
+              <h2 className="text-xl font-serif text-dark-bg">4. Compliance Agreement</h2>
+            </div>
 
+            {/* Warning Box */}
+            <div className="bg-amber-100/50 border border-amber-300/50 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-amber-800 mb-2">
+                    Safe Harbor De-identification Required
+                  </h3>
+                  <p className="text-sm text-amber-700 mb-3">
+                    Luma uses a &quot;Safe Harbor&quot; approach. Your clinical notes must <strong>NOT</strong> contain the following PHI identifiers:
+                  </p>
+                  <ul className="text-sm text-amber-700 space-y-1.5 mb-3">
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                      Social Security Numbers
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                      Full addresses (state only is allowed)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                      Phone numbers or email addresses
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                      Medical Record Numbers (MRN)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                      Dates of birth (age only is allowed)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                      Health insurance ID numbers
+                    </li>
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => setShowFullHipaaList(true)}
+                    className="text-sm text-amber-800 hover:text-amber-900 underline underline-offset-2 flex items-center gap-1"
+                  >
+                    View full list of 18 HIPAA identifiers
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
 
+            {/* Checkbox Agreement */}
+            <label className="flex items-start gap-4 cursor-pointer p-4 rounded-lg border border-sage-medium/30 bg-white/50 hover:bg-white/80 transition-colors">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="mt-0.5 w-6 h-6 rounded-md border-2 border-sage-medium text-mint focus:ring-mint focus:ring-offset-0 cursor-pointer accent-mint"
+              />
+              <span className="text-sm text-gray-700 leading-relaxed">
+                I confirm that my clinical notes do not contain PHI identifiers (SSN, full addresses, phone numbers, MRN, DOB, etc.). I understand that I am responsible for de-identifying patient data before submission.
+              </span>
+            </label>
+          </Card>
+
+          {/* HIPAA Full List Dialog */}
+          <Dialog open={showFullHipaaList} onOpenChange={setShowFullHipaaList}>
+            <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-mint" />
+                  18 HIPAA Safe Harbor Identifiers
+                </DialogTitle>
+                <DialogDescription>
+                  To comply with HIPAA Safe Harbor de-identification, your clinical notes must not contain any of these identifiers:
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-4">
+                <ol className="text-sm text-gray-700 space-y-2 list-decimal list-inside">
+                  <li><strong>Names</strong> — <span className="text-mint">(patient name IS allowed for our use case)</span></li>
+                  <li><strong>Geographic data</strong> smaller than state</li>
+                  <li><strong>Dates</strong> (except year) related to an individual — birth date, admission date, discharge date, death date</li>
+                  <li><strong>Phone numbers</strong></li>
+                  <li><strong>Fax numbers</strong></li>
+                  <li><strong>Email addresses</strong></li>
+                  <li><strong>Social Security Numbers</strong></li>
+                  <li><strong>Medical Record Numbers</strong></li>
+                  <li><strong>Health plan beneficiary numbers</strong></li>
+                  <li><strong>Account numbers</strong></li>
+                  <li><strong>Certificate/license numbers</strong></li>
+                  <li><strong>Vehicle identifiers</strong> and serial numbers</li>
+                  <li><strong>Device identifiers</strong> and serial numbers</li>
+                  <li><strong>Web URLs</strong></li>
+                  <li><strong>IP addresses</strong></li>
+                  <li><strong>Biometric identifiers</strong> (fingerprints, voiceprints)</li>
+                  <li><strong>Full-face photographs</strong></li>
+                  <li><strong>Any other unique identifying number</strong>, characteristic, or code</li>
+                </ol>
+                <div className="mt-4 p-3 bg-mint/10 rounded-lg border border-mint/20">
+                  <p className="text-sm text-gray-600">
+                    <strong>What IS allowed:</strong> Patient name, age (not DOB), state (not full address), and clinical data (diagnoses, medications, lab values, treatment history).
+                  </p>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
 
           {/* Submit Buttons */}
@@ -402,8 +536,8 @@ Requesting Rinvoq 15mg daily."
             <Button
               type="submit"
               size="lg"
-              disabled={loading}
-              className="gap-2 bg-dark-bg hover:bg-dark-bg/90 text-white min-w-[200px]"
+              disabled={loading || !agreedToTerms}
+              className="gap-2 bg-dark-bg hover:bg-dark-bg/90 text-white min-w-[200px] disabled:opacity-50"
             >
               {loading ? (
                 <>

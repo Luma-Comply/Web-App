@@ -382,20 +382,30 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
       )
     }
 
-    // Update user's remaining cases count
-    const { data: userData } = await supabase
+    // Update remaining cases count - use team owner's pool if user is a team member
+    const { data: currentUser } = await supabase
       .from("users")
-      .select("cases_remaining_this_month")
+      .select("team_owner_id, cases_remaining_this_month, cases_remaining")
       .eq("id", session.user.id)
       .single()
 
-    if (userData && userData.cases_remaining_this_month > 0) {
+    // Determine whose cases pool to decrement (team owner's or own)
+    const poolOwnerId = currentUser?.team_owner_id || session.user.id
+
+    const { data: poolOwnerData } = await supabase
+      .from("users")
+      .select("cases_remaining_this_month, cases_remaining")
+      .eq("id", poolOwnerId)
+      .single()
+
+    if (poolOwnerData && poolOwnerData.cases_remaining > 0) {
       await supabase
         .from("users")
         .update({
-          cases_remaining_this_month: userData.cases_remaining_this_month - 1,
+          cases_remaining_this_month: Math.max(0, (poolOwnerData.cases_remaining_this_month || 50) - 1),
+          cases_remaining: Math.max(0, (poolOwnerData.cases_remaining || 50) - 1),
         })
-        .eq("id", session.user.id)
+        .eq("id", poolOwnerId)
     }
 
     return NextResponse.json({

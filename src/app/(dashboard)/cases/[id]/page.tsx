@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -70,7 +70,6 @@ export default function CaseDetailPage() {
   const [copied, setCopied] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [isSavingEdits, setIsSavingEdits] = useState(false)
-  const hasAutoExtracted = useRef(false) // Track if auto-extraction has run
 
   // Check if user has manually edited (from database metadata)
   const hasManuallyEdited = caseData?.metadata?.manually_edited === true
@@ -316,90 +315,8 @@ export default function CaseDetailPage() {
     }
   }, [caseData])
 
-  // AUTO-UPDATE PATIENT NAME AND PAYER FROM NOTES
-  // Only runs once after generation completes, not after manual edits
-  useEffect(() => {
-    if (!caseData) return
-    if (hasManuallyEdited) {
-      console.log("Skipping auto-extraction: User has manually edited")
-      return // Skip auto-extraction if user has manually edited
-    }
-    if (hasAutoExtracted.current) {
-      console.log("Skipping auto-extraction: Already extracted once")
-      return // Only run once per case
-    }
-
-    const hasGenerated = Boolean(caseData.generated_output || editedOutput)
-    if (!hasGenerated) return // Only update after generation is complete
-
-    console.log("Running auto-extraction...")
-
-    // Update patient name
-    const extractedName = extractPatientNameFromNotes()
-    const shouldUseExtractedName = extractedName &&
-      (extractedName.first !== caseData.patient_first_name || extractedName.last !== caseData.patient_last_name) &&
-      isValidName(extractedName.first) && isValidName(extractedName.last)
-
-    if (shouldUseExtractedName && extractedName) {
-      // Auto-save the corrected name to database
-      const updateName = async () => {
-        try {
-          await supabase
-            .from("cases")
-            .update({
-              patient_first_name: extractedName.first,
-              patient_last_name: extractedName.last
-            })
-            .eq("id", caseData.id)
-
-          // Update local state
-          setCaseData({
-            ...caseData,
-            patient_first_name: extractedName.first,
-            patient_last_name: extractedName.last
-          })
-        } catch (error) {
-          console.error("Error updating patient name:", error)
-        }
-      }
-
-      updateName()
-    }
-
-    // Update payer
-    const extractedPayer = extractPayerFromNotes()
-    const shouldUseExtractedPayer = extractedPayer &&
-      extractedPayer !== caseData.payer_name
-
-    if (shouldUseExtractedPayer && extractedPayer) {
-      // Auto-save the corrected payer to database
-      const updatePayer = async () => {
-        try {
-          await supabase
-            .from("cases")
-            .update({
-              payer_name: extractedPayer
-            })
-            .eq("id", caseData.id)
-
-          // Update local state
-          setCaseData({
-            ...caseData,
-            payer_name: extractedPayer
-          })
-        } catch (error) {
-          console.error("Error updating payer:", error)
-        }
-      }
-
-      updatePayer()
-    }
-
-    // Mark that auto-extraction has run
-    hasAutoExtracted.current = true
-    // Removed patient_first_name and patient_last_name from deps to prevent infinite loop
-    // Only trigger on generation completion
-  }, [caseData?.generated_output, editedOutput, caseData?.id, hasManuallyEdited])
+  // Note: Auto-extraction is now display-only (see render logic below)
+  // We no longer auto-save extracted names to the database to prevent overwriting user input
 
   async function loadCase() {
     try {
@@ -413,9 +330,6 @@ export default function CaseDetailPage() {
 
       setCaseData(data)
       setEditedOutput(data.edited_output || data.generated_output || "")
-
-      // Reset auto-extraction flag when loading a new case
-      hasAutoExtracted.current = false
     } catch (error) {
       console.error("Error loading case:", error)
     } finally {
@@ -481,14 +395,15 @@ export default function CaseDetailPage() {
   }
 
   // Open edit modal and populate form
+  // Always use actual database values, not auto-extracted display values
   const openEditModal = () => {
     if (!caseData) return
     setEditFormData({
-      patient_first_name: displayFirstName,
-      patient_last_name: displayLastName,
+      patient_first_name: caseData.patient_first_name || "",
+      patient_last_name: caseData.patient_last_name || "",
       patient_age: caseData.patient_age?.toString() || "",
       patient_state: caseData.patient_state || "",
-      payer_name: displayPayer,
+      payer_name: caseData.payer_name || "",
       claim_amount: caseData.claim_amount?.toString() || "",
       disease_activity: caseData.disease_activity || "",
     })
@@ -502,12 +417,8 @@ export default function CaseDetailPage() {
       return
     }
 
-    if (isSavingEdits) {
-      console.log("Already saving, skipping duplicate request")
-      return
-    }
+    if (isSavingEdits) return
 
-    console.log("Saving edits...", editFormData)
     setIsSavingEdits(true)
 
     try {
@@ -584,13 +495,8 @@ export default function CaseDetailPage() {
         }
       }
 
-      console.log("Updating with data:", updateData)
-      console.log("Case ID:", caseData.id)
-
       // Check authentication
       const { data: { session } } = await supabase.auth.getSession()
-      console.log("Current session:", session?.user?.id)
-      console.log("Case user_id:", caseData.user_id)
 
       if (!session) {
         throw new Error("Not authenticated. Please refresh the page and try again.")
@@ -611,8 +517,6 @@ export default function CaseDetailPage() {
         })
         throw new Error(error.message || "Database update failed")
       }
-
-      console.log("Update successful:", data)
 
       // Update local state with returned data (includes the manually_edited flag)
       const updatedCase = data && data.length > 0 ? data[0] : { ...caseData, ...updateData }
@@ -769,42 +673,35 @@ export default function CaseDetailPage() {
   const hasGenerated = Boolean(caseData?.generated_output || editedOutput)
   const needsGeneration = caseData && !caseData.generated_output && caseData.status === 'draft'
 
-  // If user has manually edited, always use database values - don't auto-extract
+  // Always use database values for display
+  // Only show extracted values as a hint when user left fields empty
   let displayFirstName = caseData?.patient_first_name || ''
   let displayLastName = caseData?.patient_last_name || ''
   let displayPayer = caseData?.payer_name || ''
   let showExtractedNameLabel = false
   let showExtractedPayerLabel = false
 
-  console.log("Display logic - hasManuallyEdited:", hasManuallyEdited)
-  console.log("Display logic - DB values:", {
-    first: caseData?.patient_first_name,
-    last: caseData?.patient_last_name,
-    payer: caseData?.payer_name,
-    metadata: caseData?.metadata
-  })
-
-  // Only run extraction logic if user hasn't manually edited
+  // Only run extraction logic if user hasn't manually edited AND left name fields empty
+  // This prevents overwriting user-entered names with auto-extracted values
   if (!hasManuallyEdited) {
-    const extractedName = extractPatientNameFromNotes()
-    const extractedPayer = extractPayerFromNotes()
+    const nameFieldsEmpty = !caseData?.patient_first_name?.trim() || !caseData?.patient_last_name?.trim()
+    const payerFieldEmpty = !caseData?.payer_name?.trim()
 
-    // Only use extracted name if it's different from form input and valid
-    const shouldUseExtractedName = extractedName &&
-      (extractedName.first !== caseData?.patient_first_name || extractedName.last !== caseData?.patient_last_name) &&
-      isValidName(extractedName.first) && isValidName(extractedName.last)
-
-    if (shouldUseExtractedName && extractedName) {
-      displayFirstName = extractedName.first
-      displayLastName = extractedName.last
-      showExtractedNameLabel = true
+    if (nameFieldsEmpty) {
+      const extractedName = extractPatientNameFromNotes()
+      if (extractedName && isValidName(extractedName.first) && isValidName(extractedName.last)) {
+        displayFirstName = extractedName.first
+        displayLastName = extractedName.last
+        showExtractedNameLabel = true
+      }
     }
 
-    // Only use extracted payer if it's different from form input
-    const shouldUseExtractedPayer = extractedPayer && extractedPayer !== caseData?.payer_name
-    if (shouldUseExtractedPayer && extractedPayer) {
-      displayPayer = extractedPayer
-      showExtractedPayerLabel = true
+    if (payerFieldEmpty) {
+      const extractedPayer = extractPayerFromNotes()
+      if (extractedPayer) {
+        displayPayer = extractedPayer
+        showExtractedPayerLabel = true
+      }
     }
   }
 
@@ -959,8 +856,32 @@ export default function CaseDetailPage() {
                 <h2 className="text-xl font-serif text-dark-bg">
                   {hasGenerated ? "Generated Documentation" : "Generating Documentation..."}
                 </h2>
-                {!hasGenerated && !generating && (
-                  // Fallback button if auto-start fails or user cancels
+                {hasGenerated ? (
+                  <div className="flex gap-2">
+                    <Button onClick={saveEdits} variant="outline" size="sm">
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Save Changes
+                    </Button>
+                    <Button
+                      onClick={generateDocumentation}
+                      disabled={generating}
+                      variant="secondary"
+                      size="sm"
+                    >
+                      {generating ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Regenerating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Regenerate
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ) : !generating && (
                   <Button
                     onClick={generateDocumentation}
                     className="gap-2"
@@ -981,10 +902,6 @@ export default function CaseDetailPage() {
                   />
 
                   <div className="flex gap-3 flex-wrap">
-                    <Button onClick={saveEdits} variant="outline">
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Save Changes
-                    </Button>
                     <Button onClick={copyToClipboard} variant="outline">
                       <AnimatePresence mode="popLayout" initial={false}>
                         <motion.div
@@ -1015,23 +932,6 @@ export default function CaseDetailPage() {
                     <Button onClick={generatePdf} variant="outline">
                       <Download className="w-4 h-4 mr-2" />
                       PDF
-                    </Button>
-                    <Button
-                      onClick={generateDocumentation}
-                      disabled={generating}
-                      variant="secondary"
-                    >
-                      {generating ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Regenerating...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Regenerate
-                        </>
-                      )}
                     </Button>
                   </div>
                 </>
@@ -1128,7 +1028,7 @@ export default function CaseDetailPage() {
                   id="state"
                   value={editFormData.patient_state}
                   onChange={(e) =>
-                    setEditFormData({ ...editFormData, patient_state: e.target.value })
+                    setEditFormData({ ...editFormData, patient_state: e.target.value.toUpperCase() })
                   }
                 />
               </div>
@@ -1151,13 +1051,13 @@ export default function CaseDetailPage() {
                 <Input
                   id="claim-amount"
                   type="text"
-                  placeholder="50000"
-                  value={editFormData.claim_amount}
-                  onChange={(e) =>
-                    setEditFormData({ ...editFormData, claim_amount: e.target.value })
-                  }
+                  placeholder="$50,000.00"
+                  value={editFormData.claim_amount ? `$${parseFloat(editFormData.claim_amount.replace(/[^0-9.]/g, '') || '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/[^0-9.]/g, '')
+                    setEditFormData({ ...editFormData, claim_amount: rawValue })
+                  }}
                 />
-                <p className="text-xs text-gray-500">Enter amount as a number (e.g., 50000)</p>
               </div>
 
               <div className="space-y-2 col-span-2">
