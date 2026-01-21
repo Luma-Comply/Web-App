@@ -35,6 +35,110 @@ npm start
 npm run lint
 ```
 
+## Hooks Required for Every Code Change
+
+Hooks are mandatory. Hooks must be used to run code automatically before and after any change Claude makes. The goal is to catch problems immediately instead of letting them pile up.
+
+Whenever you touch code, you must ensure the project hooks run.
+
+### What Hooks Are For
+
+Hooks exist to enforce quality, consistency, and safety on every edit.
+
+Examples include:
+- Prettier or formatters on every file you touch
+- Type checking after every edit
+- Linting and tests when available
+
+This process is required to prevent technical debt from forming.
+
+### Required Behavior
+
+**Before completing any change:**
+- Run formatting hooks on all modified files
+
+**After completing any change:**
+- Run type checking
+- Run linting if available
+- Run tests if available
+
+**If any hook fails:**
+- Fix the issue before continuing
+- Do not stack new changes on top of failing hooks
+
+### Long Change Safety Check
+
+For large edits, additional checkpoints are required.
+
+**After every 1000 lines changed or generated:**
+- Re-run format, lint, and type checks
+- Run security checks if available
+
+This is mandatory for refactors, migrations, or large feature work.
+
+### Pull Request Readiness
+
+Before any pull request is considered ready:
+- All hooks must pass
+- Formatting, linting, type checks, tests, and any security checks required by the project
+
+## What NOT to Do
+
+Claude has known tendencies that must be actively avoided. The default behavior must always be minimal, simple, and contained.
+
+### Do Not Overengineer
+
+Do NOT introduce:
+- Extra files unless absolutely required
+- New folders for small changes
+- Abstractions that were not explicitly requested
+- "Future-proofing" or speculative flexibility
+- Frameworks or systems when a direct solution works
+
+If something can be solved in a few lines, do not turn it into a system.
+
+### Keep Changes Minimal and Local
+
+**Prefer:**
+- One file when possible
+- Small, direct edits
+- Existing patterns already used in the codebase
+
+**Avoid:**
+- Spreading logic across many files
+- Creating helper layers without a clear, current need
+- Refactors that were not explicitly requested
+
+### Do Not Invent Scope
+
+Only build exactly what is asked.
+
+Do NOT:
+- Add features that were not requested
+- Prepare for hypothetical use cases
+- Rewrite working code without a concrete reason
+- Turn simple fixes into "architectures"
+
+### Technical Debt Awareness
+
+Before producing a solution, always cross-check.
+
+**Ask internally:**
+- Did this actually need this many files?
+- Could this be simpler?
+- Did I introduce unnecessary moving parts?
+
+If a task could realistically be done with a couple lines of code, it should not result in many files.
+
+### Simplicity Override
+
+When instructions include:
+- "Keep this simple"
+- "Minimal solution"
+- "One file if possible"
+
+You must strongly bias toward the smallest working implementation, even if it feels less engineered.
+
 ## Architecture Overview
 
 ### Route Structure
