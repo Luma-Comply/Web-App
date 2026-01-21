@@ -244,31 +244,25 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Organization Name Field */}
-            <div className="space-y-2">
-              <Label htmlFor="practiceName" className="text-sm font-medium text-dark-bg">
-                Organization / Practice Name {isTeamOwner && <span className="text-coral">*</span>}
-              </Label>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  id="practiceName"
-                  type="text"
-                  value={practiceName}
-                  onChange={(e) => setPracticeName(e.target.value)}
-                  disabled={!isTeamOwner}
-                  className={`pl-10 border-sage-medium/30 ${
-                    isTeamOwner ? "bg-white" : "bg-gray-100 text-gray-600 cursor-not-allowed"
-                  }`}
-                  placeholder="Your Practice Name"
-                />
+            {/* Organization Name Field - Only shown for team owners */}
+            {isTeamOwner && (
+              <div className="space-y-2">
+                <Label htmlFor="practiceName" className="text-sm font-medium text-dark-bg">
+                  Organization / Practice Name <span className="text-coral">*</span>
+                </Label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    id="practiceName"
+                    type="text"
+                    value={practiceName}
+                    onChange={(e) => setPracticeName(e.target.value)}
+                    className="pl-10 border-sage-medium/30 bg-white"
+                    placeholder="Your Practice Name"
+                  />
+                </div>
               </div>
-              {!isTeamOwner && (
-                <p className="text-xs text-gray-500">
-                  Only team owners can change the organization name.
-                </p>
-              )}
-            </div>
+            )}
 
             {/* Email Field */}
             <div className="space-y-2">

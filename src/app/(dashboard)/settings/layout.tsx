@@ -11,7 +11,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -26,7 +25,6 @@ export default function SettingsLayout({
   const supabase = createClient()
   const [userEmail, setUserEmail] = useState("")
   const [practiceName, setPracticeName] = useState("")
-  const [userName, setUserName] = useState("") // User's first + last name from metadata
   const [isTeamOwner, setIsTeamOwner] = useState(true) // Default to true to avoid flash
 
   useEffect(() => {
@@ -36,14 +34,6 @@ export default function SettingsLayout({
       } = await supabase.auth.getSession()
       if (session) {
         setUserEmail(session.user.email || "")
-
-        // Get user's name from metadata
-        const metadata = session.user.user_metadata || {}
-        const firstName = metadata.first_name || ""
-        const lastName = metadata.last_name || ""
-        if (firstName || lastName) {
-          setUserName(`${firstName} ${lastName}`.trim())
-        }
 
         // Load practice name and ownership status from users table
         const { data: userData } = await supabase
@@ -114,21 +104,11 @@ export default function SettingsLayout({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600 hidden md:block">{isTeamOwner ? (practiceName || userEmail) : (userName || userEmail)}</span>
+                  <span className="text-sm text-gray-600 hidden md:block">{practiceName || userEmail}</span>
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-white border border-sage-medium/30">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{isTeamOwner ? (practiceName || userEmail) : (userName || userEmail)}</p>
-                    {!isTeamOwner && practiceName && (
-                      <p className="text-xs leading-none text-gray-500">{practiceName}</p>
-                    )}
-                    <p className="text-xs leading-none text-gray-500">{userEmail}</p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
+              <DropdownMenuContent align="end" className="w-48 bg-white border border-sage-medium/30">
                 <DropdownMenuItem
                   onClick={() => router.push('/settings/profile')}
                   className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"

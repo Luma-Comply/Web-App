@@ -107,6 +107,36 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
+    // Verify the user record was actually created (upsert can silently fail)
+    const { data: verifyUser, error: verifyError } = await serviceClient
+      .from("users")
+      .select("id, team_owner_id")
+      .eq("id", newUser.user.id)
+      .single()
+
+    if (verifyError || !verifyUser) {
+      console.error("User record verification failed:", verifyError)
+      // The upsert silently failed - try a direct INSERT
+      const { error: insertError } = await serviceClient.from("users").insert({
+        id: newUser.user.id,
+        email: invitation.invitee_email,
+        team_owner_id: invitation.team_owner_id,
+        is_team_owner: false,
+        subscription_status: "trialing",
+        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        cases_remaining: 50,
+      })
+
+      if (insertError) {
+        console.error("Direct insert also failed:", insertError)
+        // Clean up auth user since we couldn't create the DB record
+        await serviceClient.auth.admin.deleteUser(newUser.user.id)
+        return NextResponse.json({
+          error: `Failed to create user record after retry: ${insertError.message || insertError.code || 'Unknown error'}`
+        }, { status: 500 })
+      }
+    }
+
     // Mark invitation as accepted
     const { error: inviteUpdateError } = await serviceClient
       .from("team_invitations")
