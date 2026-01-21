@@ -85,17 +85,22 @@ export async function POST(request: NextRequest) {
       // Non-fatal, continue - the email_confirm on create might have worked
     }
 
-    // Create user record in public.users table
-    const { error: insertError } = await serviceClient.from("users").insert({
-      id: newUser.user.id,
-      email: invitation.invitee_email,
-      team_owner_id: invitation.team_owner_id,
-      is_team_owner: false,
-    })
+    // Update user record in public.users table to link to team
+    // The trigger on auth.users may have already created the base record,
+    // so we use upsert to handle both cases
+    const { error: upsertError } = await serviceClient.from("users").upsert(
+      {
+        id: newUser.user.id,
+        email: invitation.invitee_email,
+        team_owner_id: invitation.team_owner_id,
+        is_team_owner: false,
+      },
+      { onConflict: "id" }
+    )
 
-    if (insertError) {
-      console.error("Error creating user record:", insertError)
-      // Try to clean up the auth user if DB insert failed
+    if (upsertError) {
+      console.error("Error creating/updating user record:", upsertError)
+      // Try to clean up the auth user if DB operation failed
       await serviceClient.auth.admin.deleteUser(newUser.user.id)
       return NextResponse.json({ error: "Failed to create user record" }, { status: 500 })
     }
