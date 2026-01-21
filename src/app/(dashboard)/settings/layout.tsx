@@ -26,6 +26,8 @@ export default function SettingsLayout({
   const supabase = createClient()
   const [userEmail, setUserEmail] = useState("")
   const [practiceName, setPracticeName] = useState("")
+  const [userName, setUserName] = useState("") // User's first + last name from metadata
+  const [isTeamOwner, setIsTeamOwner] = useState(true) // Default to true to avoid flash
 
   useEffect(() => {
     async function loadUser() {
@@ -35,14 +37,26 @@ export default function SettingsLayout({
       if (session) {
         setUserEmail(session.user.email || "")
 
-        // Load practice name from users table
+        // Get user's name from metadata
+        const metadata = session.user.user_metadata || {}
+        const firstName = metadata.first_name || ""
+        const lastName = metadata.last_name || ""
+        if (firstName || lastName) {
+          setUserName(`${firstName} ${lastName}`.trim())
+        }
+
+        // Load practice name and ownership status from users table
         const { data: userData } = await supabase
           .from("users")
-          .select("practice_name, team_owner_id")
+          .select("practice_name, team_owner_id, is_team_owner")
           .eq("id", session.user.id)
           .single()
 
         if (userData) {
+          // Check if user is a team owner (either is_team_owner flag or no team_owner_id)
+          const ownerStatus = userData.is_team_owner || !userData.team_owner_id
+          setIsTeamOwner(ownerStatus)
+
           // If user is a team member, fetch owner's practice name
           if (userData.team_owner_id) {
             const { data: ownerData } = await supabase
@@ -54,21 +68,29 @@ export default function SettingsLayout({
           } else {
             setPracticeName(userData.practice_name || "")
           }
+
+          // Redirect team members away from Team/Billing pages
+          if (!ownerStatus && (pathname === "/settings/team" || pathname === "/settings/billing")) {
+            router.push("/settings/profile")
+          }
         }
       }
     }
     loadUser()
-  }, [])
+  }, [pathname, router])
 
   async function handleSignOut() {
     await supabase.auth.signOut()
     router.push("/")
   }
 
+  // Only show Team and Billing tabs for team owners
   const tabs = [
     { name: "Profile", href: "/settings/profile", icon: User },
-    { name: "Team", href: "/settings/team", icon: Users },
-    { name: "Billing", href: "/settings/billing", icon: CreditCard },
+    ...(isTeamOwner ? [
+      { name: "Team", href: "/settings/team", icon: Users },
+      { name: "Billing", href: "/settings/billing", icon: CreditCard },
+    ] : []),
   ]
 
   return (
@@ -92,14 +114,17 @@ export default function SettingsLayout({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600 hidden md:block">{practiceName || userEmail}</span>
+                  <span className="text-sm text-gray-600 hidden md:block">{isTeamOwner ? (practiceName || userEmail) : (userName || userEmail)}</span>
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-white border border-sage-medium/30">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{practiceName || userEmail}</p>
+                    <p className="text-sm font-medium leading-none">{isTeamOwner ? (practiceName || userEmail) : (userName || userEmail)}</p>
+                    {!isTeamOwner && practiceName && (
+                      <p className="text-xs leading-none text-gray-500">{practiceName}</p>
+                    )}
                     <p className="text-xs leading-none text-gray-500">{userEmail}</p>
                   </div>
                 </DropdownMenuLabel>
@@ -111,20 +136,24 @@ export default function SettingsLayout({
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => router.push('/settings/team')}
-                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
-                >
-                  <Users className="mr-2 h-4 w-4" />
-                  Team
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => router.push('/settings/billing')}
-                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
-                >
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Billing
-                </DropdownMenuItem>
+                {isTeamOwner && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => router.push('/settings/team')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Team
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => router.push('/settings/billing')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Billing
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleSignOut}

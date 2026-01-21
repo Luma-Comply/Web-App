@@ -84,6 +84,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [userEmail, setUserEmail] = useState("")
   const [practiceName, setPracticeName] = useState("")
+  const [userName, setUserName] = useState("") // User's first + last name from metadata
+  const [isTeamOwner, setIsTeamOwner] = useState(true) // Default true to avoid flash
   const [activeTab, setActiveTab] = useState("active") // "active" | "archived"
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [caseToDelete, setCaseToDelete] = useState<Case | null>(null)
@@ -121,10 +123,18 @@ export default function DashboardPage() {
 
       setUserEmail(session.user.email || "")
 
+      // Get user's name from metadata
+      const metadata = session.user.user_metadata || {}
+      const firstName = metadata.first_name || ""
+      const lastName = metadata.last_name || ""
+      if (firstName || lastName) {
+        setUserName(`${firstName} ${lastName}`.trim())
+      }
+
       // Load user profile for subscription, limits, and practice name
       const { data: userData } = await supabase
         .from("users")
-        .select("subscription_status, trial_ends_at, cases_remaining, cases_used_this_period, billing_period_end, practice_name, team_owner_id")
+        .select("subscription_status, trial_ends_at, cases_remaining, cases_used_this_period, billing_period_end, practice_name, team_owner_id, is_team_owner")
         .eq("id", session.user.id)
         .single()
 
@@ -136,6 +146,9 @@ export default function DashboardPage() {
           cases_used_this_period: userData.cases_used_this_period || 0,
           billing_period_end: userData.billing_period_end,
         })
+
+        // Check if user is a team owner
+        setIsTeamOwner(userData.is_team_owner || !userData.team_owner_id)
 
         // Set practice name - if user is a team member, fetch owner's practice name
         if (userData.team_owner_id) {
@@ -279,14 +292,17 @@ export default function DashboardPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600 hidden md:block">{practiceName || userEmail}</span>
+                  <span className="text-sm text-gray-600 hidden md:block">{isTeamOwner ? (practiceName || userEmail) : (userName || userEmail)}</span>
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-white border border-sage-medium/30">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{practiceName || userEmail}</p>
+                    <p className="text-sm font-medium leading-none">{isTeamOwner ? (practiceName || userEmail) : (userName || userEmail)}</p>
+                    {!isTeamOwner && practiceName && (
+                      <p className="text-xs leading-none text-gray-500">{practiceName}</p>
+                    )}
                     <p className="text-xs leading-none text-gray-500">{userEmail}</p>
                   </div>
                 </DropdownMenuLabel>
@@ -298,20 +314,24 @@ export default function DashboardPage() {
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => router.push('/settings/team')}
-                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
-                >
-                  <Users className="mr-2 h-4 w-4" />
-                  Team
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => router.push('/settings/billing')}
-                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
-                >
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Billing
-                </DropdownMenuItem>
+                {isTeamOwner && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => router.push('/settings/team')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Team
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => router.push('/settings/billing')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Billing
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleSignOut}
