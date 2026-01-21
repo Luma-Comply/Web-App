@@ -328,14 +328,16 @@ export default function DashboardPage() {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Subscription Banner */}
-        <SubscriptionBanner
-          subscriptionStatus={subscription.subscription_status}
-          trialEndsAt={subscription.trial_ends_at}
-          casesRemaining={subscription.cases_remaining}
-          casesUsedThisPeriod={subscription.cases_used_this_period}
-          billingPeriodEnd={subscription.billing_period_end}
-        />
+        {/* Subscription Banner - Only shown to team owners */}
+        {isTeamOwner && (
+          <SubscriptionBanner
+            subscriptionStatus={subscription.subscription_status}
+            trialEndsAt={subscription.trial_ends_at}
+            casesRemaining={subscription.cases_remaining}
+            casesUsedThisPeriod={subscription.cases_used_this_period}
+            billingPeriodEnd={subscription.billing_period_end}
+          />
+        )}
 
         {/* Stats Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
