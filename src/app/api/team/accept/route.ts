@@ -100,9 +100,12 @@ export async function POST(request: NextRequest) {
 
     if (upsertError) {
       console.error("Error creating/updating user record:", upsertError)
+      console.error("Upsert error details:", JSON.stringify(upsertError, null, 2))
       // Try to clean up the auth user if DB operation failed
       await serviceClient.auth.admin.deleteUser(newUser.user.id)
-      return NextResponse.json({ error: "Failed to create user record" }, { status: 500 })
+      return NextResponse.json({
+        error: `Failed to create user record: ${upsertError.message || upsertError.code || 'Unknown error'}`
+      }, { status: 500 })
     }
 
     // Mark invitation as accepted
