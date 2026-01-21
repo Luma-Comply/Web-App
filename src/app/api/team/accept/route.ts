@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     // Double-check: explicitly update user to confirm email (belt and suspenders)
     // Some Supabase configurations ignore email_confirm on createUser
-    const { error: updateError } = await serviceClient.auth.admin.updateUser(
+    const { error: updateError } = await serviceClient.auth.admin.updateUserById(
       newUser.user.id,
       { email_confirm: true }
     )
