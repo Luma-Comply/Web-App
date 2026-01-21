@@ -58,16 +58,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log("Step 1: Creating auth user for:", invitation.invitee_email)
-
     // Create user with Admin API - email is pre-confirmed
     const { data: newUser, error: createError } = await serviceClient.auth.admin.createUser({
       email: invitation.invitee_email,
       password: password,
       email_confirm: true, // This skips email confirmation
     })
-
-    console.log("Step 2: createUser result - user:", newUser?.user?.id, "error:", createError?.message)
 
     if (createError || !newUser?.user) {
       console.error("Error creating user:", createError)
@@ -76,8 +72,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
-
-    console.log("Step 3: Auth user created successfully, ID:", newUser.user.id)
 
     // Double-check: explicitly update user to confirm email (belt and suspenders)
     // Some Supabase configurations ignore email_confirm on createUser
@@ -90,8 +84,6 @@ export async function POST(request: NextRequest) {
       console.error("Error confirming email:", updateError)
       // Non-fatal, continue - the email_confirm on create might have worked
     }
-
-    console.log("Step 4: About to upsert user record")
 
     // Update user record in public.users table to link to team
     // The trigger on auth.users may have already created the base record,
@@ -106,19 +98,14 @@ export async function POST(request: NextRequest) {
       { onConflict: "id" }
     )
 
-    console.log("Step 5: Upsert result - error:", upsertError?.message)
-
     if (upsertError) {
       console.error("Error creating/updating user record:", upsertError)
-      console.error("Upsert error details:", JSON.stringify(upsertError, null, 2))
       // Try to clean up the auth user if DB operation failed
       await serviceClient.auth.admin.deleteUser(newUser.user.id)
       return NextResponse.json({
         error: `Failed to create user record: ${upsertError.message || upsertError.code || 'Unknown error'}`
       }, { status: 500 })
     }
-
-    console.log("Step 6: User record created/updated successfully")
 
     // Mark invitation as accepted
     const { error: inviteUpdateError } = await serviceClient
