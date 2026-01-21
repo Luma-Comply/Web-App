@@ -154,13 +154,12 @@ export default function DashboardPage() {
         }
       }
 
-      // Load ALL cases (active + archived) to calculate stats correctly
+      // Load cases - RLS handles visibility (team owners see all team cases, members see only their own)
       const { data: casesData } = await supabase
         .from("cases")
         .select("*")
-        .eq("user_id", session.user.id)
         .order("created_at", { ascending: false })
-        .limit(100) // Fetches recent 100 cases
+        .limit(100)
 
       if (casesData) {
         setCases(casesData as Case[]) // Type assertion for new is_archived field
