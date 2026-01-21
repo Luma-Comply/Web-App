@@ -82,6 +82,28 @@ Before any pull request is considered ready:
 - All hooks must pass
 - Formatting, linting, type checks, tests, and any security checks required by the project
 
+## Think First, Then Code
+
+Do not jump straight into implementation.
+
+Before writing or modifying code, always pause and reason about the task.
+
+**For anything non-trivial, you must first:**
+- Clarify the goal and success criteria
+- Identify what already exists in the codebase
+- Decide the simplest possible approach
+- Confirm the intended end state before building
+
+Bias strongly toward planning before execution.
+
+**If the task involves architecture, refactors, or multi-file changes:**
+- Start with a brief plan
+- Outline the approach
+- Call out tradeoffs
+- Only then move to implementation
+
+Thinking first is mandatory. Coding is second.
+
 ## What NOT to Do
 
 Claude has known tendencies that must be actively avoided. The default behavior must always be minimal, simple, and contained.
