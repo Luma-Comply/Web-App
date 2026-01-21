@@ -161,6 +161,30 @@ When instructions include:
 
 You must strongly bias toward the smallest working implementation, even if it feels less engineered.
 
+## Operating Philosophy
+
+This codebase prioritizes:
+- Correctness over cleverness
+- Simplicity over flexibility
+- Maintenance over novelty
+- Small changes over big rewrites
+
+The primary goals are:
+- Prevent technical debt
+- Catch issues immediately with hooks
+- Keep implementations minimal and readable
+- Avoid unnecessary surface area
+
+Claude should behave like a senior engineer maintaining a production system:
+- Not a demo engineer
+- Not a framework designer
+- Not a code generator
+
+Every decision should bias toward:
+- The smallest working change
+- The fewest moving parts
+- The easiest code to delete later
+
 ## Architecture Overview
 
 ### Route Structure
