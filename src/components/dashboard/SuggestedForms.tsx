@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, Download, ExternalLink, AlertCircle } from "lucide-react"
+import { Download } from "lucide-react"
 
 interface SuggestedForm {
     id: string
@@ -159,69 +159,55 @@ export function SuggestedForms({ caseId, lastGenerated }: SuggestedFormsProps) {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            {/* Header - stacks on mobile, inline on tablet+ */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h3 className="text-lg font-serif font-medium text-dark-bg flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-mint-dark" />
+                    <h3 className="text-lg font-sans font-semibold text-dark-bg">
                         Suggested Supporting Documents
                     </h3>
                     <p className="text-sm text-gray-500 mt-1">
                         Based on payer policy research, these documents may increase approval odds.
                     </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={downloadFormsPDF} className="gap-2">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadFormsPDF}
+                    className="gap-2 w-full sm:w-auto shrink-0"
+                >
                     <Download className="w-4 h-4" />
                     Download Checklist
                 </Button>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            {/* Grid - 1 col mobile, 2 cols tablet, 3 cols on larger tablets/desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {forms.map((form) => (
-                    <Card key={form.id} className="p-3 border-sage-medium/20 hover:border-mint/30 transition-colors bg-white/80">
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="space-y-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className="font-medium text-dark-bg text-sm truncate">{form.title}</h4>
-                                    {form.confidence === "high" && (
-                                        <span className="text-[10px] font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                                            High
-                                        </span>
-                                    )}
-                                    {form.confidence === "medium" && (
-                                        <span className="text-[10px] font-semibold bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                                            Med
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-xs text-gray-500 line-clamp-2 leading-snug">
-                                    {form.description}
-                                </p>
-                            </div>
-
-                            <div className="shrink-0">
-                                {form.download_url ? (
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-8 w-8 text-mint-dark hover:text-mint-dark hover:bg-mint/10 border-mint/20"
-                                        onClick={() => window.open(form.download_url!, '_blank')}
-                                        title={form.is_external ? "Open Link" : "Download"}
-                                    >
-                                        {form.is_external ? <ExternalLink className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
-                                    </Button>
-                                ) : (
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-300 cursor-not-allowed" disabled>
-                                        <AlertCircle className="w-3.5 h-3.5" />
-                                    </Button>
+                    <Card key={form.id} className="p-3 sm:p-4 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
+                        <div className="space-y-1.5">
+                            <div className="flex items-start sm:items-center gap-2 flex-wrap">
+                                <h4 className="font-medium text-dark-bg text-sm leading-snug">{form.title}</h4>
+                                {form.confidence === "high" && (
+                                    <span className="text-[10px] font-semibold bg-green-100 text-green-700 border border-green-300 px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0">
+                                        High
+                                    </span>
+                                )}
+                                {form.confidence === "medium" && (
+                                    <span className="text-[10px] font-semibold bg-yellow-100 text-yellow-700 border border-yellow-400 px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0">
+                                        Med
+                                    </span>
                                 )}
                             </div>
+                            <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
+                                {form.description}
+                            </p>
                         </div>
                     </Card>
                 ))}
             </div>
 
-            <div className="flex justify-center">
-                <p className="text-xs text-gray-400 italic">
+            <div className="flex justify-center px-4">
+                <p className="text-xs text-gray-400 italic text-center">
                     * Suggestions are AI-generated based on public payer data. Verify requirements before submission.
                 </p>
             </div>
