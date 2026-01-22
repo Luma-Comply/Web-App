@@ -36,6 +36,26 @@ export interface ChecklistItem {
   guidance?: string // Why this matters for audits
 }
 
+// Editable checklist types for user annotations
+export interface ChecklistEdit {
+  item_id: string
+  user_notes: string
+  marked_addressed: boolean
+  addressed_at?: string
+  updated_at: string
+}
+
+export interface ChecklistEditsData {
+  version: number
+  last_validation_run: string
+  edits: Record<string, ChecklistEdit>
+}
+
+export interface ChecklistItemWithEdits extends ChecklistItem {
+  userNotes?: string
+  markedAddressed?: boolean
+}
+
 export interface ChecklistCategory {
   category: string
   description: string

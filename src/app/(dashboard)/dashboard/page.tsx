@@ -403,7 +403,7 @@ export default function DashboardPage() {
         {/* Improved Table Layout with Tabs */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-serif text-dark-bg">Case Management</h1>
+            <h1 className="text-2xl font-sans font-semibold text-dark-bg">Case Management</h1>
           </div>
 
           <Tabs defaultValue="active" onValueChange={setActiveTab} className="w-full">

@@ -17,10 +17,11 @@ import {
   XCircle,
   AlertCircle,
   Info,
-  Shield,
+  StickyNote,
+  Check,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { LCDValidationResult } from "@/lib/lcd-validation"
+import type { LCDValidationResult, ChecklistEdit, ChecklistItemWithEdits } from "@/lib/lcd-validation"
 import { AUDIT_RISK_LEVELS, type AuditRiskLevel } from "@/lib/lcd-requirements"
 
 interface LCDValidationPanelProps {
@@ -40,14 +41,36 @@ interface LCDValidationPanelProps {
     perplexityFindings: LCDValidationResult["perplexityFindings"]
   }
   isCollapsed?: boolean
+  checklistEdits?: Record<string, ChecklistEdit>
+  onItemClick?: (item: ChecklistItemWithEdits) => void
+  isEditable?: boolean
 }
 
 export function LCDValidationPanel({
   validation,
   isCollapsed: initialCollapsed = false,
+  checklistEdits,
+  onItemClick,
+  isEditable = true,
 }: LCDValidationPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(initialCollapsed)
   const [expandedCategories, setExpandedCategories] = useState<string[]>([])
+
+  // Merge user edits with checklist items
+  const getItemWithEdits = (item: LCDValidationResult["checklist"][0]["items"][0]): ChecklistItemWithEdits => {
+    const edit = checklistEdits?.[item.id]
+    return {
+      ...item,
+      userNotes: edit?.user_notes,
+      markedAddressed: edit?.marked_addressed,
+    }
+  }
+
+  const handleItemClick = (item: LCDValidationResult["checklist"][0]["items"][0]) => {
+    if (isEditable && onItemClick) {
+      onItemClick(getItemWithEdits(item))
+    }
+  }
 
   const riskLevel = validation.riskLevel as AuditRiskLevel
   const riskConfig = AUDIT_RISK_LEVELS[riskLevel] || AUDIT_RISK_LEVELS.MEDIUM
@@ -81,27 +104,26 @@ export function LCDValidationPanel({
     switch (risk) {
       case "INSTANT_DENIAL":
       case "VERY_HIGH":
-        return "bg-red-100 text-red-800 border-red-200"
+        return "bg-red-100 text-red-800 border-red-300"
       case "HIGH":
-        return "bg-orange-100 text-orange-800 border-orange-200"
+        return "bg-orange-100 text-orange-800 border-orange-300"
       case "MEDIUM":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+        return "bg-yellow-100 text-yellow-800 border-yellow-400"
       case "LOW":
-        return "bg-green-100 text-green-800 border-green-200"
+        return "bg-green-100 text-green-800 border-green-300"
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return "bg-gray-100 text-gray-800 border-gray-300"
     }
   }
 
   return (
-    <Card className="border-sage-medium/30">
+    <Card className="bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
       <Collapsible open={!isCollapsed} onOpenChange={() => setIsCollapsed(!isCollapsed)}>
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-sage-light/10 transition-colors">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Shield className="w-5 h-5 text-mint" />
-                <CardTitle className="text-lg font-serif">
+                <CardTitle className="text-lg font-sans font-semibold">
                   LCD L35041 Validation
                 </CardTitle>
                 <Badge
@@ -129,11 +151,11 @@ export function LCDValidationPanel({
           <CardContent className="space-y-6">
             {/* Summary Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="text-sm text-gray-500">Denial Risk</div>
+              <div className="bg-white rounded-xl p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Denial Risk</div>
                 <div
                   className={cn(
-                    "text-lg font-semibold",
+                    "text-xl font-bold",
                     riskLevel === "LOW"
                       ? "text-green-600"
                       : riskLevel === "MEDIUM"
@@ -144,26 +166,30 @@ export function LCDValidationPanel({
                   {validation.denialProbability}%
                 </div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="text-sm text-gray-500">Wound Type</div>
-                <div className="text-lg font-semibold">
-                  {validation.detectedWoundType || "Unknown"}
+              <div className="bg-white rounded-xl p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Wound Type</div>
+                <div className="text-xl font-bold text-dark-bg">
+                  {validation.detectedWoundType
+                    ? validation.detectedWoundType.split('_').map(word =>
+                        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                      ).join(' ')
+                    : "Unknown"}
                 </div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="text-sm text-gray-500">CTP Product</div>
+              <div className="bg-white rounded-xl p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CTP Product</div>
                 <div
                   className={cn(
-                    "text-lg font-semibold",
+                    "text-xl font-bold",
                     validation.ctpCovered ? "text-green-600" : "text-red-600"
                   )}
                 >
                   {validation.ctpCovered ? "Covered" : "Verify"}
                 </div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="text-sm text-gray-500">LCD Date</div>
-                <div className="text-lg font-semibold">
+              <div className="bg-white rounded-xl p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">LCD Date</div>
+                <div className="text-xl font-bold text-dark-bg">
                   {validation.perplexityFindings.lcdEffectiveDate}
                 </div>
               </div>
@@ -171,7 +197,7 @@ export function LCDValidationPanel({
 
             {/* Instant Denial Warnings */}
             {validation.instantDenialTriggers.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="bg-red-50 border border-red-300 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="w-5 h-5 text-red-600" />
                   <span className="font-semibold text-red-800">
@@ -191,7 +217,7 @@ export function LCDValidationPanel({
 
             {/* Very High Risk Items */}
             {validation.veryHighRiskItems.length > 0 && (
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="bg-orange-50 border border-orange-300 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertCircle className="w-5 h-5 text-orange-600" />
                   <span className="font-semibold text-orange-800">
@@ -247,48 +273,87 @@ export function LCDValidationPanel({
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div className="border-l-2 border-gray-200 ml-4 pl-4 py-2 space-y-2">
-                      {category.items.map((item) => (
-                        <div key={item.id} className="flex items-start gap-2">
-                          {getStatusIcon(item.status)}
-                          <div className="flex-1">
-                            <div
-                              className={cn(
-                                "text-sm",
-                                item.status === "FOUND"
-                                  ? "text-gray-700"
-                                  : item.status === "VIOLATION"
-                                    ? "text-red-700 font-medium"
-                                    : "text-gray-600"
-                              )}
-                            >
-                              {item.label}
-                            </div>
-                            {item.evidence && (
-                              <div className="text-xs text-green-600 mt-0.5 italic">
-                                Found: "{item.evidence}"
-                              </div>
+                      {category.items.map((item) => {
+                        const itemWithEdits = getItemWithEdits(item)
+                        const hasUserNotes = Boolean(itemWithEdits.userNotes)
+                        const isAddressed = itemWithEdits.markedAddressed
+
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => handleItemClick(item)}
+                            className={cn(
+                              "flex items-start gap-2 rounded-md p-2 -ml-2 transition-colors",
+                              isEditable && onItemClick && "cursor-pointer hover:bg-sage-light/20",
+                              isAddressed && "bg-mint/5"
                             )}
-                            {item.suggestion &&
-                              (item.status === "MISSING" ||
-                                item.status === "PARTIAL") && (
-                                <div className="text-xs text-orange-600 mt-0.5">
-                                  Add: {item.suggestion}
+                          >
+                            {/* Status icon or addressed checkmark */}
+                            {isAddressed ? (
+                              <div className="flex items-center justify-center w-4 h-4 rounded-full bg-mint/20">
+                                <Check className="w-3 h-3 text-mint" />
+                              </div>
+                            ) : (
+                              getStatusIcon(item.status)
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div
+                                className={cn(
+                                  "text-sm",
+                                  isAddressed
+                                    ? "text-mint font-medium"
+                                    : item.status === "FOUND"
+                                      ? "text-gray-700"
+                                      : item.status === "VIOLATION"
+                                        ? "text-red-700 font-medium"
+                                        : "text-gray-600"
+                                )}
+                              >
+                                {item.label}
+                              </div>
+                              {item.evidence && (
+                                <div className="text-xs text-green-600 mt-0.5 italic">
+                                  Found: "{item.evidence}"
                                 </div>
                               )}
-                          </div>
-                          {item.auditRisk && item.status !== "FOUND" && (
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-xs",
-                                getRiskBadgeColor(item.auditRisk)
+                              {item.suggestion &&
+                                (item.status === "MISSING" ||
+                                  item.status === "PARTIAL") &&
+                                !isAddressed && (
+                                  <div className="text-xs text-orange-600 mt-0.5">
+                                    Add: {item.suggestion}
+                                  </div>
+                                )}
+                              {/* Show user notes indicator */}
+                              {hasUserNotes && (
+                                <div className="flex items-center gap-1 text-xs text-mint mt-1">
+                                  <StickyNote className="w-3 h-3" />
+                                  <span className="truncate max-w-[200px]">
+                                    {itemWithEdits.userNotes}
+                                  </span>
+                                </div>
                               )}
-                            >
-                              {item.auditRisk.replace("_", " ")}
-                            </Badge>
-                          )}
-                        </div>
-                      ))}
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              {/* Notes indicator badge */}
+                              {hasUserNotes && !isAddressed && (
+                                <div className="w-2 h-2 rounded-full bg-mint" title="Has notes" />
+                              )}
+                              {item.auditRisk && item.status !== "FOUND" && !isAddressed && (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-xs",
+                                    getRiskBadgeColor(item.auditRisk)
+                                  )}
+                                >
+                                  {item.auditRisk.replace("_", " ")}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
@@ -306,10 +371,10 @@ export function LCDValidationPanel({
                       className={cn(
                         "p-3 rounded-lg border",
                         rec.priority === "CRITICAL"
-                          ? "bg-red-50 border-red-200"
+                          ? "bg-red-50 border-red-300"
                           : rec.priority === "HIGH"
-                            ? "bg-orange-50 border-orange-200"
-                            : "bg-yellow-50 border-yellow-200"
+                            ? "bg-orange-50 border-orange-300"
+                            : "bg-yellow-50 border-yellow-400"
                       )}
                     >
                       <div className="flex items-center gap-2 mb-1">
@@ -318,10 +383,10 @@ export function LCDValidationPanel({
                           className={cn(
                             "text-xs",
                             rec.priority === "CRITICAL"
-                              ? "bg-red-100 text-red-700"
+                              ? "bg-red-100 text-red-700 border-red-300"
                               : rec.priority === "HIGH"
-                                ? "bg-orange-100 text-orange-700"
-                                : "bg-yellow-100 text-yellow-700"
+                                ? "bg-orange-100 text-orange-700 border-orange-300"
+                                : "bg-yellow-100 text-yellow-700 border-yellow-400"
                           )}
                         >
                           {rec.priority}
@@ -370,7 +435,7 @@ export function LCDValidationPanel({
                           <Badge
                             key={i}
                             variant="outline"
-                            className="text-xs bg-blue-100 text-blue-700"
+                            className="text-xs bg-blue-100 text-blue-700 border-blue-300"
                           >
                             {area}
                           </Badge>

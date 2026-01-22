@@ -7,7 +7,7 @@ export default function PostBody({ content }: Props) {
     <div className="max-w-3xl mx-auto">
       <div
         className="prose prose-lg prose-gray max-w-none
-          prose-headings:font-serif prose-headings:text-dark-bg
+          prose-headings:font-sans prose-headings:font-semibold prose-headings:text-dark-bg
           prose-h2:text-3xl prose-h2:mt-12 prose-h2:mb-4
           prose-h3:text-2xl prose-h3:mt-8 prose-h3:mb-3
           prose-p:text-gray-700 prose-p:leading-relaxed

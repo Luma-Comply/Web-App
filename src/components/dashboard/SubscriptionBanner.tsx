@@ -66,7 +66,7 @@ export function SubscriptionBanner({
           <div className="flex items-start gap-3 flex-1">
             <AlertCircle className="w-6 h-6 text-coral flex-shrink-0 mt-1" />
             <div>
-              <h3 className="text-lg font-serif text-dark-bg mb-1">
+              <h3 className="text-lg font-sans font-semibold text-dark-bg mb-1">
                 {subscriptionStatus === "canceled" ? "Subscription Canceled" : "Trial Ended"}
               </h3>
               <p className="text-gray-700 mb-3">
@@ -105,7 +105,7 @@ export function SubscriptionBanner({
             <Clock className="w-6 h-6 text-mint flex-shrink-0 mt-1" />
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h3 className="text-lg font-serif text-dark-bg">Free Trial Active</h3>
+                <h3 className="text-lg font-sans font-semibold text-dark-bg">Free Trial Active</h3>
                 <Badge variant="outline" className="bg-mint/10 text-mint border-mint/30">
                   {daysLeft} days left
                 </Badge>
@@ -146,7 +146,7 @@ export function SubscriptionBanner({
             <CheckCircle className={`w-6 h-6 flex-shrink-0 mt-1 ${isLowOnCases ? "text-coral" : "text-mint"}`} />
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h3 className="text-lg font-serif text-dark-bg">Professional Plan</h3>
+                <h3 className="text-lg font-sans font-semibold text-dark-bg">Professional Plan</h3>
                 <Badge variant="outline" className="bg-mint/10 text-mint border-mint/30">
                   Active
                 </Badge>
@@ -204,7 +204,7 @@ export function SubscriptionBanner({
           <div className="flex items-start gap-3 flex-1">
             <AlertCircle className="w-6 h-6 text-coral flex-shrink-0 mt-1" />
             <div>
-              <h3 className="text-lg font-serif text-dark-bg mb-1">Payment Failed</h3>
+              <h3 className="text-lg font-sans font-semibold text-dark-bg mb-1">Payment Failed</h3>
               <p className="text-gray-700 mb-3">
                 Your last payment failed. Please update your payment method to continue using Luma.
               </p>

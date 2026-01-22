@@ -33,7 +33,7 @@ export default function SignInDialog({ open, onOpenChange }: SignInDialogProps) 
             <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
           </div>
           <DialogHeader className="text-left space-y-1">
-            <DialogTitle className="text-2xl font-serif text-dark-bg">
+            <DialogTitle className="text-2xl font-sans font-semibold text-dark-bg">
               Welcome back
             </DialogTitle>
             <DialogDescription className="text-gray-600">

@@ -84,7 +84,7 @@ function AuthConfirmContent() {
           {status === "loading" && (
             <>
               <Loader2 className="w-16 h-16 text-mint animate-spin" />
-              <h1 className="text-2xl font-serif text-dark-bg">Verifying your email...</h1>
+              <h1 className="text-2xl font-sans font-semibold text-dark-bg">Verifying your email...</h1>
               <p className="text-gray-600">Please wait while we confirm your email address.</p>
             </>
           )}
@@ -92,7 +92,7 @@ function AuthConfirmContent() {
           {status === "success" && (
             <>
               <CheckCircle2 className="w-16 h-16 text-mint" />
-              <h1 className="text-2xl font-serif text-dark-bg">Email Verified!</h1>
+              <h1 className="text-2xl font-sans font-semibold text-dark-bg">Email Verified!</h1>
               <p className="text-gray-600">{message}</p>
               <p className="text-sm text-gray-500">Redirecting you to your profile...</p>
             </>
@@ -101,7 +101,7 @@ function AuthConfirmContent() {
           {status === "error" && (
             <>
               <XCircle className="w-16 h-16 text-coral" />
-              <h1 className="text-2xl font-serif text-dark-bg">Verification Failed</h1>
+              <h1 className="text-2xl font-sans font-semibold text-dark-bg">Verification Failed</h1>
               <p className="text-gray-600">{message}</p>
               <div className="flex gap-3 mt-4">
                 <Button

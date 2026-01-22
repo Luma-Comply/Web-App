@@ -30,7 +30,7 @@ export default function TermsPage() {
       {/* Content */}
       <main className="container mx-auto px-4 py-16">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-4xl md:text-5xl font-serif text-dark-bg mb-4">
+          <h1 className="text-4xl md:text-5xl font-sans font-semibold text-dark-bg mb-4">
             Terms of Service
           </h1>
           <p className="text-gray-600 mb-12">
@@ -39,7 +39,7 @@ export default function TermsPage() {
 
           <div className="prose prose-lg max-w-none">
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">1. Acceptance of Terms</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">1. Acceptance of Terms</h2>
               <p className="text-gray-700 mb-4">
                 By accessing or using Luma (&quot;the Service&quot;), you agree to be bound by these Terms of Service (&quot;Terms&quot;). If you disagree with any part of the terms, you may not access the Service.
               </p>
@@ -49,7 +49,7 @@ export default function TermsPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">2. Description of Service</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">2. Description of Service</h2>
               <p className="text-gray-700 mb-4">
                 Luma is an AI-powered platform that assists healthcare providers in generating medical necessity documentation for prior authorizations, appeals, and other clinical documentation needs. The Service includes:
               </p>
@@ -63,7 +63,7 @@ export default function TermsPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">3. User Accounts</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">3. User Accounts</h2>
               <p className="text-gray-700 mb-4">
                 To use the Service, you must create an account. You agree to:
               </p>
@@ -79,7 +79,7 @@ export default function TermsPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">4. Acceptable Use</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">4. Acceptable Use</h2>
               <p className="text-gray-700 mb-4">You agree NOT to use the Service to:</p>
               <ul className="list-disc pl-6 text-gray-700 space-y-2">
                 <li>Generate fraudulent or misleading documentation</li>
@@ -94,7 +94,7 @@ export default function TermsPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">5. Healthcare Provider Responsibilities</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">5. Healthcare Provider Responsibilities</h2>
               <p className="text-gray-700 mb-4">
                 As a healthcare provider using Luma, you acknowledge and agree that:
               </p>
@@ -108,7 +108,7 @@ export default function TermsPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">6. Subscription and Payment</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">6. Subscription and Payment</h2>
               <p className="text-gray-700 mb-4">
                 <strong>Subscription Plans:</strong> The Service is offered on a subscription basis. Current pricing and features are available on our website.
               </p>
@@ -127,7 +127,7 @@ export default function TermsPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">7. Intellectual Property</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">7. Intellectual Property</h2>
               <p className="text-gray-700 mb-4">
                 <strong>Our IP:</strong> The Service, including its original content, features, and functionality, is owned by Luma Health and protected by copyright, trademark, and other intellectual property laws.
               </p>
@@ -137,7 +137,7 @@ export default function TermsPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">8. Disclaimer of Warranties</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">8. Disclaimer of Warranties</h2>
               <p className="text-gray-700 mb-4">
                 THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED.
               </p>
@@ -153,7 +153,7 @@ export default function TermsPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">9. Limitation of Liability</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">9. Limitation of Liability</h2>
               <p className="text-gray-700 mb-4">
                 TO THE MAXIMUM EXTENT PERMITTED BY LAW, LUMA HEALTH SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO:
               </p>
@@ -171,14 +171,14 @@ export default function TermsPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">10. Indemnification</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">10. Indemnification</h2>
               <p className="text-gray-700">
                 You agree to indemnify and hold harmless Luma Health, its officers, directors, employees, and agents from any claims, damages, losses, or expenses (including reasonable attorney&apos;s fees) arising from your use of the Service, violation of these Terms, or infringement of any third-party rights.
               </p>
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">11. Termination</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">11. Termination</h2>
               <p className="text-gray-700 mb-4">
                 We may terminate or suspend your account immediately, without prior notice or liability, for any reason, including breach of these Terms.
               </p>
@@ -188,21 +188,21 @@ export default function TermsPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">12. Changes to Terms</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">12. Changes to Terms</h2>
               <p className="text-gray-700">
                 We reserve the right to modify these Terms at any time. We will provide notice of material changes by posting the updated Terms on this page and updating the &quot;Last updated&quot; date. Your continued use of the Service after changes constitutes acceptance of the new Terms.
               </p>
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">13. Governing Law</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">13. Governing Law</h2>
               <p className="text-gray-700">
                 These Terms shall be governed by and construed in accordance with the laws of the State of Delaware, without regard to its conflict of law provisions. Any disputes shall be resolved in the state or federal courts located in Delaware.
               </p>
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">14. Contact Us</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">14. Contact Us</h2>
               <p className="text-gray-700">
                 If you have any questions about these Terms, please contact us at:{" "}
                 <a href="mailto:hello@useluma.io" className="text-mint hover:underline">

@@ -257,7 +257,7 @@ export default function NewCasePage() {
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-serif text-dark-bg mb-2">Create New Case</h1>
+          <h1 className="text-3xl font-sans font-semibold text-dark-bg mb-2">Create New Case</h1>
           <p className="text-gray-600">
             Select document type and paste clinical notes. Our AI will handle the rest.
           </p>
@@ -275,7 +275,7 @@ export default function NewCasePage() {
           {/* 1. DOCUMENT TYPE (Top Priority)                */}
           {/* ============================================== */}
           <Card className="p-6 glass-card border border-sage-medium/30">
-            <h2 className="text-xl font-serif text-dark-bg mb-4">1. Document Type</h2>
+            <h2 className="text-xl font-sans font-semibold text-dark-bg mb-4">1. Document Type</h2>
             <Label htmlFor="doc_type">What document do you need generated?</Label>
             <select
               id="doc_type"
@@ -317,7 +317,7 @@ export default function NewCasePage() {
           {/* Step 2: Shows after document type is selected */}
           {isStep1Complete && (
           <Card className="p-6 glass-card border border-sage-medium/30">
-            <h2 className="text-xl font-serif text-dark-bg mb-4">2. Patient & Claim Info</h2>
+            <h2 className="text-xl font-sans font-semibold text-dark-bg mb-4">2. Patient & Claim Info</h2>
             <div className="grid md:grid-cols-2 gap-4">
               {/* Patient Name */}
               <div>
@@ -420,7 +420,7 @@ export default function NewCasePage() {
           <Card className="p-6 glass-card border border-mint/30 shadow-sm">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h2 className="text-xl font-serif text-dark-bg">3. Paste Clinical Notes</h2>
+                <h2 className="text-xl font-sans font-semibold text-dark-bg">3. Paste Clinical Notes</h2>
                 <p className="text-sm text-gray-600 mt-1">
                   Paste the full clinical context here (Progress Note, H&P, Previous Denial).
                   Our AI will read this to generate the letter.
@@ -452,7 +452,7 @@ Requesting Rinvoq 15mg daily."
           {/* Step 4: Shows with Step 3 after patient info is complete */}
           {isStep1Complete && isStep2Complete && (
           <Card className="p-6 glass-card border border-amber-500/30 bg-amber-50/30">
-            <h2 className="text-xl font-serif text-dark-bg mb-4">4. Compliance Agreement</h2>
+            <h2 className="text-xl font-sans font-semibold text-dark-bg mb-4">4. Compliance Agreement</h2>
 
             {/* Warning Box */}
             <div className="bg-amber-100/50 border border-amber-300/50 rounded-lg p-4 mb-4">

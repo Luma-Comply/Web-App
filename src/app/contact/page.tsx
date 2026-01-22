@@ -34,7 +34,7 @@ export default function ContactPage() {
             <div className="w-20 h-20 bg-mint/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <Mail className="w-10 h-10 text-mint" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-serif text-dark-bg mb-4">
+            <h1 className="text-4xl md:text-5xl font-sans font-semibold text-dark-bg mb-4">
               Contact Us
             </h1>
             <p className="text-xl text-gray-600 mb-8">
@@ -43,7 +43,7 @@ export default function ContactPage() {
           </div>
 
           <div className="glass-card rounded-xl p-8 mb-8">
-            <h2 className="text-2xl font-serif text-dark-bg mb-4">
+            <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">
               Get in Touch
             </h2>
             <p className="text-gray-700 mb-6">

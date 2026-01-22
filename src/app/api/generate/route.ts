@@ -5,6 +5,7 @@ import {
   validateAgainstLCD,
   formatValidationSummary,
   LCDValidationResult,
+  ChecklistEditsData,
 } from "@/lib/lcd-validation"
 import { WoundType } from "@/lib/lcd-requirements"
 
@@ -212,6 +213,9 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
         )
 
         // Store validation result in case metadata for future reference
+        // Preserve existing checklist edits during regeneration
+        const existingChecklistEdits = caseData.metadata?.checklist_edits as ChecklistEditsData | undefined
+
         await supabase
           .from("cases")
           .update({
@@ -226,6 +230,24 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
                 detected_wound_type: lcdValidationResult.detectedWoundType,
                 ctp_covered: lcdValidationResult.ctpProductCheck.covered,
               },
+              // Store full validation for persistence across page loads
+              lcd_validation_full: {
+                riskLevel: lcdValidationResult.auditRisk.overallScore,
+                denialProbability: lcdValidationResult.auditRisk.estimatedDenialProbability,
+                foundCount: lcdValidationResult.summary.foundCount,
+                missingCount: lcdValidationResult.summary.missingCount,
+                totalRequirements: lcdValidationResult.summary.totalRequirements,
+                detectedWoundType: lcdValidationResult.detectedWoundType,
+                ctpCovered: lcdValidationResult.ctpProductCheck.covered,
+                instantDenialTriggers: lcdValidationResult.auditRisk.instantDenialTriggers,
+                veryHighRiskItems: lcdValidationResult.auditRisk.veryHighRiskItems,
+                highRiskItems: lcdValidationResult.auditRisk.highRiskItems,
+                checklist: lcdValidationResult.checklist,
+                recommendations: lcdValidationResult.recommendations,
+                perplexityFindings: lcdValidationResult.perplexityFindings,
+              },
+              // Preserve checklist edits during regeneration
+              ...(existingChecklistEdits && { checklist_edits: existingChecklistEdits }),
             },
           })
           .eq("id", caseId)
@@ -321,6 +343,23 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
     }
 
     // --- STEP 2: GENERATE WITH OPENAI ---
+
+    // Build user edits context from checklist edits (if any)
+    let userEditsContext = ""
+    const existingEdits = caseData.metadata?.checklist_edits as ChecklistEditsData | undefined
+    if (existingEdits?.edits) {
+      const editsWithNotes = Object.values(existingEdits.edits).filter(
+        (edit) => edit.user_notes && edit.user_notes.trim()
+      )
+      if (editsWithNotes.length > 0) {
+        userEditsContext = `
+USER NOTES/CLARIFICATIONS (Incorporate these into the documentation):
+${editsWithNotes.map((edit) => `- ${edit.item_id}: ${edit.user_notes}`).join("\n")}
+
+IMPORTANT: The user has provided specific notes and clarifications above. Make sure to incorporate these details into the generated documentation where relevant.
+`
+      }
+    }
 
     // Build prompt for AI - enhanced for biologics PA with validation results
     let systemPrompt: string
@@ -420,16 +459,16 @@ CRITICAL - PATIENT INFORMATION:
     }
 
     const userPrompt = `GENERATE DOCUMENTATION FOR:
-    
+
     CASE CONTEXT (Form Input - Use as reference, but Clinical Notes are source of truth):
     - Patient Form Input: ${caseData.patient_first_name} ${caseData.patient_last_name}, ${caseData.patient_age}yo ${caseData.patient_gender || ''} from ${caseData.patient_state}
     - Payer: ${caseData.payer_name} (${caseData.payer_type})
     - Medication: ${caseData.requested_medication} ${caseData.medication_dose}
     - Document Type: ${getDocTypeLabel(caseData.doc_type)}
-    
+
     RESEARCHED PAYER GUIDELINES (Use this to align the letter):
     ${researchContext}
-    
+    ${userEditsContext}
     CLINICAL NOTES (PRIMARY SOURCE - Extract ALL information from here):
     ${caseData.disease_activity}
     ${caseData.prior_treatments}

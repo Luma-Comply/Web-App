@@ -21,11 +21,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { LumaLogo } from "@/components/LumaLogo"
 import { SuggestedForms } from "@/components/dashboard/SuggestedForms"
 import { LCDValidationPanel } from "@/components/dashboard/LCDValidationPanel"
-import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X, Plus } from "lucide-react"
-import type { LCDValidationResult } from "@/lib/lcd-validation"
+import { ChecklistItemEditModal } from "@/components/dashboard/ChecklistItemEditModal"
+import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X, Plus, RefreshCw, Send, Save, ChevronDown, ChevronUp } from "lucide-react"
+import type { LCDValidationResult, ChecklistEdit, ChecklistEditsData, ChecklistItemWithEdits } from "@/lib/lcd-validation"
 import { motion, AnimatePresence } from "framer-motion"
 
 interface CaseData {
@@ -71,6 +77,7 @@ export default function CaseDetailPage() {
   const [editedOutput, setEditedOutput] = useState("")
   const [copied, setCopied] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [isDocCollapsed, setIsDocCollapsed] = useState(false)
   const [isSavingEdits, setIsSavingEdits] = useState(false)
   const [lcdValidation, setLcdValidation] = useState<{
     riskLevel: string
@@ -87,6 +94,12 @@ export default function CaseDetailPage() {
     recommendations: LCDValidationResult["recommendations"]
     perplexityFindings: LCDValidationResult["perplexityFindings"]
   } | null>(null)
+
+  // Checklist edit state
+  const [checklistEdits, setChecklistEdits] = useState<Record<string, ChecklistEdit>>({})
+  const [editingItem, setEditingItem] = useState<ChecklistItemWithEdits | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isSavingChecklistEdit, setIsSavingChecklistEdit] = useState(false)
 
   // Check if user has manually edited (from database metadata)
   const hasManuallyEdited = caseData?.metadata?.manually_edited === true
@@ -347,6 +360,16 @@ export default function CaseDetailPage() {
 
       setCaseData(data)
       setEditedOutput(data.edited_output || data.generated_output || "")
+
+      // Load saved LCD validation from metadata if available
+      if (data.metadata?.lcd_validation_full) {
+        setLcdValidation(data.metadata.lcd_validation_full)
+      }
+
+      // Load saved checklist edits from metadata if available
+      if (data.metadata?.checklist_edits?.edits) {
+        setChecklistEdits(data.metadata.checklist_edits.edits)
+      }
     } catch (error) {
       console.error("Error loading case:", error)
     } finally {
@@ -412,6 +435,32 @@ export default function CaseDetailPage() {
         variant: "destructive",
         title: "Save Failed",
         description: "Failed to save changes. Please try again.",
+      })
+    }
+  }
+
+  async function markAsSubmitted() {
+    if (!caseData) return
+
+    try {
+      const { error } = await supabase
+        .from("cases")
+        .update({ status: "submitted" })
+        .eq("id", caseData.id)
+
+      if (error) throw error
+
+      setCaseData({ ...caseData, status: "submitted" })
+      toast({
+        title: "Case Submitted",
+        description: "This case has been marked as submitted.",
+      })
+    } catch (error) {
+      console.error("Error updating status:", error)
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: "Failed to update case status. Please try again.",
       })
     }
   }
@@ -559,6 +608,86 @@ export default function CaseDetailPage() {
       })
     } finally {
       setIsSavingEdits(false)
+    }
+  }
+
+  // Handle clicking a checklist item to open edit modal
+  const handleChecklistItemClick = (item: ChecklistItemWithEdits) => {
+    setEditingItem(item)
+    setIsEditModalOpen(true)
+  }
+
+  // Save checklist item edit to database
+  async function handleSaveChecklistEdit(itemId: string, notes: string, markedAddressed: boolean) {
+    if (!caseData) return
+
+    setIsSavingChecklistEdit(true)
+    try {
+      const now = new Date().toISOString()
+
+      // Build the new edit
+      const newEdit: ChecklistEdit = {
+        item_id: itemId,
+        user_notes: notes,
+        marked_addressed: markedAddressed,
+        updated_at: now,
+        ...(markedAddressed && !checklistEdits[itemId]?.addressed_at
+          ? { addressed_at: now }
+          : { addressed_at: checklistEdits[itemId]?.addressed_at }),
+      }
+
+      // Update local state
+      const updatedEdits = {
+        ...checklistEdits,
+        [itemId]: newEdit,
+      }
+      setChecklistEdits(updatedEdits)
+
+      // Build the checklist edits data structure
+      const checklistEditsData: ChecklistEditsData = {
+        version: 1,
+        last_validation_run: caseData.metadata?.lcd_validation?.run_at || now,
+        edits: updatedEdits,
+      }
+
+      // Save to database metadata
+      const { error } = await supabase
+        .from("cases")
+        .update({
+          metadata: {
+            ...caseData.metadata,
+            checklist_edits: checklistEditsData,
+          },
+        })
+        .eq("id", caseData.id)
+
+      if (error) throw error
+
+      // Update local case data
+      setCaseData({
+        ...caseData,
+        metadata: {
+          ...caseData.metadata,
+          checklist_edits: checklistEditsData,
+        },
+      })
+
+      setIsEditModalOpen(false)
+      setEditingItem(null)
+
+      toast({
+        title: "Notes Saved",
+        description: "Your checklist notes have been saved successfully.",
+      })
+    } catch (error) {
+      console.error("Error saving checklist edit:", error)
+      toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: "Failed to save checklist notes. Please try again.",
+      })
+    } finally {
+      setIsSavingChecklistEdit(false)
     }
   }
 
@@ -727,8 +856,8 @@ export default function CaseDetailPage() {
     }
   }
 
-  // Show full-screen loading when generating OR when case needs generation (before any output exists)
-  if ((generating || needsGeneration) && !hasGenerated) {
+  // Show full-screen loading when generating (including regeneration)
+  if (generating || (needsGeneration && !hasGenerated)) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-center justify-center">
         <div className="text-center px-4">
@@ -780,12 +909,85 @@ export default function CaseDetailPage() {
       </header>
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Case Title Section */}
+        {caseData && (
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-dark-bg/70 mb-1 uppercase tracking-wide">
+                  {caseData.doc_type === "biologics_pa" && "Biologics Prior Authorization"}
+                  {caseData.doc_type === "medical_necessity" && "Medical Necessity Letter"}
+                  {caseData.doc_type === "appeal" && "Appeal Letter"}
+                  {!["biologics_pa", "medical_necessity", "appeal"].includes(caseData.doc_type) && "Case Documentation"}
+                </p>
+                <h1 className="text-3xl font-sans font-bold text-dark-bg">
+                  {displayFirstName} {displayLastName}
+                </h1>
+                {caseData.requested_medication &&
+                 !caseData.requested_medication.toLowerCase().includes("see notes") && (
+                  <p className="text-lg text-gray-600 mt-1">
+                    {caseData.requested_medication}
+                    {caseData.medication_dose &&
+                     !caseData.medication_dose.toLowerCase().includes("see notes") &&
+                     ` · ${caseData.medication_dose}`}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-col items-end gap-3">
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${
+                  caseData.status === "approved" ? "bg-green-100 text-green-800 border-green-300" :
+                  caseData.status === "denied" ? "bg-red-100 text-red-800 border-red-300" :
+                  caseData.status === "submitted" ? "bg-blue-100 text-blue-800 border-blue-300" :
+                  "bg-gray-100 text-gray-800 border-gray-300"
+                }`}>
+                  {caseData.status.charAt(0).toUpperCase() + caseData.status.slice(1)}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={saveEdits}
+                    className="gap-2 border-dark-bg text-dark-bg hover:bg-dark-bg hover:text-white"
+                  >
+                    <Save className="w-4 h-4" />
+                    Save
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={generateDocumentation}
+                    disabled={generating}
+                    className="gap-2 border-dark-bg text-dark-bg hover:bg-dark-bg hover:text-white"
+                  >
+                    {generating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    Regenerate
+                  </Button>
+                  {caseData.status === "draft" && (
+                    <Button
+                      size="sm"
+                      onClick={markAsSubmitted}
+                      className="gap-2 bg-mint hover:bg-mint/90"
+                    >
+                      <Send className="w-4 h-4" />
+                      Mark Submitted
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Left Column - Case Details */}
           <div className="lg:col-span-1 space-y-6">
-            <Card className="p-6 glass-card border border-sage-medium/30">
+            <Card className="p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-serif text-dark-bg">Case Details</h2>
+                <h2 className="text-xl font-sans font-semibold text-dark-bg">Case Details</h2>
                 <button
                   onClick={openEditModal}
                   className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors px-3 py-1.5 h-7 text-xs text-gray-700 hover:text-gray-900 font-medium"
@@ -852,7 +1054,7 @@ export default function CaseDetailPage() {
               </div>
             </Card>
 
-            <Card className="p-6 glass-card border border-sage-medium/30">
+            <Card className="p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
               <h3 className="font-semibold text-dark-bg mb-3">Clinical Details</h3>
               <div className="space-y-3 text-sm">
                 {caseData.disease_activity && (
@@ -875,121 +1077,108 @@ export default function CaseDetailPage() {
           <div className="lg:col-span-2 space-y-4">
             {/* LCD Validation Panel - Only for Biologics PA */}
             {lcdValidation && caseData?.doc_type === "biologics_pa" && (
-              <LCDValidationPanel validation={lcdValidation} isCollapsed={false} />
+              <LCDValidationPanel
+                validation={lcdValidation}
+                isCollapsed={false}
+                checklistEdits={checklistEdits}
+                onItemClick={handleChecklistItemClick}
+                isEditable={true}
+              />
             )}
 
-            <Card className="p-6 glass-card border border-sage-medium/30">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-serif text-dark-bg">
-                  {hasGenerated ? "Generated Documentation" : "Generating Documentation..."}
-                </h2>
-                {hasGenerated ? (
-                  <div className="flex gap-2">
-                    <Button onClick={saveEdits} variant="outline" size="sm">
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Save Changes
-                    </Button>
-                    <Button
-                      onClick={generateDocumentation}
-                      disabled={generating}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      {generating ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Regenerating...
-                        </>
+            <Card className="bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
+              <Collapsible open={!isDocCollapsed} onOpenChange={() => setIsDocCollapsed(!isDocCollapsed)}>
+                <CollapsibleTrigger asChild>
+                  <div className="p-6 cursor-pointer hover:bg-sage-light/10 transition-colors flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-sans font-semibold text-dark-bg">
+                        {hasGenerated ? "Generated Documentation" : "Generating Documentation..."}
+                      </h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isDocCollapsed ? (
+                        <ChevronDown className="w-5 h-5 text-gray-500" />
                       ) : (
-                        <>
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Regenerate
-                        </>
+                        <ChevronUp className="w-5 h-5 text-gray-500" />
                       )}
-                    </Button>
+                    </div>
                   </div>
-                ) : !generating && (
-                  <Button
-                    onClick={generateDocumentation}
-                    className="gap-2"
-                  >
-                    <Sparkles className="w-5 h-5" />
-                    Retry Generation
-                  </Button>
-                )}
-              </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-6 pb-6">
+                    {hasGenerated ? (
+                      <>
+                        <Textarea
+                          value={editedOutput}
+                          onChange={(e) => setEditedOutput(e.target.value)}
+                          className="min-h-[500px] font-mono text-sm mb-4"
+                          placeholder="Generated documentation will appear here..."
+                        />
 
-              {hasGenerated ? (
-                <>
-                  <Textarea
-                    value={editedOutput}
-                    onChange={(e) => setEditedOutput(e.target.value)}
-                    className="min-h-[500px] font-mono text-sm mb-4"
-                    placeholder="Generated documentation will appear here..."
-                  />
+                        <div className="flex gap-3 flex-wrap">
+                          <Button onClick={copyToClipboard} variant="outline">
+                            <AnimatePresence mode="popLayout" initial={false}>
+                              <motion.div
+                                key={copied ? "check" : "copy"}
+                                initial={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
+                                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                                exit={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
+                                transition={{
+                                  type: "spring",
+                                  duration: 0.3,
+                                  bounce: 0,
+                                }}
+                                className="flex items-center"
+                              >
+                                {copied ? (
+                                  <Check className="w-4 h-4 mr-2" />
+                                ) : (
+                                  <Copy className="w-4 h-4 mr-2" />
+                                )}
+                              </motion.div>
+                            </AnimatePresence>
+                            {copied ? "Copied!" : "Copy to Clipboard"}
+                          </Button>
+                          <Button onClick={downloadAsWord} variant="outline">
+                            <Download className="w-4 h-4 mr-2" />
+                            DOCX
+                          </Button>
+                          <Button onClick={generatePdf} variant="outline">
+                            <Download className="w-4 h-4 mr-2" />
+                            PDF
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      // LOADING STATE
+                      <div className="text-center py-20">
+                        <div className="relative w-20 h-20 mx-auto mb-8">
+                          <LumaLogo className="w-20 h-20 animate-pulse text-mint" />
+                        </div>
 
-                  <div className="flex gap-3 flex-wrap">
-                    <Button onClick={copyToClipboard} variant="outline">
-                      <AnimatePresence mode="popLayout" initial={false}>
-                        <motion.div
-                          key={copied ? "check" : "copy"}
-                          initial={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
-                          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                          exit={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
-                          transition={{
-                            type: "spring",
-                            duration: 0.3,
-                            bounce: 0,
-                          }}
-                          className="flex items-center"
-                        >
-                          {copied ? (
-                            <Check className="w-4 h-4 mr-2" />
-                          ) : (
-                            <Copy className="w-4 h-4 mr-2" />
-                          )}
-                        </motion.div>
-                      </AnimatePresence>
-                      {copied ? "Copied!" : "Copy to Clipboard"}
-                    </Button>
-                    <Button onClick={downloadAsWord} variant="outline">
-                      <Download className="w-4 h-4 mr-2" />
-                      DOCX
-                    </Button>
-                    <Button onClick={generatePdf} variant="outline">
-                      <Download className="w-4 h-4 mr-2" />
-                      PDF
-                    </Button>
+                        <h3 className="text-lg font-semibold text-dark-bg mb-2">
+                          Researching & Drafting
+                        </h3>
+
+                        {/* Tidbit Carousel */}
+                        <div className="h-16 flex items-center justify-center max-w-lg mx-auto px-4">
+                          <AnimatePresence mode="wait">
+                            <motion.p
+                              key={tidbitIndex}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="text-gray-600 italic"
+                            >
+                              "{tidbits[tidbitIndex]}"
+                            </motion.p>
+                          </AnimatePresence>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </>
-              ) : (
-                // LOADING STATE
-                <div className="text-center py-20">
-                  <div className="relative w-20 h-20 mx-auto mb-8">
-                    <LumaLogo className="w-20 h-20 animate-pulse text-mint" />
-                    {/* Or simple spinner if preferred, but user asked for "Preloader" feel */}
-                  </div>
-
-                  <h3 className="text-lg font-semibold text-dark-bg mb-2">
-                    Researching & Drafting
-                  </h3>
-
-                  {/* Tidbit Carousel */}
-                  <div className="h-16 flex items-center justify-center max-w-lg mx-auto px-4">
-                    <AnimatePresence mode="wait">
-                      <motion.p
-                        key={tidbitIndex}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="text-gray-600 italic"
-                      >
-                        "{tidbits[tidbitIndex]}"
-                      </motion.p>
-                    </AnimatePresence>
-                  </div>
-                </div>
-              )}
+                </CollapsibleContent>
+              </Collapsible>
             </Card>
           </div>
         </div>
@@ -1002,6 +1191,15 @@ export default function CaseDetailPage() {
           />
         </div>
       </div>
+
+      {/* Checklist Item Edit Modal */}
+      <ChecklistItemEditModal
+        item={editingItem}
+        open={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
+        onSave={handleSaveChecklistEdit}
+        isSaving={isSavingChecklistEdit}
+      />
 
       {/* Edit Case Details Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>

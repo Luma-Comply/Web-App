@@ -63,7 +63,7 @@ function UpdatePasswordForm() {
                                 <div className="w-16 h-16 rounded-full bg-mint/10 flex items-center justify-center mx-auto mb-4">
                                     <Lock className="w-8 h-8 text-mint" />
                                 </div>
-                                <h1 className="text-3xl font-serif text-dark-bg mb-2 text-center">
+                                <h1 className="text-3xl font-sans font-semibold text-dark-bg mb-2 text-center">
                                     Set new password
                                 </h1>
                                 <p className="text-gray-600 text-center">

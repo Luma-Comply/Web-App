@@ -173,7 +173,7 @@ function AcceptInvitationContent() {
       <Card className="w-full max-w-md glass-card border border-sage-medium/30 p-8">
         <div className="text-center mb-6">
           <LumaLogo className="w-12 h-12 mx-auto mb-4 text-dark-bg" />
-          <h1 className="text-2xl font-serif font-bold text-dark-bg mb-2">Team Invitation</h1>
+          <h1 className="text-2xl font-sans font-bold text-dark-bg mb-2">Team Invitation</h1>
         </div>
 
         {success ? (

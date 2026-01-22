@@ -58,7 +58,7 @@ export default function SignupPage() {
           <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Side - Branding */}
             <div className="hidden lg:block animate-fade-in-up">
-              <h1 className="text-5xl font-serif text-dark-bg mb-6 leading-tight">
+              <h1 className="text-5xl font-sans font-semibold text-dark-bg mb-6 leading-tight">
                 Focus on patients,
                 <span className="text-mint block">not paperwork</span>
               </h1>
@@ -95,7 +95,7 @@ export default function SignupPage() {
             <div className="animate-fade-in-up">
               <div className="glass-card rounded-2xl p-8 md:p-10 border border-sage-medium/50 shadow-xl">
                 <div className="mb-8">
-                  <h2 className="text-3xl font-serif text-dark-bg mb-2">
+                  <h2 className="text-3xl font-sans font-semibold text-dark-bg mb-2">
                     Create account
                   </h2>
                   <p className="text-gray-600">

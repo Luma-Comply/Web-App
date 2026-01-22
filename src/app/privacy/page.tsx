@@ -30,7 +30,7 @@ export default function PrivacyPage() {
       {/* Content */}
       <main className="container mx-auto px-4 py-16">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-4xl md:text-5xl font-serif text-dark-bg mb-4">
+          <h1 className="text-4xl md:text-5xl font-sans font-semibold text-dark-bg mb-4">
             Privacy Policy
           </h1>
           <p className="text-gray-600 mb-12">
@@ -39,7 +39,7 @@ export default function PrivacyPage() {
 
           <div className="prose prose-lg max-w-none">
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">Introduction</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">Introduction</h2>
               <p className="text-gray-700 mb-4">
                 Luma Health (&quot;Luma,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our medical necessity documentation platform.
               </p>
@@ -49,7 +49,7 @@ export default function PrivacyPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">Information We Collect</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">Information We Collect</h2>
 
               <h3 className="text-xl font-semibold text-dark-bg mb-3">Account Information</h3>
               <p className="text-gray-700 mb-4">
@@ -94,7 +94,7 @@ export default function PrivacyPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">How We Use Your Information</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">How We Use Your Information</h2>
               <p className="text-gray-700 mb-4">We use the information we collect to:</p>
               <ul className="list-disc pl-6 text-gray-700 space-y-2">
                 <li>Provide and maintain our documentation generation service</li>
@@ -109,7 +109,7 @@ export default function PrivacyPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">AI Processing and Third-Party Services</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">AI Processing and Third-Party Services</h2>
               <p className="text-gray-700 mb-4">
                 Luma uses AI services to generate documentation. Our AI providers maintain strict data handling practices:
               </p>
@@ -125,7 +125,7 @@ export default function PrivacyPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">Data Security</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">Data Security</h2>
               <p className="text-gray-700 mb-4">
                 We implement industry-standard security measures to protect your data:
               </p>
@@ -140,7 +140,7 @@ export default function PrivacyPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">Data Retention</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">Data Retention</h2>
               <p className="text-gray-700 mb-4">
                 We retain your data as follows:
               </p>
@@ -152,7 +152,7 @@ export default function PrivacyPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">Your Rights</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">Your Rights</h2>
               <p className="text-gray-700 mb-4">You have the right to:</p>
               <ul className="list-disc pl-6 text-gray-700 space-y-2">
                 <li>Access the personal information we hold about you</li>
@@ -170,7 +170,7 @@ export default function PrivacyPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">HIPAA Compliance</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">HIPAA Compliance</h2>
               <p className="text-gray-700 mb-4">
                 Luma is designed to operate without collecting Protected Health Information (PHI) as defined by HIPAA. By using the Safe Harbor de-identification method, the limited patient context we collect (first name + clinical data) does not constitute PHI.
               </p>
@@ -183,7 +183,7 @@ export default function PrivacyPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">Cookies and Tracking</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">Cookies and Tracking</h2>
               <p className="text-gray-700 mb-4">
                 We use essential cookies to maintain your session and preferences. We do not use third-party advertising cookies or sell your data to advertisers.
               </p>
@@ -193,14 +193,14 @@ export default function PrivacyPage() {
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">Changes to This Policy</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">Changes to This Policy</h2>
               <p className="text-gray-700">
                 We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the &quot;Last updated&quot; date. You are advised to review this Privacy Policy periodically for any changes.
               </p>
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-serif text-dark-bg mb-4">Contact Us</h2>
+              <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">Contact Us</h2>
               <p className="text-gray-700">
                 If you have any questions about this Privacy Policy, please contact us at:{" "}
                 <a href="mailto:hello@useluma.io" className="text-mint hover:underline">

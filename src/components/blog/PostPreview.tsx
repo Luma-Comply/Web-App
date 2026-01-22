@@ -34,7 +34,7 @@ export default function PostPreview({
       <Badge variant="outline" className="mb-3">
         {category}
       </Badge>
-      <h3 className="text-2xl font-serif mb-3 leading-snug">
+      <h3 className="text-2xl font-sans font-semibold mb-3 leading-snug">
         <Link
           href={`/blog/${slug}`}
           className="text-dark-bg hover:text-mint transition-colors"

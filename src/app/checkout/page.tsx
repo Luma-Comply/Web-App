@@ -75,7 +75,7 @@ export default function CheckoutPage() {
             <Shield className="w-4 h-4 mr-2 text-mint" />
             14-Day Free Trial
           </Badge>
-          <h1 className="text-4xl md:text-5xl font-serif text-dark-bg mb-4">
+          <h1 className="text-4xl md:text-5xl font-sans font-semibold text-dark-bg mb-4">
             Complete Your Registration
           </h1>
           <p className="text-xl text-gray-600">
@@ -89,7 +89,7 @@ export default function CheckoutPage() {
           <Card className="p-8 glass-card border-2 border-mint/30">
             <div className="text-center mb-6">
               <div className="flex items-baseline justify-center gap-2 mb-2">
-                <span className="text-5xl font-serif text-dark-bg">$149</span>
+                <span className="text-5xl font-sans font-semibold text-dark-bg">$149</span>
                 <span className="text-gray-600">/month</span>
               </div>
               <p className="text-sm text-gray-600">
@@ -151,7 +151,7 @@ export default function CheckoutPage() {
               <div className="flex items-start gap-3 mb-4">
                 <CreditCard className="w-6 h-6 text-mint flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="text-lg font-serif text-dark-bg mb-2">
+                  <h3 className="text-lg font-sans font-semibold text-dark-bg mb-2">
                     Secure Payment
                   </h3>
                   <p className="text-sm text-gray-600">
@@ -166,7 +166,7 @@ export default function CheckoutPage() {
               <div className="flex items-start gap-3 mb-4">
                 <Shield className="w-6 h-6 text-mint flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="text-lg font-serif text-dark-bg mb-2">
+                  <h3 className="text-lg font-sans font-semibold text-dark-bg mb-2">
                     Risk-Free Trial
                   </h3>
                   <p className="text-sm text-gray-600 mb-3">
@@ -183,7 +183,7 @@ export default function CheckoutPage() {
               <div className="flex items-start gap-3">
                 <Zap className="w-6 h-6 text-mint flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="text-lg font-serif text-dark-bg mb-2">
+                  <h3 className="text-lg font-sans font-semibold text-dark-bg mb-2">
                     Instant Access
                   </h3>
                   <p className="text-sm text-gray-600">

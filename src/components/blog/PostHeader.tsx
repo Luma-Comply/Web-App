@@ -27,7 +27,7 @@ export default function PostHeader({
         <Badge variant="secondary" className="mb-4">
           {category}
         </Badge>
-        <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-normal leading-tight text-dark-bg mb-6">
+        <h1 className="text-4xl md:text-5xl lg:text-6xl font-sans font-semibold leading-tight text-dark-bg mb-6">
           {title}
         </h1>
         <div className="flex items-center gap-6 text-gray-600">

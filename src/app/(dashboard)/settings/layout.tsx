@@ -158,7 +158,7 @@ export default function SettingsLayout({
           <span className="text-sm">Back to Dashboard</span>
         </Link>
 
-        <h1 className="text-3xl font-serif font-bold text-dark-bg mb-2">Settings</h1>
+        <h1 className="text-3xl font-sans font-bold text-dark-bg mb-2">Settings</h1>
         <p className="text-gray-600 mb-8">Manage your account settings and preferences.</p>
 
         {/* Tabs */}

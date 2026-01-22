@@ -36,7 +36,7 @@ export default function HeroPost({
           <Badge variant="secondary" className="mb-4">
             {category}
           </Badge>
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif mb-4 leading-tight">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-sans font-semibold mb-4 leading-tight">
             <Link
               href={`/blog/${slug}`}
               className="text-dark-bg hover:text-mint transition-colors"
