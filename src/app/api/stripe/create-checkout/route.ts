@@ -118,6 +118,9 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
+      metadata: {
+        supabase_user_id: authUser.id,
+      },
       subscription_data: {
         trial_period_days: 14,
         metadata: {

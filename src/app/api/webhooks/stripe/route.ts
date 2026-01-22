@@ -1,19 +1,68 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { stripe } from "@/lib/stripe";
 
-// Use service role key for webhook handlers (bypasses RLS)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+type SupabaseClientType = SupabaseClient<any, "public", any>;
+
+// Validate environment variables at startup
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+
+// Health check endpoint - allows testing if route is reachable
+export async function GET() {
+  const hasSupabaseUrl = !!SUPABASE_URL;
+  const hasSupabaseKey = !!SUPABASE_SERVICE_ROLE_KEY;
+  const hasStripeSecret = !!STRIPE_WEBHOOK_SECRET;
+
+  return NextResponse.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    config: {
+      supabaseUrl: hasSupabaseUrl,
+      supabaseKey: hasSupabaseKey,
+      stripeSecret: hasStripeSecret,
+      stripeSecretPrefix: hasStripeSecret ? STRIPE_WEBHOOK_SECRET!.substring(0, 10) + "..." : null,
+    },
+  });
+}
 
 export async function POST(req: NextRequest) {
+  console.log("Webhook POST received", {
+    url: req.url,
+    method: req.method,
+    timestamp: new Date().toISOString(),
+  });
+
+  // Check environment variables
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("Missing Supabase environment variables", {
+      hasUrl: !!SUPABASE_URL,
+      hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY,
+    });
+    return NextResponse.json(
+      { error: "Server configuration error" },
+      { status: 500 }
+    );
+  }
+
+  if (!STRIPE_WEBHOOK_SECRET) {
+    console.error("Missing STRIPE_WEBHOOK_SECRET environment variable");
+    return NextResponse.json(
+      { error: "Server configuration error" },
+      { status: 500 }
+    );
+  }
+
+  // Create Supabase client per request to ensure fresh connection
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
   const body = await req.text();
   const signature = req.headers.get("stripe-signature");
 
   if (!signature) {
+    console.error("No Stripe signature in request headers");
     return NextResponse.json({ error: "No signature" }, { status: 400 });
   }
 
@@ -23,39 +72,51 @@ export async function POST(req: NextRequest) {
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      STRIPE_WEBHOOK_SECRET
     );
-  } catch (err: any) {
-    console.error("Webhook signature verification failed:", err.message);
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    console.error("Webhook signature verification failed:", {
+      error: errorMessage,
+      signaturePrefix: signature.substring(0, 20) + "...",
+      bodyLength: body.length,
+      secretPrefix: STRIPE_WEBHOOK_SECRET.substring(0, 10) + "...",
+    });
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  console.log(`Processing webhook: ${event.type}`);
+  console.log(`Processing webhook: ${event.type}`, { eventId: event.id });
 
   try {
     switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        await handleCheckoutCompleted(session, supabase);
+        break;
+      }
+
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
-        await handleSubscriptionUpdate(subscription);
+        await handleSubscriptionUpdate(subscription, supabase);
         break;
       }
 
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        await handleSubscriptionDeleted(subscription);
+        await handleSubscriptionDeleted(subscription, supabase);
         break;
       }
 
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
-        await handlePaymentSucceeded(invoice);
+        await handlePaymentSucceeded(invoice, supabase);
         break;
       }
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        await handlePaymentFailed(invoice);
+        await handlePaymentFailed(invoice, supabase);
         break;
       }
 
@@ -64,8 +125,15 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (error: any) {
-    console.error("Webhook handler error:", error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("Webhook handler error:", {
+      message: errorMessage,
+      stack: errorStack,
+      eventType: event.type,
+      eventId: event.id,
+    });
     return NextResponse.json(
       { error: "Webhook handler failed" },
       { status: 500 }
@@ -73,12 +141,72 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
-  const userId = subscription.metadata.supabase_user_id;
+async function handleCheckoutCompleted(
+  session: Stripe.Checkout.Session,
+  supabase: SupabaseClientType
+) {
+  const userId = session.metadata?.supabase_user_id;
+  const customerId = session.customer as string;
+  const subscriptionId = session.subscription as string;
 
   if (!userId) {
-    console.error("No supabase_user_id in subscription metadata");
+    console.error("No supabase_user_id in checkout session metadata", {
+      sessionId: session.id,
+    });
     return;
+  }
+
+  console.log("Processing checkout.session.completed", {
+    userId,
+    customerId,
+    subscriptionId,
+    sessionId: session.id,
+  });
+
+  // Update user with customer ID - subscription details will be handled by subscription webhooks
+  const { error } = await supabase
+    .from("users")
+    .update({
+      stripe_customer_id: customerId,
+      stripe_subscription_id: subscriptionId,
+    })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("Failed to update user after checkout:", error);
+    throw error;
+  }
+
+  console.log(`Checkout completed for user ${userId}`);
+}
+
+async function handleSubscriptionUpdate(
+  subscription: Stripe.Subscription,
+  supabase: SupabaseClientType
+) {
+  let userId = subscription.metadata.supabase_user_id;
+
+  if (!userId) {
+    // Try to find user by customer ID as fallback
+    const customerId = subscription.customer as string;
+    console.warn("No supabase_user_id in subscription metadata, attempting customer lookup", {
+      subscriptionId: subscription.id,
+      customerId,
+      metadata: subscription.metadata,
+    });
+
+    const { data: userByCustomer } = await supabase
+      .from("users")
+      .select("id")
+      .eq("stripe_customer_id", customerId)
+      .single();
+
+    if (!userByCustomer) {
+      console.error("Could not find user by customer ID", { customerId, subscriptionId: subscription.id });
+      return;
+    }
+
+    userId = userByCustomer.id;
   }
 
   const status = subscription.status;
@@ -87,7 +215,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   const currentPeriodEnd = new Date(sub.current_period_end * 1000);
   const currentPeriodStart = new Date(sub.current_period_start * 1000);
 
-  const updateData: any = {
+  const updateData: Record<string, any> = {
     stripe_customer_id: subscription.customer as string,
     stripe_subscription_id: subscription.id,
     subscription_status: status,
@@ -101,26 +229,6 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     updateData.trial_ends_at = null;
     updateData.cases_remaining = 50;
     updateData.cases_used_this_period = 0;
-  }
-
-  // Ensure cases_remaining is set for new active subscriptions or updates if missing
-  // This covers the case where a user subscribes with a coupon or normally
-  if (status === "active" || status === "trialing") {
-    // We might want to be careful not to reset it mid-cycle if it's just a metadata update,
-    // but for now, ensuring it's not 0 is critical.
-    // A safer check: if it's a creation event or period switch, which is handled largely by webhooks.
-    // However, to fix the user's immediate "0" issue, we can default it if it's null/0 in the DB,
-    // but we don't have DB access here to check "current" value before update easily without an extra query.
-    // Best approach for "Creation/Update" webhook:
-    // If this is a new period (checked by period start comparison? No, complex).
-    // Simpler: If the event is "customer.subscription.created", we set it.
-    // If it is "updated", we usually only touch it if status changed.
-
-    // Let's rely on the fact that if we are processing this, we want to ensure they have access.
-    // BUT, we shouldn't reset `cases_remaining` on every minor update (like changing a payment method).
-    // The `invoice.payment_succeeded` handles the monthly reset.
-    // The "transition from trial" handles that specific edge case.
-    // Check if this is a NEW subscription (creation).
   }
 
   // If status is trialing, set trial end date
@@ -146,12 +254,32 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   console.log(`Updated subscription for user ${userId}: ${status}`);
 }
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  const userId = subscription.metadata.supabase_user_id;
+async function handleSubscriptionDeleted(
+  subscription: Stripe.Subscription,
+  supabase: SupabaseClientType
+) {
+  let userId = subscription.metadata.supabase_user_id;
 
   if (!userId) {
-    console.error("No supabase_user_id in subscription metadata");
-    return;
+    // Try to find user by customer ID as fallback
+    const customerId = subscription.customer as string;
+    console.warn("No supabase_user_id in deleted subscription metadata, attempting customer lookup", {
+      subscriptionId: subscription.id,
+      customerId,
+    });
+
+    const { data: userByCustomer } = await supabase
+      .from("users")
+      .select("id")
+      .eq("stripe_customer_id", customerId)
+      .single();
+
+    if (!userByCustomer) {
+      console.error("Could not find user by customer ID for deletion", { customerId, subscriptionId: subscription.id });
+      return;
+    }
+
+    userId = userByCustomer.id;
   }
 
   const { error } = await supabase
@@ -170,16 +298,43 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log(`Canceled subscription for user ${userId}`);
 }
 
-async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
+async function handlePaymentSucceeded(
+  invoice: Stripe.Invoice,
+  supabase: SupabaseClientType
+) {
   const inv = invoice as any;
   const subscriptionId = inv.subscription as string;
 
-  if (!subscriptionId) return;
+  if (!subscriptionId) {
+    console.log("Invoice has no subscription, skipping", { invoiceId: invoice.id });
+    return;
+  }
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  const userId = subscription.metadata.supabase_user_id;
+  let userId = subscription.metadata.supabase_user_id;
 
-  if (!userId) return;
+  if (!userId) {
+    // Try to find user by customer ID as fallback
+    const customerId = subscription.customer as string;
+    console.warn("No supabase_user_id in subscription metadata for payment, attempting customer lookup", {
+      subscriptionId,
+      customerId,
+      invoiceId: invoice.id,
+    });
+
+    const { data: userByCustomer } = await supabase
+      .from("users")
+      .select("id")
+      .eq("stripe_customer_id", customerId)
+      .single();
+
+    if (!userByCustomer) {
+      console.error("Could not find user by customer ID for payment", { customerId, subscriptionId, invoiceId: invoice.id });
+      return;
+    }
+
+    userId = userByCustomer.id;
+  }
 
   // Type cast to access period fields
   const sub = subscription as any;
@@ -198,21 +353,51 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 
   if (error) {
     console.error("Failed to reset cases after payment:", error);
+    throw error;
   }
 
   console.log(`Payment succeeded for user ${userId}, cases reset`);
 }
 
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
+async function handlePaymentFailed(
+  invoice: Stripe.Invoice,
+  supabase: SupabaseClientType
+) {
   const inv = invoice as any;
   const subscriptionId = inv.subscription as string;
 
-  if (!subscriptionId) return;
+  if (!subscriptionId) {
+    console.log("Invoice has no subscription, skipping payment failure", {
+      invoiceId: invoice.id,
+    });
+    return;
+  }
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  const userId = subscription.metadata.supabase_user_id;
+  let userId = subscription.metadata.supabase_user_id;
 
-  if (!userId) return;
+  if (!userId) {
+    // Try to find user by customer ID as fallback
+    const customerId = subscription.customer as string;
+    console.warn("No supabase_user_id in subscription metadata for failed payment, attempting customer lookup", {
+      subscriptionId,
+      customerId,
+      invoiceId: invoice.id,
+    });
+
+    const { data: userByCustomer } = await supabase
+      .from("users")
+      .select("id")
+      .eq("stripe_customer_id", customerId)
+      .single();
+
+    if (!userByCustomer) {
+      console.error("Could not find user by customer ID for failed payment", { customerId, subscriptionId, invoiceId: invoice.id });
+      return;
+    }
+
+    userId = userByCustomer.id;
+  }
 
   const { error } = await supabase
     .from("users")
@@ -223,6 +408,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 
   if (error) {
     console.error("Failed to mark subscription as past_due:", error);
+    throw error;
   }
 
   console.log(`Payment failed for user ${userId}`);
