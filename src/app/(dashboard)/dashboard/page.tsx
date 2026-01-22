@@ -321,7 +321,7 @@ export default function DashboardPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600 hidden md:block">{practiceName || userEmail}</span>
+                  <span className="text-sm text-gray-600 hidden md:block max-w-[200px] truncate">{practiceName || userEmail}</span>
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 </Button>
               </DropdownMenuTrigger>
@@ -407,7 +407,7 @@ export default function DashboardPage() {
           </div>
 
           <Tabs defaultValue="active" onValueChange={setActiveTab} className="w-full">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <TabsList className="bg-white/50 border border-sage-medium/30">
                 <TabsTrigger value="active">Active Cases</TabsTrigger>
                 <TabsTrigger value="archived" className="gap-2">
@@ -417,7 +417,7 @@ export default function DashboardPage() {
               </TabsList>
 
               {/* Search Input */}
-              <div className="relative w-64">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
                   type="text"
@@ -433,12 +433,12 @@ export default function DashboardPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
-                    <TableHead className="w-[280px]">Patient & Document</TableHead>
+                    <TableHead className="w-[200px] lg:w-[280px]">Patient & Document</TableHead>
                     <TableHead>Payer</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Created By</TableHead>
+                    <TableHead className="hidden sm:table-cell">Created</TableHead>
+                    <TableHead className="hidden lg:table-cell">Created By</TableHead>
                     <TableHead className="text-right">Claim Value</TableHead>
-                    <TableHead className="w-[80px]"></TableHead>
+                    <TableHead className="w-[60px] lg:w-[80px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -468,10 +468,10 @@ export default function DashboardPage() {
                         <TableCell className="text-gray-700 text-sm">
                           {c.payer_name || '-'}
                         </TableCell>
-                        <TableCell className="text-gray-500 text-sm">
+                        <TableCell className="hidden sm:table-cell text-gray-500 text-sm">
                           {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
                         </TableCell>
-                        <TableCell className="text-gray-500 text-sm">
+                        <TableCell className="hidden lg:table-cell text-gray-500 text-sm">
                           {c.created_by_email || userEmail}
                         </TableCell>
                         <TableCell className="text-right font-mono text-gray-700">

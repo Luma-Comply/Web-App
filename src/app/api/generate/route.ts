@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import OpenAI from "openai"
+import {
+  validateAgainstLCD,
+  formatValidationSummary,
+  LCDValidationResult,
+} from "@/lib/lcd-validation"
+import { WoundType } from "@/lib/lcd-requirements"
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -40,6 +46,10 @@ export async function POST(request: NextRequest) {
 
     const pp_apiKey = process.env.PERPLEXITY_API_KEY
 
+    // Track validation results for biologics PA
+    let lcdValidationResult: LCDValidationResult | null = null
+    const isBiologicsPA = caseData.doc_type === "biologics_pa"
+
     // --- STEP 1: RESEARCH WITH PERPLEXITY ---
     let researchContext = "No specific payer guidelines found."
 
@@ -57,7 +67,47 @@ export async function POST(request: NextRequest) {
 
         console.log(`Researching payer: ${caseData.payer_name} for ${caseData.requested_medication} - Document Type: ${docTypeLabel} - State: ${caseData.patient_state} - Age: ${caseData.patient_age}`)
 
-        const researchQuery = `Research and find the specific ${docTypeLabel} criteria and requirements for the following case:
+        // Use CTP-specific query for Biologics PA
+        let researchQuery: string
+
+        if (isBiologicsPA) {
+          // Enhanced CTP/wound care specific query for LCD L35041 validation
+          researchQuery = `Research current Medicare Part B LCD L35041 requirements for CTP/skin substitutes (Cellular Tissue Products):
+
+CRITICAL AUDIT QUESTIONS (Answer all):
+1. Is "${caseData.requested_medication}" on the current Novitas/Medicare covered CTP list? (LCD Attachment A)
+2. What is the current LCD L35041 effective date and any changes since November 2024?
+3. What are the CURRENT application limits? (Previously 4, now 8 with KX modifier for 5-8)
+4. What triggers the KX modifier requirement?
+5. What are the SOC failure criteria for DFU (50% area reduction rule after 4 weeks)?
+6. What ABI threshold indicates ischemia (non-coverage threshold)?
+7. What are current Qlarant/Novitas audit focus areas for CTPs in ${new Date().getFullYear()}?
+8. Any recent OIG work plan items targeting skin substitutes?
+9. What are common documentation failures causing CTP denials?
+
+PATIENT CASE:
+- CTP Product: ${caseData.requested_medication}
+- Dose/Size: ${caseData.medication_dose || "Not specified"}
+- State: ${caseData.patient_state}
+- Payer: ${caseData.payer_name} (${caseData.payer_type})
+- Patient Age: ${caseData.patient_age}
+
+CLINICAL CONTEXT (abbreviated):
+${clinicalNotes.substring(0, 1500)}
+
+RETURN FORMAT (include all if found):
+- LCD_EFFECTIVE_DATE: [date]
+- PRODUCT_COVERED: [YES/NO/VERIFY]
+- APPLICATION_LIMIT: [number]
+- RECENT_LCD_CHANGES: [list any changes]
+- AUDIT_FOCUS_AREAS: [current audit targets]
+- SOC_FAILURE_CRITERIA: [specific requirements]
+- DOCUMENTATION_GAPS_CAUSING_DENIALS: [common failures]
+- ABI_THRESHOLD: [value]
+- KX_MODIFIER_RULES: [when required]`
+        } else {
+          // Standard query for non-CTP cases
+          researchQuery = `Research and find the specific ${docTypeLabel} criteria and requirements for the following case:
 
 PATIENT INFORMATION:
 - Age: ${caseData.patient_age} years old
@@ -92,6 +142,12 @@ CRITICAL: Research ${caseData.payer_name}'s policy specifically for ${caseData.p
 7. Any state-specific prior authorization requirements
 
 Focus on the most current policy bulletins and clinical coverage guidelines for ${caseData.payer_name} in ${caseData.patient_state}.`
+        }
+
+        // Use CTP-specific system prompt for biologics PA
+        const systemContent = isBiologicsPA
+          ? "You are an expert Medicare LCD compliance researcher specializing in CTP (Cellular Tissue Products) / skin substitutes for wound care. Focus on LCD L35041 requirements, Novitas MAC policies, current audit focus areas, and documentation requirements. Be specific about coverage criteria, SOC failure requirements, and common denial reasons."
+          : "You are an expert medical insurance researcher specializing in state-specific payer policies. Find the most current clinical coverage guidelines, policy bulletins, and medical necessity criteria. Pay special attention to state-specific variations as payer policies differ significantly by state (e.g., Cigna in California vs Texas). Be comprehensive, factual, and include all relevant criteria."
 
         const researchResponse = await fetch("https://api.perplexity.ai/chat/completions", {
           method: "POST",
@@ -104,7 +160,7 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
             messages: [
               {
                 role: "system",
-                content: "You are an expert medical insurance researcher specializing in state-specific payer policies. Find the most current clinical coverage guidelines, policy bulletins, and medical necessity criteria. Pay special attention to state-specific variations as payer policies differ significantly by state (e.g., Cigna in California vs Texas). Be comprehensive, factual, and include all relevant criteria."
+                content: systemContent
               },
               {
                 role: "user",
@@ -124,6 +180,58 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
         }
       } catch (ppError) {
         console.error("Perplexity Call Failed:", ppError)
+      }
+    }
+
+    // --- STEP 1.25: LCD VALIDATION FOR BIOLOGICS PA ---
+    if (isBiologicsPA) {
+      try {
+        console.log("Running LCD L35041 validation for CTP/wound care...")
+
+        const clinicalNotesForValidation = [
+          caseData.disease_activity,
+          caseData.prior_treatments,
+          caseData.lab_values,
+        ]
+          .filter(Boolean)
+          .join("\n\n")
+
+        // Get wound type from metadata if available, otherwise auto-detect
+        const woundTypeFromMeta = caseData.metadata?.wound_type as WoundType | undefined
+
+        lcdValidationResult = await validateAgainstLCD(
+          clinicalNotesForValidation,
+          caseData.requested_medication || "",
+          researchContext,
+          woundTypeFromMeta
+        )
+
+        console.log(
+          `LCD Validation Complete - Risk: ${lcdValidationResult.auditRisk.overallScore}, ` +
+            `Found: ${lcdValidationResult.summary.foundCount}/${lcdValidationResult.summary.totalRequirements}`
+        )
+
+        // Store validation result in case metadata for future reference
+        await supabase
+          .from("cases")
+          .update({
+            metadata: {
+              ...caseData.metadata,
+              lcd_validation: {
+                run_at: new Date().toISOString(),
+                risk_level: lcdValidationResult.auditRisk.overallScore,
+                denial_probability: lcdValidationResult.auditRisk.estimatedDenialProbability,
+                found_count: lcdValidationResult.summary.foundCount,
+                missing_count: lcdValidationResult.summary.missingCount,
+                detected_wound_type: lcdValidationResult.detectedWoundType,
+                ctp_covered: lcdValidationResult.ctpProductCheck.covered,
+              },
+            },
+          })
+          .eq("id", caseId)
+      } catch (validationError) {
+        console.error("LCD Validation Error:", validationError)
+        // Continue without validation - don't block generation
       }
     }
 
@@ -214,13 +322,69 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
 
     // --- STEP 2: GENERATE WITH OPENAI ---
 
-    // Build prompt for AI
-    const systemPrompt = `You are an AI assistant powered by advanced internet research capabilities. Your task is to generate approval-ready medical documentation based on valid coverage criteria.
-    
+    // Build prompt for AI - enhanced for biologics PA with validation results
+    let systemPrompt: string
+
+    if (isBiologicsPA && lcdValidationResult) {
+      // Enhanced CTP/wound care specific prompt with validation
+      systemPrompt = `You are an AI assistant specialized in CTP (Cellular Tissue Products) / skin substitute prior authorization documentation for Medicare Part B.
+
+CRITICAL CONTEXT - LCD L35041 COMPLIANCE:
+This is a Biologics Prior Authorization for a CTP/skin substitute. The documentation has been validated against LCD L35041 requirements.
+
+VALIDATION RESULTS:
+- Audit Risk Level: ${lcdValidationResult.auditRisk.overallScore}
+- Estimated Denial Probability: ${lcdValidationResult.auditRisk.estimatedDenialProbability}%
+- CTP Product Coverage: ${lcdValidationResult.ctpProductCheck.covered ? "COVERED" : "VERIFY COVERAGE"}
+- Detected Wound Type: ${lcdValidationResult.detectedWoundType || "Unknown"}
+- Documentation Found: ${lcdValidationResult.summary.foundCount}/${lcdValidationResult.summary.totalRequirements}
+- Missing Items: ${lcdValidationResult.summary.missingCount}
+${lcdValidationResult.auditRisk.instantDenialTriggers.length > 0 ? `- INSTANT DENIAL TRIGGERS: ${lcdValidationResult.auditRisk.instantDenialTriggers.join(", ")}` : ""}
+${lcdValidationResult.auditRisk.veryHighRiskItems.length > 0 ? `- VERY HIGH RISK MISSING: ${lcdValidationResult.auditRisk.veryHighRiskItems.join(", ")}` : ""}
+
+OUTPUT FORMAT REQUIREMENTS:
+1. START with the LCD L35041 Validation Summary section (formatted as shown below)
+2. THEN include the Prior Authorization letter
+
+The validation summary should appear FIRST in this format:
+---
+LCD L35041 VALIDATION SUMMARY
+
+Denial Risk: [RISK LEVEL] ([X]% estimated)
+LCD Effective Date: ${lcdValidationResult.perplexityFindings.lcdEffectiveDate}
+Wound Type: ${lcdValidationResult.detectedWoundType || "See clinical notes"}
+CTP Product: ${lcdValidationResult.ctpProductCheck.covered ? "Covered" : "Verify Coverage Required"}
+
+Documentation Status:
+- Found: ${lcdValidationResult.summary.foundCount}
+- Missing: ${lcdValidationResult.summary.missingCount}
+- Partial: ${lcdValidationResult.summary.partialCount}
+
+[If there are missing high-risk items, list them with recommended language to add]
+
+---
+
+THEN generate the Prior Authorization letter following these rules:
+- Professional, persuasive, medical-legal tone
+- Clean format WITHOUT placeholders or markdown
+- Extract patient name from Clinical Notes (source of truth)
+- Include ALL wounds/conditions mentioned
+- Reference SOC failure documentation explicitly
+- Include ABI results if present
+- Note wound measurements with dates
+
+CRITICAL - PATIENT INFORMATION:
+- Use patient name from Clinical Notes, not form input
+- Extract ALL relevant details: wounds, measurements, lab values, ABI, vascular studies
+- Verify staging and dates from notes`
+    } else {
+      // Standard prompt for non-CTP cases
+      systemPrompt = `You are an AI assistant powered by advanced internet research capabilities. Your task is to generate approval-ready medical documentation based on valid coverage criteria.
+
     CRITICAL INPUTS:
     1. **RESEARCHED GUIDELINES**: Real-time policy data found for this specific payer. Use this to structure your arguments.
     2. **CLINICAL NOTES**: The raw patient history provided by the user.
-    
+
     OUTPUT REQUIREMENTS:
     - Synthesize the Clinical Notes to prove the patient meets the Researched Guidelines.
     - If the patient meets criteria, explicitly state how (e.g., "Patient meets step therapy requirement having failed Methotrexate...").
@@ -234,7 +398,7 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
     - Start directly with the payer information and subject line.
     - Use actual dates, addresses, and information from the clinical notes when available.
     - If information is not available, simply omit it rather than using placeholders.
-    
+
     CRITICAL - PATIENT INFORMATION ACCURACY:
     - ALWAYS extract the ACTUAL patient name from the Clinical Notes. The name in the Clinical Notes is the source of truth, not the form input.
     - If the Clinical Notes contain a different patient name than the form input, USE THE NAME FROM THE CLINICAL NOTES.
@@ -242,7 +406,7 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
     - Include ALL wounds/conditions mentioned in the notes, not just one.
     - Verify wound staging, measurements, and dates directly from the clinical notes.
     - Extract practice/clinic names from the notes - use the CURRENT practice name if mentioned, not closed practices.
-    
+
     PROVIDER INFORMATION:
     - At the END of the letter, include provider contact information.
     - FIRST, carefully search the Clinical Notes for any doctor/provider name, clinic name, practice name, or phone number.
@@ -253,6 +417,7 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
       [Phone Number from notes]"
     - If NO provider information with phone number is found in the notes, do NOT add any provider contact information at the end.
     - Only extract and use provider info that includes a phone number.`
+    }
 
     const userPrompt = `GENERATE DOCUMENTATION FOR:
     
@@ -408,10 +573,50 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
         .eq("id", poolOwnerId)
     }
 
-    return NextResponse.json({
+    // Build response - include validation for biologics PA
+    const response: {
+      success: boolean
+      documentation: string
+      validation?: {
+        riskLevel: string
+        denialProbability: number
+        foundCount: number
+        missingCount: number
+        totalRequirements: number
+        detectedWoundType?: string
+        ctpCovered: boolean
+        instantDenialTriggers: string[]
+        veryHighRiskItems: string[]
+        highRiskItems: string[]
+        checklist: LCDValidationResult["checklist"]
+        recommendations: LCDValidationResult["recommendations"]
+        perplexityFindings: LCDValidationResult["perplexityFindings"]
+      }
+    } = {
       success: true,
       documentation,
-    })
+    }
+
+    // Add validation results for biologics PA
+    if (isBiologicsPA && lcdValidationResult) {
+      response.validation = {
+        riskLevel: lcdValidationResult.auditRisk.overallScore,
+        denialProbability: lcdValidationResult.auditRisk.estimatedDenialProbability,
+        foundCount: lcdValidationResult.summary.foundCount,
+        missingCount: lcdValidationResult.summary.missingCount,
+        totalRequirements: lcdValidationResult.summary.totalRequirements,
+        detectedWoundType: lcdValidationResult.detectedWoundType,
+        ctpCovered: lcdValidationResult.ctpProductCheck.covered,
+        instantDenialTriggers: lcdValidationResult.auditRisk.instantDenialTriggers,
+        veryHighRiskItems: lcdValidationResult.auditRisk.veryHighRiskItems,
+        highRiskItems: lcdValidationResult.auditRisk.highRiskItems,
+        checklist: lcdValidationResult.checklist,
+        recommendations: lcdValidationResult.recommendations,
+        perplexityFindings: lcdValidationResult.perplexityFindings,
+      }
+    }
+
+    return NextResponse.json(response)
   } catch (error: any) {
     console.error("Error generating documentation:", error)
     return NextResponse.json(

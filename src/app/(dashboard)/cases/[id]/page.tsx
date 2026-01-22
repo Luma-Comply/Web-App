@@ -23,7 +23,9 @@ import {
 } from "@/components/ui/dialog"
 import { LumaLogo } from "@/components/LumaLogo"
 import { SuggestedForms } from "@/components/dashboard/SuggestedForms"
+import { LCDValidationPanel } from "@/components/dashboard/LCDValidationPanel"
 import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X, Plus } from "lucide-react"
+import type { LCDValidationResult } from "@/lib/lcd-validation"
 import { motion, AnimatePresence } from "framer-motion"
 
 interface CaseData {
@@ -70,6 +72,21 @@ export default function CaseDetailPage() {
   const [copied, setCopied] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [isSavingEdits, setIsSavingEdits] = useState(false)
+  const [lcdValidation, setLcdValidation] = useState<{
+    riskLevel: string
+    denialProbability: number
+    foundCount: number
+    missingCount: number
+    totalRequirements: number
+    detectedWoundType?: string
+    ctpCovered: boolean
+    instantDenialTriggers: string[]
+    veryHighRiskItems: string[]
+    highRiskItems: string[]
+    checklist: LCDValidationResult["checklist"]
+    recommendations: LCDValidationResult["recommendations"]
+    perplexityFindings: LCDValidationResult["perplexityFindings"]
+  } | null>(null)
 
   // Check if user has manually edited (from database metadata)
   const hasManuallyEdited = caseData?.metadata?.manually_edited === true
@@ -355,6 +372,11 @@ export default function CaseDetailPage() {
       // Update local state
       setCaseData({ ...caseData, generated_output: result.documentation })
       setEditedOutput(result.documentation)
+
+      // Store LCD validation results if available (biologics PA)
+      if (result.validation) {
+        setLcdValidation(result.validation)
+      }
     } catch (error) {
       console.error("Error generating documentation:", error)
       toast({
@@ -850,7 +872,12 @@ export default function CaseDetailPage() {
           </div>
 
           {/* Right Column - Generated Documentation */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-4">
+            {/* LCD Validation Panel - Only for Biologics PA */}
+            {lcdValidation && caseData?.doc_type === "biologics_pa" && (
+              <LCDValidationPanel validation={lcdValidation} isCollapsed={false} />
+            )}
+
             <Card className="p-6 glass-card border border-sage-medium/30">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-serif text-dark-bg">

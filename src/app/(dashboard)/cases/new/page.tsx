@@ -23,12 +23,8 @@ import { searchPayers } from "@/lib/payers"
 import {
   ArrowLeft,
   Loader2,
-  Copy,
   Sparkles,
   CheckCircle2,
-  FileText,
-  ChevronDown,
-  ChevronUp,
   AlertTriangle,
   Shield,
   ExternalLink,
@@ -45,13 +41,14 @@ export default function NewCasePage() {
   const [showFullHipaaList, setShowFullHipaaList] = useState(false)
 
   const [formData, setFormData] = useState({
-    doc_type: "biologics_pa",
+    doc_type: "", // Default to empty - user must select
     patient_first_name: "",
     patient_last_name: "",
     patient_age: "",
     patient_state: "",
     claim_amount: "",
     payer_name: "",
+    wound_type: "", // Auto-detect by default, or user can override
   })
 
   // Basic change handler for flat inputs
@@ -63,6 +60,8 @@ export default function NewCasePage() {
     if (name === "claim_amount") {
       const numericValue = value.replace(/,/g, "")
       setFormData((prev) => ({ ...prev, [name]: numericValue }))
+    } else if (name === "patient_state") {
+      setFormData((prev) => ({ ...prev, [name]: value.toUpperCase() }))
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }))
     }
@@ -76,11 +75,27 @@ export default function NewCasePage() {
     return parts.length > 1 ? `${parts[0]}.${parts[1].slice(0, 2)}` : parts[0]
   }
 
+  // Progressive disclosure: check if each step is complete
+  const isStep1Complete = !!formData.doc_type
+  const isStep2Complete = !!(
+    formData.patient_first_name &&
+    formData.patient_last_name &&
+    formData.patient_age &&
+    formData.patient_state &&
+    formData.payer_name
+  )
+  const isStep3Complete = pastedText.length >= 50
+
   // Submit handler
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
     // Basic validation
+    if (!formData.doc_type) {
+      setError("Please select a document type.")
+      return
+    }
+
     if (!pastedText || pastedText.length < 50) {
       setError("Please paste detailed clinical notes (at least 50 characters).")
       return
@@ -173,6 +188,8 @@ export default function NewCasePage() {
         metadata: {
           creation_method: "paste_only",
           original_pasted_text: pastedText,
+          // Wound type for LCD validation (biologics PA only)
+          wound_type: formData.wound_type || undefined, // Empty means auto-detect
           // AUDIT TRAIL - Terms Agreement
           terms_accepted: true,
           terms_accepted_at: new Date().toISOString(),
@@ -266,16 +283,39 @@ export default function NewCasePage() {
               value={formData.doc_type}
               onChange={handleChange}
               className="w-full mt-2 h-11 px-4 rounded-md border border-sage-medium bg-white focus:border-mint focus:ring-2 focus:ring-mint focus:ring-offset-0 outline-none"
+              required
             >
+              <option value="" disabled>Select Document Type</option>
               <option value="biologics_pa">Biologics Prior Authorization</option>
               <option value="medical_necessity">Medical Necessity Letter</option>
               <option value="appeal">Appeal Letter</option>
             </select>
+
+            {/* Wound Type - Only for Biologics PA */}
+            {formData.doc_type === "biologics_pa" && (
+              <div className="mt-4">
+                <Label htmlFor="wound_type">Wound Type (optional)</Label>
+                <select
+                  id="wound_type"
+                  name="wound_type"
+                  value={formData.wound_type}
+                  onChange={handleChange}
+                  className="w-full mt-2 h-11 px-4 rounded-md border border-sage-medium bg-white focus:border-mint focus:ring-2 focus:ring-mint focus:ring-offset-0 outline-none"
+                >
+                  <option value="">Auto-detect from clinical notes</option>
+                  <option value="DFU">Diabetic Foot Ulcer (DFU)</option>
+                  <option value="VLU">Venous Leg Ulcer (VLU)</option>
+                  <option value="PRESSURE_ULCER">Pressure Ulcer</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave as auto-detect or select to ensure correct LCD validation
+                </p>
+              </div>
+            )}
           </Card>
 
-          {/* ============================================== */}
-          {/* 2. KEY CONTEXT (Patient & Claim)               */}
-          {/* ============================================== */}
+          {/* Step 2: Shows after document type is selected */}
+          {isStep1Complete && (
           <Card className="p-6 glass-card border border-sage-medium/30">
             <h2 className="text-xl font-serif text-dark-bg mb-4">2. Patient & Claim Info</h2>
             <div className="grid md:grid-cols-2 gap-4">
@@ -326,7 +366,7 @@ export default function NewCasePage() {
                   name="patient_state"
                   value={formData.patient_state}
                   onChange={handleChange}
-                  placeholder="CA"
+                  placeholder="TX"
                   maxLength={2}
                   className="mt-2"
                   required
@@ -373,17 +413,14 @@ export default function NewCasePage() {
               </div>
             </div>
           </Card>
+          )}
 
-          {/* ============================================== */}
-          {/* 3. PASTE CLINICAL RECORDS (The Source)         */}
-          {/* ============================================== */}
+          {/* Step 3: Shows after patient info is complete */}
+          {isStep1Complete && isStep2Complete && (
           <Card className="p-6 glass-card border border-mint/30 shadow-sm">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <div className="flex items-center gap-2">
-                  <Copy className="w-5 h-5 text-mint" />
-                  <h2 className="text-xl font-serif text-dark-bg">3. Paste Clinical Notes</h2>
-                </div>
+                <h2 className="text-xl font-serif text-dark-bg">3. Paste Clinical Notes</h2>
                 <p className="text-sm text-gray-600 mt-1">
                   Paste the full clinical context here (Progress Note, H&P, Previous Denial).
                   Our AI will read this to generate the letter.
@@ -410,15 +447,12 @@ Requesting Rinvoq 15mg daily."
               className="min-h-[300px] font-mono text-sm mb-4 bg-white/80"
             />
           </Card>
+          )}
 
-          {/* ============================================== */}
-          {/* 4. COMPLIANCE AGREEMENT                        */}
-          {/* ============================================== */}
+          {/* Step 4: Shows with Step 3 after patient info is complete */}
+          {isStep1Complete && isStep2Complete && (
           <Card className="p-6 glass-card border border-amber-500/30 bg-amber-50/30">
-            <div className="flex items-center gap-2 mb-4">
-              <Shield className="w-5 h-5 text-amber-600" />
-              <h2 className="text-xl font-serif text-dark-bg">4. Compliance Agreement</h2>
-            </div>
+            <h2 className="text-xl font-serif text-dark-bg mb-4">4. Compliance Agreement</h2>
 
             {/* Warning Box */}
             <div className="bg-amber-100/50 border border-amber-300/50 rounded-lg p-4 mb-4">
@@ -482,6 +516,7 @@ Requesting Rinvoq 15mg daily."
               </span>
             </label>
           </Card>
+          )}
 
           {/* HIPAA Full List Dialog */}
           <Dialog open={showFullHipaaList} onOpenChange={setShowFullHipaaList}>

@@ -99,12 +99,12 @@ export function SubscriptionBanner({
     const daysLeft = Math.ceil((new Date(trialEndsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
 
     return (
-      <Card className="p-6 glass-card border-2 border-mint/50 bg-mint/5 mb-6">
-        <div className="flex items-start justify-between gap-4">
+      <Card className="p-4 sm:p-6 glass-card border-2 border-mint/50 bg-mint/5 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-start gap-3 flex-1">
             <Clock className="w-6 h-6 text-mint flex-shrink-0 mt-1" />
             <div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h3 className="text-lg font-serif text-dark-bg">Free Trial Active</h3>
                 <Badge variant="outline" className="bg-mint/10 text-mint border-mint/30">
                   {daysLeft} days left
@@ -119,7 +119,7 @@ export function SubscriptionBanner({
               </p>
             </div>
           </div>
-          <Button onClick={handleManageBilling} variant="outline" disabled={loading}>
+          <Button onClick={handleManageBilling} variant="outline" disabled={loading} className="w-full sm:w-auto">
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -140,12 +140,12 @@ export function SubscriptionBanner({
     const isLowOnCases = casesRemaining <= 10
 
     return (
-      <Card className={`p-6 glass-card border-2 mb-6 ${isLowOnCases ? "border-coral/50 bg-coral/5" : "border-sage-medium/30"}`}>
-        <div className="flex items-start justify-between gap-4">
+      <Card className={`p-4 sm:p-6 glass-card border-2 mb-6 ${isLowOnCases ? "border-coral/50 bg-coral/5" : "border-sage-medium/30"}`}>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-start gap-3 flex-1">
             <CheckCircle className={`w-6 h-6 flex-shrink-0 mt-1 ${isLowOnCases ? "text-coral" : "text-mint"}`} />
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h3 className="text-lg font-serif text-dark-bg">Professional Plan</h3>
                 <Badge variant="outline" className="bg-mint/10 text-mint border-mint/30">
                   Active
@@ -154,7 +154,7 @@ export function SubscriptionBanner({
 
               {/* Usage Bar */}
               <div className="mb-3">
-                <div className="flex items-center justify-between text-sm mb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm mb-2 gap-1">
                   <span className="text-gray-700">
                     <strong>{casesRemaining} cases</strong> remaining this month
                   </span>
@@ -181,7 +181,7 @@ export function SubscriptionBanner({
               </p>
             </div>
           </div>
-          <Button onClick={handleManageBilling} variant="outline" disabled={loading}>
+          <Button onClick={handleManageBilling} variant="outline" disabled={loading} className="w-full sm:w-auto">
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
