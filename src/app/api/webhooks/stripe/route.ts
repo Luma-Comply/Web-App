@@ -185,14 +185,26 @@ async function handleSubscriptionUpdate(
   supabase: SupabaseClientType
 ) {
   let userId = subscription.metadata.supabase_user_id;
+  const customerId = subscription.customer as string;
 
-  if (!userId) {
-    // Try to find user by customer ID as fallback
-    const customerId = subscription.customer as string;
-    console.warn("No supabase_user_id in subscription metadata, attempting customer lookup", {
+  // First, verify the user exists in our database
+  let userExists = false;
+
+  if (userId) {
+    const { data: userById } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
+    userExists = !!userById;
+  }
+
+  // If user not found by ID, try by customer ID
+  if (!userExists) {
+    console.warn("User not found by ID, attempting customer lookup", {
       subscriptionId: subscription.id,
+      userId,
       customerId,
-      metadata: subscription.metadata,
     });
 
     const { data: userByCustomer } = await supabase
@@ -201,12 +213,20 @@ async function handleSubscriptionUpdate(
       .eq("stripe_customer_id", customerId)
       .single();
 
-    if (!userByCustomer) {
-      console.error("Could not find user by customer ID", { customerId, subscriptionId: subscription.id });
-      return;
+    if (userByCustomer) {
+      userId = userByCustomer.id;
+      userExists = true;
     }
+  }
 
-    userId = userByCustomer.id;
+  // If still no user found, log and return gracefully (don't throw error)
+  if (!userExists || !userId) {
+    console.warn("User not found in database, skipping subscription update", {
+      subscriptionId: subscription.id,
+      customerId,
+      metadataUserId: subscription.metadata.supabase_user_id,
+    });
+    return;
   }
 
   const status = subscription.status;
@@ -216,7 +236,7 @@ async function handleSubscriptionUpdate(
   const currentPeriodStart = new Date(sub.current_period_start * 1000);
 
   const updateData: Record<string, any> = {
-    stripe_customer_id: subscription.customer as string,
+    stripe_customer_id: customerId,
     stripe_subscription_id: subscription.id,
     subscription_status: status,
     billing_period_start: currentPeriodStart.toISOString(),
@@ -259,27 +279,42 @@ async function handleSubscriptionDeleted(
   supabase: SupabaseClientType
 ) {
   let userId = subscription.metadata.supabase_user_id;
+  const customerId = subscription.customer as string;
 
-  if (!userId) {
-    // Try to find user by customer ID as fallback
-    const customerId = subscription.customer as string;
-    console.warn("No supabase_user_id in deleted subscription metadata, attempting customer lookup", {
-      subscriptionId: subscription.id,
-      customerId,
-    });
+  // First, verify the user exists in our database
+  let userExists = false;
 
+  if (userId) {
+    const { data: userById } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
+    userExists = !!userById;
+  }
+
+  // If user not found by ID, try by customer ID
+  if (!userExists) {
     const { data: userByCustomer } = await supabase
       .from("users")
       .select("id")
       .eq("stripe_customer_id", customerId)
       .single();
 
-    if (!userByCustomer) {
-      console.error("Could not find user by customer ID for deletion", { customerId, subscriptionId: subscription.id });
-      return;
+    if (userByCustomer) {
+      userId = userByCustomer.id;
+      userExists = true;
     }
+  }
 
-    userId = userByCustomer.id;
+  // If still no user found, log and return gracefully
+  if (!userExists || !userId) {
+    console.warn("User not found in database, skipping subscription deletion", {
+      subscriptionId: subscription.id,
+      customerId,
+      metadataUserId: subscription.metadata.supabase_user_id,
+    });
+    return;
   }
 
   const { error } = await supabase
@@ -312,28 +347,42 @@ async function handlePaymentSucceeded(
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   let userId = subscription.metadata.supabase_user_id;
+  const customerId = subscription.customer as string;
 
-  if (!userId) {
-    // Try to find user by customer ID as fallback
-    const customerId = subscription.customer as string;
-    console.warn("No supabase_user_id in subscription metadata for payment, attempting customer lookup", {
-      subscriptionId,
-      customerId,
-      invoiceId: invoice.id,
-    });
+  // First, verify the user exists in our database
+  let userExists = false;
 
+  if (userId) {
+    const { data: userById } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
+    userExists = !!userById;
+  }
+
+  // If user not found by ID, try by customer ID
+  if (!userExists) {
     const { data: userByCustomer } = await supabase
       .from("users")
       .select("id")
       .eq("stripe_customer_id", customerId)
       .single();
 
-    if (!userByCustomer) {
-      console.error("Could not find user by customer ID for payment", { customerId, subscriptionId, invoiceId: invoice.id });
-      return;
+    if (userByCustomer) {
+      userId = userByCustomer.id;
+      userExists = true;
     }
+  }
 
-    userId = userByCustomer.id;
+  // If still no user found, log and return gracefully
+  if (!userExists || !userId) {
+    console.warn("User not found in database, skipping payment success", {
+      subscriptionId,
+      customerId,
+      invoiceId: invoice.id,
+    });
+    return;
   }
 
   // Type cast to access period fields
@@ -375,28 +424,42 @@ async function handlePaymentFailed(
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   let userId = subscription.metadata.supabase_user_id;
+  const customerId = subscription.customer as string;
 
-  if (!userId) {
-    // Try to find user by customer ID as fallback
-    const customerId = subscription.customer as string;
-    console.warn("No supabase_user_id in subscription metadata for failed payment, attempting customer lookup", {
-      subscriptionId,
-      customerId,
-      invoiceId: invoice.id,
-    });
+  // First, verify the user exists in our database
+  let userExists = false;
 
+  if (userId) {
+    const { data: userById } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
+    userExists = !!userById;
+  }
+
+  // If user not found by ID, try by customer ID
+  if (!userExists) {
     const { data: userByCustomer } = await supabase
       .from("users")
       .select("id")
       .eq("stripe_customer_id", customerId)
       .single();
 
-    if (!userByCustomer) {
-      console.error("Could not find user by customer ID for failed payment", { customerId, subscriptionId, invoiceId: invoice.id });
-      return;
+    if (userByCustomer) {
+      userId = userByCustomer.id;
+      userExists = true;
     }
+  }
 
-    userId = userByCustomer.id;
+  // If still no user found, log and return gracefully
+  if (!userExists || !userId) {
+    console.warn("User not found in database, skipping payment failure", {
+      subscriptionId,
+      customerId,
+      invoiceId: invoice.id,
+    });
+    return;
   }
 
   const { error } = await supabase
