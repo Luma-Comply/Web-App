@@ -39,7 +39,7 @@ export default function ProblemSection() {
                 The Problem
               </h2>
               <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Documentation shouldn't stand between you and your patients. But right now, it does.
+                Documentation shouldn't stand between you and your patients.<br />But right now, it does.
               </p>
             </div>
           </ScrollReveal>
@@ -58,7 +58,7 @@ export default function ProblemSection() {
                     <div className="w-14 h-14 rounded-lg bg-coral/10 flex items-center justify-center mb-6">
                       <problem.icon className="w-7 h-7 text-coral" />
                     </div>
-                    <h3 className="text-xl font-semibold text-coral mb-3">
+                    <h3 className="text-[1.3rem] font-serif font-semibold text-coral mb-3">
                       {problem.title}
                     </h3>
                     <p className="text-gray-700 leading-relaxed">

@@ -88,7 +88,7 @@ Do not jump straight into implementation.
 
 Before writing or modifying code, always pause and reason about the task.
 
-**For anything non-trivial, you must first:**
+For anything non-trivial, you must first
 - Clarify the goal and success criteria
 - Identify what already exists in the codebase
 - Decide the simplest possible approach
@@ -96,7 +96,7 @@ Before writing or modifying code, always pause and reason about the task.
 
 Bias strongly toward planning before execution.
 
-**If the task involves architecture, refactors, or multi-file changes:**
+If the task involves architecture, refactors, or multi-file changes
 - Start with a brief plan
 - Outline the approach
 - Call out tradeoffs
@@ -163,24 +163,24 @@ You must strongly bias toward the smallest working implementation, even if it fe
 
 ## Operating Philosophy
 
-This codebase prioritizes:
+This codebase prioritizes
 - Correctness over cleverness
 - Simplicity over flexibility
 - Maintenance over novelty
 - Small changes over big rewrites
 
-The primary goals are:
+The primary goals are
 - Prevent technical debt
 - Catch issues immediately with hooks
 - Keep implementations minimal and readable
 - Avoid unnecessary surface area
 
-Claude should behave like a senior engineer maintaining a production system:
+Claude should behave like a senior engineer maintaining a production system
 - Not a demo engineer
 - Not a framework designer
 - Not a code generator
 
-Every decision should bias toward:
+Every decision should bias toward
 - The smallest working change
 - The fewest moving parts
 - The easiest code to delete later

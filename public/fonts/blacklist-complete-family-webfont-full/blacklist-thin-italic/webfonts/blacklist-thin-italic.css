@@ -1,0 +1,27 @@
+/*
+Font: 		Blacklist Thin
+Style: 		Italic
+URL: 		https://youworkforthem.com/font/T15569/blacklist
+Foundry: 	Typeface Design Studio
+Foundry: 	https://youworkforthem.com/designer/1740/typeface-design-studio
+Copyright:	
+Version: 	17
+Created:	January 06, 2026
+License: 	https://www.youworkforthem.com/font-license 
+License: 	The WebFont(s) listed in this document must follow the YouWorkForThem
+			WebFont license rules. All other parties are strictly restricted 
+			from using the WebFonts(s) listed without a purchased license. 
+			All details above must always remain unaltered and visible in your CSS.
+*/
+
+@font-face {
+	font-family: 'Blacklist-ThinItalic';
+	src: url('blacklist-thin-italic.eot');
+	src: url('blacklist-thin-italic.eot?#iefix') format('embedded-opentype'),
+             url('blacklist-thin-italic.woff2') format('woff2'),
+	     url('blacklist-thin-italic.woff') format('woff'),
+	     url('blacklist-thin-italic.ttf') format('truetype'),
+	     url('blacklist-thin-italic.svg#youworkforthem') format('svg');
+	font-weight: normal;
+	font-style: normal;
+}

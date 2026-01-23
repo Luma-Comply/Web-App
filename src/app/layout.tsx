@@ -1,18 +1,39 @@
 import type { Metadata } from "next";
-import { DM_Serif_Display, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
+import Script from "next/script";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
-const dmSerifDisplay = DM_Serif_Display({
-  weight: ["400"],
-  subsets: ["latin"],
+const blacklist = localFont({
+  src: [
+    {
+      path: "../../public/fonts/blacklist-complete-family-webfont-full/blacklist-regular/webfonts/blacklist-regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/blacklist-complete-family-webfont-full/blacklist-italic/webfonts/blacklist-italic.woff2",
+      weight: "400",
+      style: "italic",
+    },
+    {
+      path: "../../public/fonts/blacklist-complete-family-webfont-full/blacklist-medium-italic/webfonts/blacklist-medium-italic.woff2",
+      weight: "500",
+      style: "italic",
+    },
+    {
+      path: "../../public/fonts/blacklist-complete-family-webfont-full/blacklist-bold/webfonts/blacklist-bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
   variable: "--font-serif",
   display: "swap",
 });
 
-const ibmPlexSans = IBM_Plex_Sans({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
+const natux = localFont({
+  src: "../../public/fonts/ywft-natux-variable-webfont-full/webfonts/ywft-natux-variable.woff2",
   variable: "--font-sans",
   display: "swap",
 });
@@ -95,7 +116,32 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${dmSerifDisplay.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable} font-sans antialiased`}>
+      {/* Google Analytics */}
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=G-8KGNHVC3GQ"
+        strategy="afterInteractive"
+      />
+      <Script id="google-analytics" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-8KGNHVC3GQ');
+        `}
+      </Script>
+
+      {/* Microsoft Clarity */}
+      <Script id="microsoft-clarity" strategy="afterInteractive">
+        {`
+          (function(c,l,a,r,i,t,y){
+            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+            y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+          })(window, document, "clarity", "script", "v64a4br39t");
+        `}
+      </Script>
+
+      <body className={`${blacklist.variable} ${natux.variable} ${ibmPlexMono.variable} font-sans antialiased`}>
         {children}
         <Toaster />
       </body>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Card } from "@/components/ui/card"
 import { ChevronDown } from "lucide-react"
 
@@ -68,17 +69,28 @@ export function FAQSection() {
                   <span className="text-lg font-semibold text-dark-bg pr-4">
                     {faq.question}
                   </span>
-                  <ChevronDown
-                    className={`w-5 h-5 text-gray-500 flex-shrink-0 transition-transform ${
-                      openIndex === index ? "rotate-180" : ""
-                    }`}
-                  />
+                  <motion.div
+                    animate={{ rotate: openIndex === index ? 180 : 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                  >
+                    <ChevronDown className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                  </motion.div>
                 </button>
-                {openIndex === index && (
-                  <div className="px-6 pb-5 text-gray-700 leading-relaxed">
-                    {faq.answer}
-                  </div>
-                )}
+                <AnimatePresence initial={false}>
+                  {openIndex === index && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-6 pb-5 text-gray-700 leading-relaxed">
+                        {faq.answer}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </Card>
             ))}
           </div>

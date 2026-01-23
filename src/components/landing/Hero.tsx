@@ -55,14 +55,14 @@ export default function Hero() {
           <div className="max-w-5xl mx-auto">
             {/* Floating HIPAA Badge */}
             <div className="mb-8 animate-fade-in-down">
-              <Badge variant="glass" className="text-sm px-4 py-2">
+              <Badge variant="glass" className="text-sm px-4 py-2 font-mono text-gray-600">
                 <ShieldCheck className="w-4 h-4 mr-2 text-mint" />
                 HIPAA Compliant from Day One
               </Badge>
             </div>
 
             {/* Headline with Staggered Animation */}
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif font-normal leading-tight text-dark-bg mb-8 text-shadow-soft">
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif font-bold leading-tight text-dark-bg mb-8 text-shadow-soft">
               <span className="block animate-fade-in-up opacity-0 [animation-fill-mode:forwards]">
                 Automate Documentation.
               </span>
@@ -109,7 +109,7 @@ export default function Hero() {
             </div>
 
             {/* Trust Indicators */}
-            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600 animate-fade-in-up opacity-0 [animation-fill-mode:forwards] animation-delay-600">
+            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600 font-mono animate-fade-in-up opacity-0 [animation-fill-mode:forwards] animation-delay-600">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-mint" />
                 <span>14-day free trial</span>

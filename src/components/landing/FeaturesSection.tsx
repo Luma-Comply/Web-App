@@ -61,7 +61,7 @@ export default function FeaturesSection() {
                   </div>
 
                   {/* Content */}
-                  <h3 className="text-2xl font-serif text-dark-bg mb-3">
+                  <h3 className="text-2xl font-serif font-bold text-dark-bg mb-3">
                     {feature.title}
                   </h3>
                   <p className="text-gray-700 leading-relaxed">

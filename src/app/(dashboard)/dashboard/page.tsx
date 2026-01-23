@@ -433,11 +433,11 @@ export default function DashboardPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
-                    <TableHead className="w-[200px] lg:w-[280px]">Patient & Document</TableHead>
-                    <TableHead>Payer</TableHead>
-                    <TableHead className="hidden sm:table-cell">Created</TableHead>
-                    <TableHead className="hidden lg:table-cell">Created By</TableHead>
-                    <TableHead className="text-right">Claim Value</TableHead>
+                    <TableHead className="w-[200px] lg:w-[280px] text-dark-bg font-semibold">Patient & Document</TableHead>
+                    <TableHead className="text-dark-bg font-semibold">Payer</TableHead>
+                    <TableHead className="hidden sm:table-cell text-dark-bg font-semibold">Created</TableHead>
+                    <TableHead className="hidden lg:table-cell text-dark-bg font-semibold">Created By</TableHead>
+                    <TableHead className="text-right text-dark-bg font-semibold">Claim Value</TableHead>
                     <TableHead className="w-[60px] lg:w-[80px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -468,10 +468,10 @@ export default function DashboardPage() {
                         <TableCell className="text-gray-700 text-sm">
                           {c.payer_name || '-'}
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell text-gray-500 text-sm">
+                        <TableCell className="hidden sm:table-cell text-gray-700 text-sm">
                           {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-gray-500 text-sm">
+                        <TableCell className="hidden lg:table-cell text-gray-700 text-sm">
                           {c.created_by_email || userEmail}
                         </TableCell>
                         <TableCell className="text-right font-mono text-gray-700">

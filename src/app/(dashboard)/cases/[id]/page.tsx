@@ -79,6 +79,7 @@ export default function CaseDetailPage() {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [isDocCollapsed, setIsDocCollapsed] = useState(false)
   const [isSavingEdits, setIsSavingEdits] = useState(false)
+  const [regenerateModalOpen, setRegenerateModalOpen] = useState(false)
   const [lcdValidation, setLcdValidation] = useState<{
     riskLevel: string
     denialProbability: number
@@ -955,7 +956,14 @@ export default function CaseDetailPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={generateDocumentation}
+                    onClick={() => {
+                      // Show confirmation modal if regenerating (already has output)
+                      if (caseData.generated_output) {
+                        setRegenerateModalOpen(true)
+                      } else {
+                        generateDocumentation()
+                      }
+                    }}
                     disabled={generating}
                     className="gap-2 border-dark-bg text-dark-bg hover:bg-dark-bg hover:text-white"
                   >
@@ -1320,6 +1328,44 @@ export default function CaseDetailPage() {
               ) : (
                 "Save Changes"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Regenerate Confirmation Modal */}
+      <Dialog open={regenerateModalOpen} onOpenChange={setRegenerateModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Regenerate Documentation?</DialogTitle>
+            <DialogDescription>
+              Regenerating will use <span className="font-semibold text-dark-bg">1 credit</span> from your account. Your current documentation will be replaced with a new version.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <RefreshCw className="w-5 h-5 text-amber-600 flex-shrink-0" />
+              <p className="text-sm text-amber-800">
+                This action will deduct 1 credit from your remaining cases.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRegenerateModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setRegenerateModalOpen(false)
+                generateDocumentation()
+              }}
+              className="bg-dark-bg hover:bg-dark-bg/90"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Regenerate
             </Button>
           </DialogFooter>
         </DialogContent>

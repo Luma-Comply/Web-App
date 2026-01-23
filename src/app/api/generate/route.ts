@@ -586,30 +586,36 @@ CRITICAL - PATIENT INFORMATION:
       )
     }
 
-    // Update remaining cases count - use team owner's pool if user is a team member
-    const { data: currentUser } = await supabase
-      .from("users")
-      .select("team_owner_id, cases_remaining_this_month, cases_remaining")
-      .eq("id", session.user.id)
-      .single()
+    // Only charge credits for REGENERATIONS (case already had generated output)
+    // First-time generation is free since credit was already charged at case creation
+    const isRegeneration = !!caseData.generated_output
 
-    // Determine whose cases pool to decrement (team owner's or own)
-    const poolOwnerId = currentUser?.team_owner_id || session.user.id
-
-    const { data: poolOwnerData } = await supabase
-      .from("users")
-      .select("cases_remaining_this_month, cases_remaining")
-      .eq("id", poolOwnerId)
-      .single()
-
-    if (poolOwnerData && poolOwnerData.cases_remaining > 0) {
-      await supabase
+    if (isRegeneration) {
+      // Update remaining cases count - use team owner's pool if user is a team member
+      const { data: currentUser } = await supabase
         .from("users")
-        .update({
-          cases_remaining_this_month: Math.max(0, (poolOwnerData.cases_remaining_this_month || 50) - 1),
-          cases_remaining: Math.max(0, (poolOwnerData.cases_remaining || 50) - 1),
-        })
+        .select("team_owner_id, cases_remaining_this_month, cases_remaining")
+        .eq("id", session.user.id)
+        .single()
+
+      // Determine whose cases pool to decrement (team owner's or own)
+      const poolOwnerId = currentUser?.team_owner_id || session.user.id
+
+      const { data: poolOwnerData } = await supabase
+        .from("users")
+        .select("cases_remaining_this_month, cases_remaining")
         .eq("id", poolOwnerId)
+        .single()
+
+      if (poolOwnerData && poolOwnerData.cases_remaining > 0) {
+        await supabase
+          .from("users")
+          .update({
+            cases_remaining_this_month: Math.max(0, (poolOwnerData.cases_remaining_this_month || 50) - 1),
+            cases_remaining: Math.max(0, (poolOwnerData.cases_remaining || 50) - 1),
+          })
+          .eq("id", poolOwnerId)
+      }
     }
 
     // Build response - include validation for biologics PA
