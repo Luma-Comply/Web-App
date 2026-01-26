@@ -2,7 +2,7 @@
 title: "Prior Authorization Automation: Streamlining Workflows to Meet 2026 Interoperability Mandates"
 excerpt: "Learn how prior authorization automation helps healthcare providers meet CMS 2026 interoperability mandates. Practical implementation guide included."
 coverImage: "/assets/blog/prior-auth-automation-2026/cover.svg"
-date: "2026-01-26"
+date: "2026-01-27"
 author:
   name: "Luma Team"
   picture: "/assets/blog/authors/luma-team.svg"

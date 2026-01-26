@@ -2,7 +2,7 @@
 title: "HIPAA-Compliant Telehealth Platforms: Meeting CMS Reimbursement Requirements in 2026"
 excerpt: "Navigate HIPAA telehealth compliance and CMS reimbursement requirements for 2026. Essential guide for healthcare providers expanding virtual care."
 coverImage: "/assets/blog/hipaa-telehealth-2026/cover.svg"
-date: "2026-01-26"
+date: "2026-01-28"
 author:
   name: "Luma Team"
   picture: "/assets/blog/authors/luma-team.svg"

@@ -2,7 +2,7 @@
 title: "AI-Powered RCM Solutions: How Healthcare Organizations Are Reducing Billing Errors and Improving Cash Flow"
 excerpt: "Discover how AI-powered RCM solutions reduce billing errors and improve cash flow. Practical implementation guide for healthcare organizations in 2026."
 coverImage: "/assets/blog/ai-rcm-solutions-2026/cover.svg"
-date: "2026-01-26"
+date: "2026-01-30"
 author:
   name: "Luma Team"
   picture: "/assets/blog/authors/luma-team.svg"

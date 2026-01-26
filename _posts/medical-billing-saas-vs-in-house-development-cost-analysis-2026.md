@@ -2,7 +2,7 @@
 title: "Medical Billing SaaS vs. In-House Development: Cost Analysis for Healthcare Providers in 2026"
 excerpt: "Compare medical billing SaaS vs in-house development costs for 2026. Complete analysis helps healthcare providers make informed technology decisions."
 coverImage: "/assets/blog/billing-saas-vs-inhouse-2026/cover.svg"
-date: "2026-01-26"
+date: "2026-01-29"
 author:
   name: "Luma Team"
   picture: "/assets/blog/authors/luma-team.svg"
