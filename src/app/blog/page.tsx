@@ -9,6 +9,9 @@ export const metadata: Metadata = {
     "Insights on medical necessity documentation, prior authorizations, HIPAA compliance, and healthcare administration.",
 }
 
+// Revalidate every hour to pick up scheduled posts
+export const revalidate = 3600
+
 export default function BlogPage() {
   const allPosts = getAllPosts()
 
