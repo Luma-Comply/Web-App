@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import OpenAI from "openai"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 import mammoth from "mammoth"
 // @ts-ignore
 import PDFParser from "pdf2json"
 import * as XLSX from 'xlsx'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_FILE_TYPES = ["pdf", "docx", "xlsx", "png", "jpg", "jpeg"]
@@ -74,14 +72,8 @@ async function extractTextFromXLSX(buffer: Buffer): Promise<string> {
 
 async function extractTextFromImage(buffer: Buffer, mimeType: string): Promise<string> {
   const base64 = buffer.toString("base64")
-  const dataUrl = `data:${mimeType};base64,${base64}`
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: `You are a medical image analyst specializing in wound care documentation for prior authorization.
+  const systemPrompt = `You are a medical image analyst specializing in wound care documentation for prior authorization.
 
 When analyzing images, determine if it's:
 1. A DOCUMENT/FORM - Extract all text, preserving structure
@@ -101,47 +93,39 @@ For wound/clinical photos, describe:
 - Overall wound healing trajectory assessment
 
 Be specific and clinical. This information will be used for Medicare LCD L35041 compliance documentation.`
-      },
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Analyze this medical image. If it's a document, extract the text. If it's a clinical photo (wound, skin condition, etc.), provide a detailed clinical assessment.",
-          },
-          {
-            type: "image_url",
-            image_url: { url: dataUrl, detail: "high" },
-          },
-        ],
-      },
-    ],
-    max_tokens: 4096,
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    systemInstruction: systemPrompt,
   })
 
-  return response.choices[0]?.message?.content || ""
+  const result = await model.generateContent([
+    "Analyze this medical image. If it's a document, extract the text. If it's a clinical photo (wound, skin condition, etc.), provide a detailed clinical assessment.",
+    {
+      inlineData: {
+        mimeType: mimeType,
+        data: base64
+      }
+    }
+  ])
+
+  return result.response.text() || ""
 }
 
 async function generateSummary(text: string, filename: string): Promise<string> {
   const truncatedText = text.slice(0, 8000) // Limit context for summary
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a medical document analyst. Provide a brief summary (2-3 sentences) of the uploaded document, focusing on clinically relevant information for prior authorization purposes.",
-      },
-      {
-        role: "user",
-        content: `Summarize this document (${filename}):\n\n${truncatedText}`,
-      },
-    ],
-    max_tokens: 200,
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    systemInstruction: "You are a medical document analyst. Provide a brief summary (2-3 sentences) of the uploaded document, focusing on clinically relevant information for prior authorization purposes.",
+    generationConfig: {
+      maxOutputTokens: 200,
+    }
   })
 
-  return response.choices[0]?.message?.content || "Document uploaded successfully."
+  const result = await model.generateContent(`Summarize this document (${filename}):\n\n${truncatedText}`)
+
+  return result.response.text() || "Document uploaded successfully."
 }
 
 export async function POST(request: NextRequest) {

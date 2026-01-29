@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import OpenAI from "openai"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 import {
   validateAgainstLCD,
   LCDValidationResult,
@@ -9,10 +9,7 @@ import {
 import { WoundType } from "@/lib/lcd-requirements"
 import { getMACInfo, buildStateSpecificContext, isWiserActiveForSkinSubs } from "@/lib/mac-jurisdictions"
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  timeout: 60000, // 60 second timeout
-})
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
 // Helper to send SSE events
 function sendEvent(controller: ReadableStreamDefaultController, encoder: TextEncoder, data: any) {
@@ -216,21 +213,32 @@ Find: coverage criteria, step therapy requirements, medical necessity requiremen
         // --- PHASE: extracting_forms ---
         sendEvent(controller, encoder, { phase: 'extracting_forms' })
 
-        try {
-          const formExtractionSystemPrompt = `Identify REQUIRED forms based on payer research. Return JSON: {"forms": [{"title": string, "description": string, "form_type": string, "confidence": string}]}`
-          const formExtractionUserPrompt = `Research: ${researchContext.substring(0, 2000)}\nPayer: ${caseData.payer_name}\nMedication: ${caseData.requested_medication}`
+        // Normalize confidence value to match DB constraint
+        const normalizeConfidence = (conf: string | undefined): 'high' | 'medium' | 'low' => {
+          const normalized = (conf || '').toLowerCase().trim()
+          if (normalized === 'high') return 'high'
+          if (normalized === 'medium' || normalized === 'med') return 'medium'
+          if (normalized === 'low') return 'low'
+          return 'medium' // Default to medium if unknown
+        }
 
-          const formsCompletion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            response_format: { type: "json_object" },
-            messages: [
-              { role: "system", content: formExtractionSystemPrompt },
-              { role: "user", content: formExtractionUserPrompt }
-            ],
-            temperature: 0.2
+        try {
+          const formExtractionPrompt = `Identify REQUIRED forms based on payer research. Return JSON only: {"forms": [{"title": string, "description": string, "form_type": string, "confidence": string}]}
+
+Research: ${researchContext.substring(0, 2000)}
+Payer: ${caseData.payer_name}
+Medication: ${caseData.requested_medication}`
+
+          const formModel = genAI.getGenerativeModel({
+            model: "gemini-2.0-flash",
+            generationConfig: {
+              temperature: 0.2,
+              responseMimeType: "application/json"
+            }
           })
 
-          let content = formsCompletion.choices[0]?.message?.content || "{}"
+          const formResult = await formModel.generateContent(formExtractionPrompt)
+          let content = formResult.response.text() || "{}"
           content = content.replace(/^```json\s*/, "").replace(/\s*```$/, "")
 
           const formsOutput = JSON.parse(content)
@@ -239,12 +247,12 @@ Find: coverage criteria, step therapy requirements, medical necessity requiremen
           if (suggestedForms.length > 0) {
             const formsToInsert = suggestedForms.map((form: any) => ({
               case_id: caseId,
-              title: form.title,
-              description: form.description,
-              form_type: form.form_type,
+              title: form.title || 'Untitled Document',
+              description: form.description || '',
+              form_type: form.form_type || 'other',
               payer: caseData.payer_name,
               state: caseData.patient_state,
-              confidence: form.confidence,
+              confidence: normalizeConfidence(form.confidence),
               download_url: null,
               is_external: false,
               source_snippets: [],
@@ -283,31 +291,34 @@ Find: coverage criteria, step therapy requirements, medical necessity requiremen
         }
 
         // Build prompts (simplified for streaming version)
-        const systemPrompt = isBiologicsPA && lcdValidationResult
+        const systemContext = isBiologicsPA && lcdValidationResult
           ? `You are an AI for CTP prior authorization documentation. Generate professional medical documentation.
 LCD Validation: Risk ${lcdValidationResult.auditRisk.overallScore}, ${lcdValidationResult.summary.foundCount}/${lcdValidationResult.summary.totalRequirements} requirements met.`
           : `You are an AI for medical documentation. Generate professional, persuasive prior authorization letters.`
 
-        const userPrompt = `Generate ${getDocTypeLabel(caseData.doc_type)} for:
+        const fullPrompt = `${systemContext}
+
+Generate ${getDocTypeLabel(caseData.doc_type)} for:
 Patient: ${caseData.patient_first_name} ${caseData.patient_last_name}, ${caseData.patient_age}yo, ${caseData.patient_state}
 Payer: ${caseData.payer_name}
 Medication: ${caseData.requested_medication}
 
 RESEARCH: ${researchContext.substring(0, 3000)}
 ${chatConversationContext}
-CLINICAL NOTES: ${caseData.disease_activity || ''} ${caseData.prior_treatments || ''} ${caseData.lab_values || ''}`
+CLINICAL NOTES: ${caseData.disease_activity || ''} ${caseData.prior_treatments || ''} ${caseData.lab_values || ''}
 
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          temperature: 0.7,
-          max_tokens: 3000,
+Generate a professional, persuasive prior authorization letter. Do not use markdown formatting like ** or #. Use plain text only.`
+
+        const docModel = genAI.getGenerativeModel({
+          model: "gemini-2.0-flash",
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 3000,
+          }
         })
 
-        let documentation = completion.choices[0]?.message?.content || ""
+        const docResult = await docModel.generateContent(fullPrompt)
+        let documentation = docResult.response.text() || ""
 
         // Clean up formatting
         documentation = documentation
@@ -316,6 +327,32 @@ CLINICAL NOTES: ${caseData.disease_activity || ''} ${caseData.prior_treatments |
           .replace(/\*/g, '')
           .replace(/\n{3,}/g, '\n\n')
           .trim()
+
+        // Fetch suggested forms and append to documentation
+        const { data: savedForms } = await supabase
+          .from("case_suggested_forms")
+          .select("title, description, form_type, confidence")
+          .eq("case_id", caseId)
+          .order("created_at", { ascending: false })
+
+        if (savedForms && savedForms.length > 0) {
+          const formsSection = `
+
+
+RECOMMENDED SUPPORTING DOCUMENTS
+
+The following documents are recommended to strengthen this prior authorization request based on payer policy research:
+
+${savedForms.map((form, index) => {
+  const confidenceLabel = form.confidence === 'high' ? '[HIGH PRIORITY]' : form.confidence === 'medium' ? '[MEDIUM PRIORITY]' : '[SUGGESTED]'
+  return `${index + 1}. ${form.title} ${confidenceLabel}
+   ${form.description}`
+}).join('\n\n')}
+
+Note: These recommendations are based on AI analysis of current payer policies. Please verify specific requirements with the payer before submission.`
+
+          documentation += formsSection
+        }
 
         // --- PHASE: saving ---
         sendEvent(controller, encoder, { phase: 'saving' })

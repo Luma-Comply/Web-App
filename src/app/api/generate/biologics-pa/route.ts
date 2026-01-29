@@ -1,10 +1,8 @@
 
-import { OpenAI } from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export async function POST(req: NextRequest) {
     try {
@@ -20,15 +18,11 @@ export async function POST(req: NextRequest) {
 
         // STEP 1: Research with Perplexity
         const researchPrompt = `
-      Find current ${formData.payerName} requirements for 
+      Find current ${formData.payerName} requirements for
       ${formData.requestedMedication} for ${formData.diagnosisCodes}.
       Include LCD/NCD requirements, step therapy, and documentation needed.
     `;
 
-        // Perplexity uses OpenAI-compatible API structure
-        // We use fetch here to avoid instantiating another OpenAI client if not needed,
-        // or we could use the openai client with a different base URL.
-        // Fetch is explicit and simple for this single call.
         const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
             method: 'POST',
             headers: {
@@ -51,10 +45,10 @@ export async function POST(req: NextRequest) {
         const researchContent = researchData.choices[0]?.message?.content || "No research found.";
         const citations = researchData.citations || [];
 
-        // STEP 2: Generate with ChatGPT-4o
+        // STEP 2: Generate with Gemini
         const generationPrompt = `
       Using these current requirements: ${researchContent}
-      
+
       Generate medical necessity documentation for:
       Patient: ${formData.patientFirstName || 'Unknown'} ${formData.patientLastName || 'Unknown'}
       Age: ${formData.patientAge || 'Unknown'}
@@ -63,20 +57,19 @@ export async function POST(req: NextRequest) {
       Labs: ${formData.labValues || 'None provided'}
       Requesting: ${formData.requestedMedication}
       Payer: ${formData.payerName}
-      
+
       Format with clear headers and compliance checklist.
     `;
 
-        const documentation = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: "You are a medical documentation specialist. Create compliant, professional medical necessity letters." },
-                { role: "user", content: generationPrompt }
-            ]
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.0-flash",
+            systemInstruction: "You are a medical documentation specialist. Create compliant, professional medical necessity letters.",
         });
 
+        const result = await model.generateContent(generationPrompt);
+
         return NextResponse.json({
-            documentation: documentation.choices[0].message.content,
+            documentation: result.response.text(),
             sources: citations
         });
 

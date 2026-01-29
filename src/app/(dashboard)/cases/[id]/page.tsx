@@ -374,8 +374,8 @@ export default function CaseDetailPage() {
       if (data.metadata?.checklist_edits?.edits) {
         setChecklistEdits(data.metadata.checklist_edits.edits)
       }
-    } catch (error) {
-      console.error("Error loading case:", error)
+    } catch (error: any) {
+      console.error("Error loading case:", error?.message || error?.code || JSON.stringify(error))
     } finally {
       setLoading(false)
     }

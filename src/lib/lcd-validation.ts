@@ -4,7 +4,7 @@
  * Returns audit risk assessment and actionable recommendations
  */
 
-import OpenAI from "openai"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 import {
   LCD_L35041_REQUIREMENTS,
   LCDRequirement,
@@ -143,9 +143,7 @@ export async function validateAgainstLCD(
   woundType?: WoundType, // Optional - will auto-detect if not provided
   patientState?: string // Optional - used for policy change detection
 ): Promise<LCDValidationResult> {
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  })
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
   // Step 0: Detect policy changes from Perplexity research
   const policyAlerts = patientState
@@ -156,7 +154,7 @@ export async function validateAgainstLCD(
   const ctpProductCheck = isProductCovered(ctpProduct)
 
   // Step 2: Auto-detect wound type if not provided
-  const detectedWoundType = woundType || (await detectWoundType(openai, clinicalNotes))
+  const detectedWoundType = woundType || (await detectWoundType(genAI, clinicalNotes))
 
   // Step 3: Get requirements for this wound type
   const requirements = getRequirementsForWoundType(detectedWoundType)
@@ -172,12 +170,7 @@ export async function validateAgainstLCD(
     ctpProduct
   )
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: `You are a Medicare LCD L35041 compliance expert analyzing wound care documentation for CTP/skin substitute prior authorizations.
+  const systemPrompt = `You are a Medicare LCD L35041 compliance expert analyzing wound care documentation for CTP/skin substitute prior authorizations.
 
 Your task is to check if clinical notes contain required documentation elements. Be thorough but fair - if information is present in any form, mark it as FOUND. Only mark MISSING if the information is truly absent.
 
@@ -186,20 +179,23 @@ For each requirement, provide:
 2. evidence: Direct quote from notes if found (keep brief, max 100 chars)
 3. suggestion: Specific language to add if missing
 
-IMPORTANT: This is for Medicare Part B CTP claims. SOC failure documentation is CRITICAL - it's the #1 audit failure reason.`,
-      },
-      {
-        role: "user",
-        content: validationPrompt,
-      },
-    ],
-    temperature: 0.1, // Low temperature for accuracy
-    response_format: { type: "json_object" },
+IMPORTANT: This is for Medicare Part B CTP claims. SOC failure documentation is CRITICAL - it's the #1 audit failure reason.
+
+Return your response as valid JSON only.`
+
+  const validationModel = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    systemInstruction: systemPrompt,
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: "application/json"
+    }
   })
 
-  const validationResponse = JSON.parse(
-    completion.choices[0]?.message?.content || "{}"
-  ) as ValidationResponse
+  const completion = await validationModel.generateContent(validationPrompt)
+  const responseText = completion.response.text() || "{}"
+
+  const validationResponse = JSON.parse(responseText) as ValidationResponse
 
   // Step 6: Build checklist from validation response
   const checklist = buildChecklist(validationResponse, detectedWoundType)
@@ -251,32 +247,26 @@ interface ValidationResponse {
  * Auto-detect wound type from clinical notes
  */
 async function detectWoundType(
-  openai: OpenAI,
+  genAI: GoogleGenerativeAI,
   clinicalNotes: string
 ): Promise<WoundType> {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: `Analyze the clinical notes and determine the wound type. Return ONLY one of: DFU, VLU, PRESSURE_ULCER
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    systemInstruction: `Analyze the clinical notes and determine the wound type. Return ONLY one of: DFU, VLU, PRESSURE_ULCER
 
 DFU = Diabetic Foot Ulcer (patient has diabetes, wound on foot)
 VLU = Venous Leg Ulcer (venous insufficiency, typically lower leg)
 PRESSURE_ULCER = Pressure injury/decubitus ulcer (from pressure/friction)
 
 Return the single most likely wound type based on the notes.`,
-      },
-      {
-        role: "user",
-        content: clinicalNotes.substring(0, 3000), // Limit for efficiency
-      },
-    ],
-    temperature: 0,
-    max_tokens: 20,
+    generationConfig: {
+      temperature: 0,
+      maxOutputTokens: 20,
+    }
   })
 
-  const response = completion.choices[0]?.message?.content?.trim().toUpperCase() || "DFU"
+  const result = await model.generateContent(clinicalNotes.substring(0, 3000))
+  const response = result.response.text()?.trim().toUpperCase() || "DFU"
 
   if (response.includes("VLU")) return "VLU"
   if (response.includes("PRESSURE")) return "PRESSURE_ULCER"

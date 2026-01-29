@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import OpenAI from "openai"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 import {
   validateAgainstLCD,
   formatValidationSummary,
@@ -10,9 +10,7 @@ import {
 import { WoundType } from "@/lib/lcd-requirements"
 import { getMACInfo, buildStateSpecificContext, isWiserActiveForSkinSubs } from "@/lib/mac-jurisdictions"
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
 export async function POST(request: NextRequest) {
   try {
@@ -326,19 +324,19 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
       State: ${caseData.patient_state}
       `
 
-      const formsCompletion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: formExtractionSystemPrompt },
-          { role: "user", content: formExtractionUserPrompt }
-        ],
-        temperature: 0.2
+      const formModel = genAI.getGenerativeModel({
+        model: "gemini-2.0-flash",
+        generationConfig: {
+          temperature: 0.2,
+          responseMimeType: "application/json"
+        }
       })
 
-      console.log("GPT-4o Form Extraction Response:", formsCompletion.choices[0]?.message?.content)
+      const formResult = await formModel.generateContent(`${formExtractionSystemPrompt}\n\n${formExtractionUserPrompt}`)
 
-      let content = formsCompletion.choices[0]?.message?.content || "{}"
+      console.log("Gemini Form Extraction Response:", formResult.response.text())
+
+      let content = formResult.response.text() || "{}"
       // Strip markdown code blocks if present
       content = content.replace(/^```json\s*/, "").replace(/\s*```$/, "")
 
@@ -352,15 +350,24 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
 
       const suggestedForms = formsOutput.forms || []
 
+      // Normalize confidence value to match DB constraint
+      const normalizeConfidence = (conf: string | undefined): 'high' | 'medium' | 'low' => {
+        const normalized = (conf || '').toLowerCase().trim()
+        if (normalized === 'high') return 'high'
+        if (normalized === 'medium' || normalized === 'med') return 'medium'
+        if (normalized === 'low') return 'low'
+        return 'medium' // Default to medium if unknown
+      }
+
       if (suggestedForms.length > 0) {
         const formsToInsert = suggestedForms.map((form: any) => ({
           case_id: caseId,
-          title: form.title,
-          description: form.description,
-          form_type: form.form_type,
+          title: form.title || 'Untitled Document',
+          description: form.description || '',
+          form_type: form.form_type || 'other',
           payer: caseData.payer_name,
           state: caseData.patient_state,
-          confidence: form.confidence,
+          confidence: normalizeConfidence(form.confidence),
           // We don't have direct URLs yet, would need a separate search or mapping
           download_url: null,
           is_external: false,
@@ -594,18 +601,19 @@ CRITICAL - PATIENT INFORMATION:
     
     Please write the ${getDocTypeLabel(caseData.doc_type)} now, ensuring all patient information, wound details, and provider information is extracted directly from the Clinical Notes.`
 
-    // Generate documentation with OpenAI
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 3000,
+    // Generate documentation with Gemini
+    const docModel = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      systemInstruction: systemPrompt,
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 3000,
+      }
     })
 
-    let documentation = completion.choices[0]?.message?.content || ""
+    const docResult = await docModel.generateContent(userPrompt)
+
+    let documentation = docResult.response.text() || ""
 
     // Clean up placeholders and special characters
     documentation = documentation
@@ -657,6 +665,32 @@ CRITICAL - PATIENT INFORMATION:
         const defaultSignature = `\n\nSincerely,\n${userProfile.practice_name}${userProfile.specialty ? `\n${userProfile.specialty}` : ''}`
         documentation += defaultSignature
       }
+    }
+
+    // Fetch suggested forms and append to documentation
+    const { data: suggestedForms } = await supabase
+      .from("case_suggested_forms")
+      .select("title, description, form_type, confidence")
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false })
+
+    if (suggestedForms && suggestedForms.length > 0) {
+      const formsSection = `
+
+
+RECOMMENDED SUPPORTING DOCUMENTS
+
+The following documents are recommended to strengthen this prior authorization request based on payer policy research:
+
+${suggestedForms.map((form, index) => {
+  const confidenceLabel = form.confidence === 'high' ? '[HIGH PRIORITY]' : form.confidence === 'medium' ? '[MEDIUM PRIORITY]' : '[SUGGESTED]'
+  return `${index + 1}. ${form.title} ${confidenceLabel}
+   ${form.description}`
+}).join('\n\n')}
+
+Note: These recommendations are based on AI analysis of current payer policies. Please verify specific requirements with the payer before submission.`
+
+      documentation += formsSection
     }
 
     // Update case with generated documentation
