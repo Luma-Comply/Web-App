@@ -14,6 +14,7 @@ import {
   AUDIT_RISK_LEVELS,
 } from "./lcd-requirements"
 import { isProductCovered, CTPSearchResult } from "./novitas-ctp-products"
+import { detectPolicyChanges, PolicyChangeAlert, MAC_DATA_VERSION } from "./mac-jurisdictions"
 
 // ══════════════════════════════════════════════════════════════
 // TYPES
@@ -116,6 +117,15 @@ export interface LCDValidationResult {
 
   // Detected wound type (if auto-detected)
   detectedWoundType?: WoundType
+
+  // Policy change alerts detected from research
+  policyAlerts?: PolicyChangeAlert[]
+
+  // Data version info
+  dataVersion?: {
+    lastUpdated: string
+    wiserStates: string[]
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -130,11 +140,17 @@ export async function validateAgainstLCD(
   clinicalNotes: string,
   ctpProduct: string,
   perplexityContext: string,
-  woundType?: WoundType // Optional - will auto-detect if not provided
+  woundType?: WoundType, // Optional - will auto-detect if not provided
+  patientState?: string // Optional - used for policy change detection
 ): Promise<LCDValidationResult> {
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   })
+
+  // Step 0: Detect policy changes from Perplexity research
+  const policyAlerts = patientState
+    ? detectPolicyChanges(perplexityContext, patientState)
+    : []
 
   // Step 1: Check CTP product coverage locally
   const ctpProductCheck = isProductCovered(ctpProduct)
@@ -209,6 +225,11 @@ IMPORTANT: This is for Medicare Part B CTP claims. SOC failure documentation is 
     recommendations,
     summary,
     detectedWoundType,
+    policyAlerts: policyAlerts.length > 0 ? policyAlerts : undefined,
+    dataVersion: {
+      lastUpdated: MAC_DATA_VERSION.lastUpdated,
+      wiserStates: MAC_DATA_VERSION.wiserPilotStates,
+    },
   }
 }
 

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { LumaLogo } from "@/components/LumaLogo"
 import { searchPayers } from "@/lib/payers"
+import { getActiveWiserSkinSubStates, isWiserActiveForSkinSubs, getMACInfo } from "@/lib/mac-jurisdictions"
 import {
   ArrowLeft,
   Loader2,
@@ -28,6 +29,11 @@ import {
   AlertTriangle,
   Shield,
   ExternalLink,
+  Upload,
+  FileText,
+  Image,
+  X,
+  AlertCircle,
 } from "lucide-react"
 
 export default function NewCasePage() {
@@ -36,9 +42,85 @@ export default function NewCasePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [pastedText, setPastedText] = useState("")
-  const [showFileUpload, setShowFileUpload] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [fileError, setFileError] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [uploadingFiles, setUploadingFiles] = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [showFullHipaaList, setShowFullHipaaList] = useState(false)
+  const [payerSelected, setPayerSelected] = useState(false) // Track if payer was selected from dropdown
+
+  // File upload configuration
+  const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'png', 'jpg', 'jpeg']
+  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+
+  const validateFile = (file: File): { valid: boolean; error?: string } => {
+    const extension = file.name.split('.').pop()?.toLowerCase() || ''
+
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      if (extension === 'heic' || extension === 'heif') {
+        return { valid: false, error: `HEIC/HEIF files are not supported. Please convert to JPG or PNG.` }
+      }
+      if (['mp4', 'mp3', 'mov', 'avi', 'wmv', 'webm'].includes(extension)) {
+        return { valid: false, error: `Video files are not supported. Please upload documents or images.` }
+      }
+      if (extension === 'doc') {
+        return { valid: false, error: `DOC files are not supported. Please convert to DOCX or PDF.` }
+      }
+      if (extension === 'xls') {
+        return { valid: false, error: `XLS files are not supported. Please convert to XLSX or PDF.` }
+      }
+      return { valid: false, error: `${extension.toUpperCase()} files are not supported. Allowed: PDF, DOCX, XLSX, PNG, JPG.` }
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return { valid: false, error: `"${file.name}" exceeds 10MB limit.` }
+    }
+
+    return { valid: true }
+  }
+
+  const handleFileSelect = (files: FileList | File[]) => {
+    setFileError(null)
+    const fileArray = Array.from(files)
+    const validFiles: File[] = []
+    const errors: string[] = []
+
+    for (const file of fileArray) {
+      // Check for duplicates
+      if (selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+        continue // Skip duplicates silently
+      }
+
+      const validation = validateFile(file)
+      if (validation.valid) {
+        validFiles.push(file)
+      } else {
+        errors.push(validation.error || 'Invalid file')
+      }
+    }
+
+    if (errors.length > 0) {
+      setFileError(errors[0])
+      setTimeout(() => setFileError(null), 5000)
+    }
+
+    if (validFiles.length > 0) {
+      setSelectedFiles(prev => [...prev, ...validFiles])
+    }
+  }
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    if (e.dataTransfer.files.length) {
+      handleFileSelect(e.dataTransfer.files)
+    }
+  }
 
   const [formData, setFormData] = useState({
     doc_type: "", // Default to empty - user must select
@@ -48,7 +130,8 @@ export default function NewCasePage() {
     patient_state: "",
     claim_amount: "",
     payer_name: "",
-    wound_type: "", // Auto-detect by default, or user can override
+    wound_type: "", // Required for biologics_pa
+    custom_wound_type: "", // Used when wound_type is "OTHER"
   })
 
   // Basic change handler for flat inputs
@@ -76,15 +159,18 @@ export default function NewCasePage() {
   }
 
   // Progressive disclosure: check if each step is complete
-  const isStep1Complete = !!formData.doc_type
+  const isStep1Complete = formData.doc_type === "biologics_pa"
+    ? !!(formData.doc_type && formData.wound_type && (formData.wound_type !== "OTHER" || formData.custom_wound_type.trim()))
+    : !!formData.doc_type
   const isStep2Complete = !!(
     formData.patient_first_name &&
     formData.patient_last_name &&
     formData.patient_age &&
     formData.patient_state &&
-    formData.payer_name
+    payerSelected // Only true when payer is selected from dropdown
   )
-  const isStep3Complete = pastedText.length >= 50
+  // Step 3 requires either clinical notes (50+ chars) OR uploaded files
+  const isStep3Complete = (pastedText && pastedText.length >= 50) || selectedFiles.length > 0
 
   // Submit handler
   async function handleSubmit(e: React.FormEvent) {
@@ -96,8 +182,30 @@ export default function NewCasePage() {
       return
     }
 
-    if (!pastedText || pastedText.length < 50) {
-      setError("Please paste detailed clinical notes (at least 50 characters).")
+    // Wound type required for biologics PA
+    if (formData.doc_type === "biologics_pa" && !formData.wound_type) {
+      setError("Please select a wound type for Biologics Prior Authorization.")
+      return
+    }
+
+    // Custom wound type required when "Other" is selected
+    if (formData.wound_type === "OTHER" && !formData.custom_wound_type.trim()) {
+      setError("Please enter the wound type.")
+      return
+    }
+
+    // Require either clinical notes (50+ chars) OR uploaded files
+    const hasValidNotes = pastedText && pastedText.length >= 50
+    const hasFiles = selectedFiles.length > 0
+
+    if (!hasValidNotes && !hasFiles) {
+      setError("Please paste clinical notes (at least 50 characters) or upload documents.")
+      return
+    }
+
+    // If notes provided but too short, show specific error
+    if (pastedText && pastedText.length > 0 && pastedText.length < 50 && !hasFiles) {
+      setError("Clinical notes must be at least 50 characters, or upload documents instead.")
       return
     }
 
@@ -157,10 +265,15 @@ export default function NewCasePage() {
       // and 'prior_treatments' (secondary) to ensure AI sees it.
       // Other specific fields like 'diagnosis_codes' get a default placeholder
       // so the AI Generator knows to extract them from the text.
+      //
+      // Auto-generate if user provided clinical notes OR uploaded files
+      // Chat mode only if neither is provided
+      const hasClinicaNotes = pastedText && pastedText.length >= 50
+      const hasContent = hasClinicaNotes || selectedFiles.length > 0
       const caseInsert: any = {
         user_id: session.user.id,
         created_by_email: session.user.email, // Track who created the case
-        status: "draft",
+        status: hasContent ? "draft" : "chat", // Auto-generate if notes or files provided
 
         // 1. Key Fields Input Manually
         doc_type: formData.doc_type,
@@ -184,12 +297,17 @@ export default function NewCasePage() {
         payer_type: "commercial", // Default, can be inferred
 
 
-        // 4. Metadata for UI to know this was a paste-only case
+        // 4. Metadata for UI to know the creation method
         metadata: {
-          creation_method: "paste_only",
+          creation_method: pastedText && selectedFiles.length > 0
+            ? "paste_and_upload"
+            : selectedFiles.length > 0
+              ? "upload_only"
+              : "paste_only",
           original_pasted_text: pastedText,
           // Wound type for LCD validation (biologics PA only)
-          wound_type: formData.wound_type || undefined, // Empty means auto-detect
+          wound_type: formData.wound_type || undefined,
+          custom_wound_type: formData.wound_type === "OTHER" ? formData.custom_wound_type.trim() : undefined,
           // AUDIT TRAIL - Terms Agreement
           terms_accepted: true,
           terms_accepted_at: new Date().toISOString(),
@@ -214,14 +332,37 @@ export default function NewCasePage() {
         throw new Error("Case was created but no data was returned")
       }
 
-      // Decrement cases remaining (usage will be counted when AI generates)
-      await supabase
-        .from("users")
-        .update({
-          cases_remaining: user.cases_remaining - 1,
-          cases_used_this_period: (user as any).cases_used_this_period + 1,
-        })
-        .eq("id", session.user.id)
+      // Charge credit if we have content (notes or files) and will auto-generate
+      if (hasContent) {
+        await supabase
+          .from("users")
+          .update({
+            cases_remaining: user.cases_remaining - 1,
+            cases_used_this_period: (user as any).cases_used_this_period + 1,
+          })
+          .eq("id", session.user.id)
+      }
+
+      // Upload selected files to the case
+      if (selectedFiles.length > 0) {
+        setUploadingFiles(true)
+        for (const file of selectedFiles) {
+          const formData = new FormData()
+          formData.append('file', file)
+          formData.append('caseId', caseData.id)
+
+          try {
+            await fetch('/api/chat/upload', {
+              method: 'POST',
+              body: formData,
+            })
+          } catch (uploadError) {
+            console.error('Error uploading file:', uploadError)
+            // Continue with other files even if one fails
+          }
+        }
+        setUploadingFiles(false)
+      }
 
       // Redirect to case processing/AI generation
       // This matches User intent: "go straight to perplexity ai" (conceptually)
@@ -291,32 +432,74 @@ export default function NewCasePage() {
               <option value="appeal">Appeal Letter</option>
             </select>
 
-            {/* Wound Type - Only for Biologics PA */}
+            {/* Wound Type - Required for Biologics PA */}
             {formData.doc_type === "biologics_pa" && (
               <div className="mt-4">
-                <Label htmlFor="wound_type">Wound Type (optional)</Label>
+                <Label htmlFor="wound_type">Wound Type</Label>
                 <select
                   id="wound_type"
                   name="wound_type"
                   value={formData.wound_type}
                   onChange={handleChange}
                   className="w-full mt-2 h-11 px-4 rounded-md border border-sage-medium bg-white focus:border-mint focus:ring-2 focus:ring-mint focus:ring-offset-0 outline-none"
+                  required
                 >
-                  <option value="">Auto-detect from clinical notes</option>
+                  <option value="" disabled>Select Wound Type</option>
                   <option value="DFU">Diabetic Foot Ulcer (DFU)</option>
                   <option value="VLU">Venous Leg Ulcer (VLU)</option>
-                  <option value="PRESSURE_ULCER">Pressure Ulcer</option>
+                  <option value="PRESSURE_ULCER">Pressure Ulcer / Pressure Injury</option>
+                  <option value="ARTERIAL_ULCER">Arterial Ulcer</option>
+                  <option value="SURGICAL_WOUND">Surgical Wound (Non-healing)</option>
+                  <option value="TRAUMATIC_WOUND">Traumatic Wound</option>
+                  <option value="BURN">Burn Wound</option>
+                  <option value="OTHER">Other</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Leave as auto-detect or select to ensure correct LCD validation
-                </p>
+                {formData.wound_type === "OTHER" && (
+                  <Input
+                    id="custom_wound_type"
+                    name="custom_wound_type"
+                    value={formData.custom_wound_type}
+                    onChange={handleChange}
+                    placeholder="Enter wound type"
+                    className="mt-2"
+                    required
+                  />
+                )}
+              </div>
+            )}
+
+            {/* WISeR Pilot State Info */}
+            {formData.doc_type === "biologics_pa" && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-900 mb-1">WISeR Prior Authorization Pilot (2026)</p>
+                    <p className="text-blue-700 mb-2">
+                      Medicare requires AI-based Prior Authorization for skin substitutes/CTPs in 6 states:
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {getActiveWiserSkinSubStates().map((state) => {
+                        const info = getMACInfo(state)
+                        return (
+                          <span key={state} className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                            {state} ({info?.aiVendor?.split(",")[0]})
+                          </span>
+                        )
+                      })}
+                    </div>
+                    <p className="text-blue-600 text-xs">
+                      Other states: Coverage based on MAC-specific LCDs or &quot;reasonable and necessary&quot; determinations.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </Card>
 
           {/* Step 2: Shows after document type is selected */}
           {isStep1Complete && (
-          <Card className="p-6 glass-card border border-sage-medium/30">
+          <Card className="p-6 glass-card border border-sage-medium/30 overflow-visible">
             <h2 className="text-xl font-sans font-semibold text-dark-bg mb-4">2. Patient & Claim Info</h2>
             <div className="grid md:grid-cols-2 gap-4">
               {/* Patient Name */}
@@ -380,9 +563,15 @@ export default function NewCasePage() {
                   id="payer_name"
                   name="payer_name"
                   value={formData.payer_name}
-                  onValueChange={(value) =>
+                  onValueChange={(value) => {
                     setFormData((prev) => ({ ...prev, payer_name: value }))
-                  }
+                    // Reset selection if user starts typing again
+                    if (payerSelected) setPayerSelected(false)
+                  }}
+                  onSelect={(value) => {
+                    setFormData((prev) => ({ ...prev, payer_name: value }))
+                    setPayerSelected(true)
+                  }}
                   onSearch={searchPayers}
                   placeholder="Start typing... e.g. Tradi, Blue Cross, Aetna"
                   className="mt-2"
@@ -415,15 +604,15 @@ export default function NewCasePage() {
           </Card>
           )}
 
-          {/* Step 3: Shows after patient info is complete */}
+          {/* Step 3: Shows after patient info is complete - NOW OPTIONAL */}
           {isStep1Complete && isStep2Complete && (
           <Card className="p-6 glass-card border border-mint/30 shadow-sm">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h2 className="text-xl font-sans font-semibold text-dark-bg">3. Paste Clinical Notes</h2>
+                <h2 className="text-xl font-sans font-semibold text-dark-bg">3. Paste Clinical Notes (Optional)</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Paste the full clinical context here (Progress Note, H&P, Previous Denial).
-                  Our AI will read this to generate the letter.
+                  Paste clinical context here, or skip to chat with our AI assistant.
+                  You can provide notes during the chat conversation instead.
                 </p>
               </div>
               {pastedText.length > 0 && (
@@ -437,15 +626,104 @@ export default function NewCasePage() {
             <Textarea
               value={pastedText}
               onChange={(e) => setPastedText(e.target.value)}
-              placeholder="PASTE HERE...
+              placeholder="PASTE HERE (or skip and provide via chat)...
 
 Example:
 Patient is a 45yo male with RA.
 Failed Methotrexate (3 months) and Humira (6 months).
 Current DAS28 is 5.2.
 Requesting Rinvoq 15mg daily."
-              className="min-h-[300px] font-mono text-sm mb-4 bg-white/80"
+              className="min-h-[200px] font-mono text-sm mb-4 bg-white/80"
             />
+
+            {/* Divider */}
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-gray-400">or upload documents</span>
+              </div>
+            </div>
+
+            {/* File Upload Zone */}
+            <div
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                isDragging ? 'border-mint bg-mint/5' : 'border-gray-200 hover:border-gray-300'
+              }`}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+            >
+              <input
+                type="file"
+                id="file-upload"
+                className="hidden"
+                multiple
+                accept=".pdf,.docx,.xlsx,.png,.jpg,.jpeg"
+                onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
+              />
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-600">
+                  <span className="text-mint font-medium">Click to upload</span> or drag and drop
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  PDF, DOCX, XLSX, PNG, JPG (max 10MB each)
+                </p>
+              </label>
+            </div>
+
+            {/* File Error Display */}
+            {fileError && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-coral">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{fileError}</span>
+                <button onClick={() => setFileError(null)} className="ml-auto">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Selected Files List */}
+            {selectedFiles.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected
+                </p>
+                {selectedFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-3 p-2 rounded-lg bg-sage-light/20"
+                  >
+                    {['png', 'jpg', 'jpeg'].includes(file.name.split('.').pop()?.toLowerCase() || '') ? (
+                      <Image className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                    ) : (
+                      <FileText className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                    )}
+                    <span className="text-sm text-gray-700 truncate flex-1">{file.name}</span>
+                    <span className="text-xs text-gray-400">
+                      {(file.size / 1024).toFixed(0)}KB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(index)}
+                      className="p-1 hover:bg-gray-200 rounded"
+                    >
+                      <X className="w-4 h-4 text-gray-500" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="text-xs text-gray-500 mt-4">
+              {pastedText.length >= 50
+                ? "With clinical notes provided, documentation will generate automatically."
+                : selectedFiles.length > 0
+                ? "Files will be processed when you start the chat."
+                : "Without notes or files, you'll chat with our AI to refine your case."}
+            </p>
           </Card>
           )}
 
@@ -571,14 +849,21 @@ Requesting Rinvoq 15mg daily."
             <Button
               type="submit"
               size="lg"
-              disabled={loading || !agreedToTerms}
+              disabled={loading || !agreedToTerms || (pastedText.length < 50 && selectedFiles.length === 0)}
               className="gap-2 bg-dark-bg hover:bg-dark-bg/90 text-white min-w-[200px] disabled:opacity-50"
             >
               {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Creating Case...
-                </>
+                uploadingFiles ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Uploading Files...
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Creating Case...
+                  </>
+                )
               ) : (
                 <>
                   <Sparkles className="w-5 h-5" />

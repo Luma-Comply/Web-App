@@ -8,6 +8,7 @@ import {
   ChecklistEditsData,
 } from "@/lib/lcd-validation"
 import { WoundType } from "@/lib/lcd-requirements"
+import { getMACInfo, buildStateSpecificContext, isWiserActiveForSkinSubs } from "@/lib/mac-jurisdictions"
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -15,7 +16,7 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const { caseId } = await request.json()
+    const { caseId, chatContext } = await request.json()
 
     if (!caseId) {
       return NextResponse.json({ error: "Case ID is required" }, { status: 400 })
@@ -72,40 +73,59 @@ export async function POST(request: NextRequest) {
         let researchQuery: string
 
         if (isBiologicsPA) {
-          // Enhanced CTP/wound care specific query for LCD L35041 validation
-          researchQuery = `Research current Medicare Part B LCD L35041 requirements for CTP/skin substitutes (Cellular Tissue Products):
+          // Get state-specific MAC information
+          const macInfo = getMACInfo(caseData.patient_state)
+          const stateContext = buildStateSpecificContext(caseData.patient_state)
+          const isWiserState = isWiserActiveForSkinSubs(caseData.patient_state)
+          const lcdNumber = macInfo?.lcdPolicyNumber || "L35041"
 
-CRITICAL AUDIT QUESTIONS (Answer all):
-1. Is "${caseData.requested_medication}" on the current Novitas/Medicare covered CTP list? (LCD Attachment A)
-2. What is the current LCD L35041 effective date and any changes since November 2024?
-3. What are the CURRENT application limits? (Previously 4, now 8 with KX modifier for 5-8)
-4. What triggers the KX modifier requirement?
-5. What are the SOC failure criteria for DFU (50% area reduction rule after 4 weeks)?
-6. What ABI threshold indicates ischemia (non-coverage threshold)?
-7. What are current Qlarant/Novitas audit focus areas for CTPs in ${new Date().getFullYear()}?
+          // Enhanced CTP/wound care specific query with state-specific MAC info
+          researchQuery = `Research current Medicare Part B LCD ${lcdNumber} requirements for CTP/skin substitutes (Cellular Tissue Products):
+
+${stateContext}
+
+CRITICAL: This patient is in ${caseData.patient_state}. Research the SPECIFIC LCD requirements for ${macInfo?.macName || "their MAC"} (Jurisdiction ${macInfo?.jurisdiction || "unknown"}).
+${isWiserState ? `\nIMPORTANT: ${caseData.patient_state} is a WISeR pilot state. Prior Authorization will be processed by ${macInfo?.aiVendor}. Documentation must meet AI review standards.` : ""}
+
+CRITICAL AUDIT QUESTIONS (Answer all for LCD ${lcdNumber}):
+1. Is "${caseData.requested_medication}" on the current ${macInfo?.macName || "Medicare"} covered CTP list? (LCD Attachment A for ${lcdNumber})
+2. What is the current LCD ${lcdNumber} effective date and any changes since November 2024?
+3. What are the CURRENT application limits for ${macInfo?.macName || "this MAC"}? (Check for 8 application limit with KX modifier for 5-8)
+4. What triggers the KX modifier requirement under ${lcdNumber}?
+5. What are the SOC failure criteria for the patient's wound type (50% area reduction rule after 4 weeks)?
+6. What ABI threshold indicates ischemia (non-coverage threshold) for ${macInfo?.macName || "this MAC"}?
+7. What are current audit focus areas for CTPs under ${macInfo?.macName || "this MAC"} in ${new Date().getFullYear()}?
 8. Any recent OIG work plan items targeting skin substitutes?
-9. What are common documentation failures causing CTP denials?
+9. What are common documentation failures causing CTP denials under LCD ${lcdNumber}?
+10. What specific debridement and vascular testing requirements does ${macInfo?.macName || "this MAC"} require?
 
 PATIENT CASE:
 - CTP Product: ${caseData.requested_medication}
 - Dose/Size: ${caseData.medication_dose || "Not specified"}
 - State: ${caseData.patient_state}
+- MAC: ${macInfo?.macName || "Unknown"} (${macInfo?.jurisdiction || "Unknown"})
+- LCD: ${lcdNumber}
 - Payer: ${caseData.payer_name} (${caseData.payer_type})
 - Patient Age: ${caseData.patient_age}
+- WISeR Pilot State: ${isWiserState ? "YES - PA Required" : "NO"}
 
 CLINICAL CONTEXT (abbreviated):
 ${clinicalNotes.substring(0, 1500)}
 
 RETURN FORMAT (include all if found):
+- MAC_JURISDICTION: ${macInfo?.jurisdiction || "[identify]"}
+- LCD_POLICY_NUMBER: ${lcdNumber}
 - LCD_EFFECTIVE_DATE: [date]
-- PRODUCT_COVERED: [YES/NO/VERIFY]
+- PRODUCT_COVERED: [YES/NO/VERIFY] (check ${macInfo?.macName || "MAC"} covered list)
 - APPLICATION_LIMIT: [number]
-- RECENT_LCD_CHANGES: [list any changes]
-- AUDIT_FOCUS_AREAS: [current audit targets]
+- RECENT_LCD_CHANGES: [list any changes specific to ${lcdNumber}]
+- AUDIT_FOCUS_AREAS: [current audit targets for ${macInfo?.macName || "this MAC"}]
 - SOC_FAILURE_CRITERIA: [specific requirements]
 - DOCUMENTATION_GAPS_CAUSING_DENIALS: [common failures]
 - ABI_THRESHOLD: [value]
-- KX_MODIFIER_RULES: [when required]`
+- KX_MODIFIER_RULES: [when required]
+- DEBRIDEMENT_REQUIREMENTS: [specific to ${macInfo?.macName || "MAC"}]
+- VASCULAR_TESTING_REQUIREMENTS: [specific to ${macInfo?.macName || "MAC"}]`
         } else {
           // Standard query for non-CTP cases
           researchQuery = `Research and find the specific ${docTypeLabel} criteria and requirements for the following case:
@@ -145,9 +165,17 @@ CRITICAL: Research ${caseData.payer_name}'s policy specifically for ${caseData.p
 Focus on the most current policy bulletins and clinical coverage guidelines for ${caseData.payer_name} in ${caseData.patient_state}.`
         }
 
-        // Use CTP-specific system prompt for biologics PA
+        // Use CTP-specific system prompt for biologics PA with state-specific MAC info
+        const macInfoForPrompt = getMACInfo(caseData.patient_state)
         const systemContent = isBiologicsPA
-          ? "You are an expert Medicare LCD compliance researcher specializing in CTP (Cellular Tissue Products) / skin substitutes for wound care. Focus on LCD L35041 requirements, Novitas MAC policies, current audit focus areas, and documentation requirements. Be specific about coverage criteria, SOC failure requirements, and common denial reasons."
+          ? `You are an expert Medicare LCD compliance researcher specializing in CTP (Cellular Tissue Products) / skin substitutes for wound care.
+
+CRITICAL: The patient is in ${caseData.patient_state}, which falls under ${macInfoForPrompt?.macName || "Medicare"} (Jurisdiction ${macInfoForPrompt?.jurisdiction || "unknown"}).
+Research the SPECIFIC LCD ${macInfoForPrompt?.lcdPolicyNumber || "L35041"} requirements for THIS MAC - different MACs have different LCD policy numbers and requirements.
+
+${isWiserActiveForSkinSubs(caseData.patient_state) ? `IMPORTANT: ${caseData.patient_state} is a WISeR pilot state (2026). Prior Authorization is processed by ${macInfoForPrompt?.aiVendor}. Claims without PA go to 100% pre-payment review.` : ""}
+
+Focus on: LCD requirements specific to this MAC, covered product list, current audit focus areas, debridement requirements, vascular testing thresholds, and documentation requirements. Be specific about coverage criteria, SOC failure requirements, and common denial reasons for this specific MAC jurisdiction.`
           : "You are an expert medical insurance researcher specializing in state-specific payer policies. Find the most current clinical coverage guidelines, policy bulletins, and medical necessity criteria. Pay special attention to state-specific variations as payer policies differ significantly by state (e.g., Cigna in California vs Texas). Be comprehensive, factual, and include all relevant criteria."
 
         const researchResponse = await fetch("https://api.perplexity.ai/chat/completions", {
@@ -204,7 +232,8 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
           clinicalNotesForValidation,
           caseData.requested_medication || "",
           researchContext,
-          woundTypeFromMeta
+          woundTypeFromMeta,
+          caseData.patient_state // For policy change detection
         )
 
         console.log(
@@ -260,6 +289,18 @@ Focus on the most current policy bulletins and clinical coverage guidelines for 
     // --- STEP 1.5: EXTRACT SUGGESTED FORMS ---
     try {
       console.log("Extracting suggested forms...")
+
+      // Delete old suggested forms for this case (cleanup on regeneration)
+      const { error: deleteFormsError } = await supabase
+        .from("case_suggested_forms")
+        .delete()
+        .eq("case_id", caseId)
+
+      if (deleteFormsError) {
+        console.error("Error deleting old suggested forms:", deleteFormsError)
+      } else {
+        console.log("Cleared old suggested forms for regeneration")
+      }
 
       const formExtractionSystemPrompt = `You are an expert in medical insurance administration. Your goal is to identify REQUIRED and SUGGESTED forms based on provided payer research and case details.
       
@@ -358,6 +399,54 @@ ${editsWithNotes.map((edit) => `- ${edit.item_id}: ${edit.user_notes}`).join("\n
 
 IMPORTANT: The user has provided specific notes and clarifications above. Make sure to incorporate these details into the generated documentation where relevant.
 `
+      }
+    }
+
+    // Build chat context from conversation history (if provided)
+    let chatConversationContext = ""
+    if (chatContext && Array.isArray(chatContext) && chatContext.length > 0) {
+      // Extract relevant information from chat messages
+      const relevantMessages = chatContext
+        .filter((msg: any) => msg.role === 'user' || msg.role === 'assistant')
+        .map((msg: any) => `${msg.role === 'user' ? 'Provider' : 'Luma'}: ${msg.content}`)
+        .join("\n\n")
+
+      if (relevantMessages) {
+        chatConversationContext = `
+CHAT CONVERSATION CONTEXT:
+The following is the conversation between the provider and Luma AI assistant that led to this generation request. Use any clinical information, clarifications, or context provided in this conversation:
+
+${relevantMessages}
+
+END OF CHAT CONTEXT
+`
+      }
+    }
+
+    // Also load chat messages from database if chatContext not provided
+    if (!chatConversationContext) {
+      const { data: chatMessages } = await supabase
+        .from("case_messages")
+        .select("role, content")
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: true })
+
+      if (chatMessages && chatMessages.length > 0) {
+        const relevantMessages = chatMessages
+          .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+          .map((msg) => `${msg.role === 'user' ? 'Provider' : 'Luma'}: ${msg.content}`)
+          .join("\n\n")
+
+        if (relevantMessages) {
+          chatConversationContext = `
+CHAT CONVERSATION CONTEXT:
+The following is the conversation between the provider and Luma AI assistant that led to this generation request. Use any clinical information, clarifications, or context provided in this conversation:
+
+${relevantMessages}
+
+END OF CHAT CONTEXT
+`
+        }
       }
     }
 
@@ -469,6 +558,7 @@ CRITICAL - PATIENT INFORMATION:
     RESEARCHED PAYER GUIDELINES (Use this to align the letter):
     ${researchContext}
     ${userEditsContext}
+    ${chatConversationContext}
     CLINICAL NOTES (PRIMARY SOURCE - Extract ALL information from here):
     ${caseData.disease_activity}
     ${caseData.prior_treatments}
@@ -586,11 +676,23 @@ CRITICAL - PATIENT INFORMATION:
       )
     }
 
-    // Only charge credits for REGENERATIONS (case already had generated output)
-    // First-time generation is free since credit was already charged at case creation
-    const isRegeneration = !!caseData.generated_output
+    // Charge credits logic:
+    // - For cases with status 'chat': charge on first generation (credit not charged at creation)
+    // - For cases with status 'draft' that already have output: charge for regeneration
+    // - For cases with status 'draft' without output: don't charge (already charged at creation)
+    const isFromChatMode = caseData.status === 'chat'
+    const isRegeneration = caseData.status !== 'chat' && !!caseData.generated_output
+    const shouldChargeCredit = isFromChatMode || isRegeneration
 
-    if (isRegeneration) {
+    // Update status from 'chat' to 'draft' on first generation
+    if (isFromChatMode) {
+      await supabase
+        .from("cases")
+        .update({ status: "draft" })
+        .eq("id", caseId)
+    }
+
+    if (shouldChargeCredit) {
       // Update remaining cases count - use team owner's pool if user is a team member
       const { data: currentUser } = await supabase
         .from("users")

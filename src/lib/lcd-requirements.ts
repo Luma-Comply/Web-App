@@ -15,7 +15,15 @@ export type AuditRiskLevel =
   | "MEDIUM"
   | "LOW"
 
-export type WoundType = "DFU" | "VLU" | "PRESSURE_ULCER"
+export type WoundType =
+  | "DFU"
+  | "VLU"
+  | "PRESSURE_ULCER"
+  | "ARTERIAL_ULCER"
+  | "SURGICAL_WOUND"
+  | "TRAUMATIC_WOUND"
+  | "BURN"
+  | "OTHER"
 
 export interface LCDRequirement {
   id: string

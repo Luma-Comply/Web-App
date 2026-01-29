@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 export interface AutocompleteProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "onSelect"> {
   suggestions?: string[]
   onValueChange?: (value: string) => void
+  onSelect?: (value: string) => void // Called only when a suggestion is selected
   onSearch?: (query: string) => string[]
   maxSuggestions?: number
 }
@@ -18,6 +19,7 @@ export const Autocomplete = React.forwardRef<HTMLInputElement, AutocompleteProps
       className,
       suggestions = [],
       onValueChange,
+      onSelect,
       onSearch,
       maxSuggestions = 10,
       ...props
@@ -65,6 +67,7 @@ export const Autocomplete = React.forwardRef<HTMLInputElement, AutocompleteProps
     const handleSuggestionClick = (suggestion: string) => {
       setInputValue(suggestion)
       onValueChange?.(suggestion)
+      onSelect?.(suggestion) // Notify that a selection was made
       setShowSuggestions(false)
     }
 
@@ -82,7 +85,11 @@ export const Autocomplete = React.forwardRef<HTMLInputElement, AutocompleteProps
       } else if (e.key === "Enter") {
         e.preventDefault()
         if (filteredSuggestions[activeSuggestionIndex]) {
-          handleSuggestionClick(filteredSuggestions[activeSuggestionIndex])
+          const selected = filteredSuggestions[activeSuggestionIndex]
+          setInputValue(selected)
+          onValueChange?.(selected)
+          onSelect?.(selected) // Notify that a selection was made
+          setShowSuggestions(false)
         }
       } else if (e.key === "Escape") {
         setShowSuggestions(false)
@@ -113,7 +120,7 @@ export const Autocomplete = React.forwardRef<HTMLInputElement, AutocompleteProps
           autoComplete="off"
         />
         {showSuggestions && filteredSuggestions.length > 0 && (
-          <ul className="absolute z-50 w-full mt-1 bg-white border border-sage-medium/30 rounded-md shadow-lg max-h-60 overflow-auto">
+          <ul className="absolute z-[100] w-full mt-1 bg-white border border-sage-medium/30 rounded-md shadow-lg max-h-60 overflow-auto">
             {filteredSuggestions.map((suggestion, index) => (
               <li
                 key={suggestion}

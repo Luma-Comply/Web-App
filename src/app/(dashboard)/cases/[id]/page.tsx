@@ -21,16 +21,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
 import { LumaLogo } from "@/components/LumaLogo"
 import { SuggestedForms } from "@/components/dashboard/SuggestedForms"
 import { LCDValidationPanel } from "@/components/dashboard/LCDValidationPanel"
 import { ChecklistItemEditModal } from "@/components/dashboard/ChecklistItemEditModal"
-import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X, Plus, RefreshCw, Send, Save, ChevronDown, ChevronUp } from "lucide-react"
+import { ChatInterface } from "@/components/chat/ChatInterface"
+import { GeneratingSteps } from "@/components/GeneratingSteps"
+import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X, Plus, RefreshCw, Send, Save, ChevronDown, MessageSquare, FileText, Image, AlertTriangle } from "lucide-react"
 import type { LCDValidationResult, ChecklistEdit, ChecklistEditsData, ChecklistItemWithEdits } from "@/lib/lcd-validation"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -80,6 +77,12 @@ export default function CaseDetailPage() {
   const [isDocCollapsed, setIsDocCollapsed] = useState(false)
   const [isSavingEdits, setIsSavingEdits] = useState(false)
   const [regenerateModalOpen, setRegenerateModalOpen] = useState(false)
+  const [isChatExpanded, setIsChatExpanded] = useState(false) // Opens when user clicks "Chat with Luma" card
+  const [isChatCopied, setIsChatCopied] = useState(false)
+  const [uploadedDocs, setUploadedDocs] = useState<{ filename: string; fileType: string }[]>([])
+  const [showDocsDropdown, setShowDocsDropdown] = useState(false)
+  const [showRisksDropdown, setShowRisksDropdown] = useState(false)
+  const [copiedRiskIndex, setCopiedRiskIndex] = useState<string | null>(null)
   const [lcdValidation, setLcdValidation] = useState<{
     riskLevel: string
     denialProbability: number
@@ -339,12 +342,12 @@ export default function CaseDetailPage() {
   }
 
   // AUTO-GENERATE TRIGGER
-  useEffect(() => {
-    if (caseData && !caseData.generated_output && !generating && caseData.status === 'draft') {
-      // Start generation immediately (no delay to prevent flash)
-      generateDocumentation()
-    }
-  }, [caseData])
+  // For 'draft' status cases without output, GeneratingSteps component handles generation
+  // via the streaming API. No need to call generateDocumentation() here.
+  // The render condition (needsGeneration && !hasGenerated) shows GeneratingSteps which handles it.
+
+  // Check if case is in chat mode
+  const isInChatMode = caseData?.status === 'chat'
 
   // Note: Auto-extraction is now display-only (see render logic below)
   // We no longer auto-save extracted names to the database to prevent overwriting user input
@@ -378,42 +381,87 @@ export default function CaseDetailPage() {
     }
   }
 
-  async function generateDocumentation() {
+  async function copyChatMessages() {
     if (!caseData) return
 
-    setGenerating(true)
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseId: caseData.id }),
-      })
+    const { data: messages } = await supabase
+      .from("case_messages")
+      .select("role, content")
+      .eq("case_id", caseData.id)
+      .order("created_at", { ascending: true })
 
-      if (!response.ok) throw new Error("Failed to generate documentation")
+    if (messages && messages.length > 0) {
+      const assistantMessages = messages
+        .filter(m => m.role === "assistant")
+        .map(m => m.content.replace("[READY_TO_GENERATE]", "").trim())
+        .join("\n\n---\n\n")
 
-      const result = await response.json()
-
-      // Update local state
-      setCaseData({ ...caseData, generated_output: result.documentation })
-      setEditedOutput(result.documentation)
-
-      // Store LCD validation results if available (biologics PA)
-      if (result.validation) {
-        setLcdValidation(result.validation)
+      if (assistantMessages) {
+        await navigator.clipboard.writeText(assistantMessages)
+        setIsChatCopied(true)
+        setTimeout(() => setIsChatCopied(false), 2000)
       }
-    } catch (error) {
-      console.error("Error generating documentation:", error)
-      toast({
-        variant: "destructive",
-        title: "Generation Failed",
-        description: "Failed to generate documentation. Please try again.",
-      })
-    } finally {
-      setGenerating(false)
     }
   }
 
-  // ... (Save/Copy/Download functions remain same)
+  async function copyRiskItem(text: string, index: string) {
+    await navigator.clipboard.writeText(text)
+    setCopiedRiskIndex(index)
+    setTimeout(() => setCopiedRiskIndex(null), 2000)
+  }
+
+  const getRiskItems = () => {
+    if (!lcdValidation) return []
+    const items: { label: string; text: string; severity: 'instant' | 'very-high' | 'high' }[] = []
+
+    lcdValidation.instantDenialTriggers.forEach((trigger) => {
+      items.push({ label: trigger, text: trigger, severity: 'instant' })
+    })
+    lcdValidation.veryHighRiskItems.forEach((item) => {
+      items.push({ label: item, text: item, severity: 'very-high' })
+    })
+    lcdValidation.highRiskItems.forEach((item) => {
+      items.push({ label: item, text: item, severity: 'high' })
+    })
+
+    return items
+  }
+
+  const riskItems = getRiskItems()
+
+  async function loadUploadedDocs() {
+    if (!caseData) return
+
+    const { data: messages } = await supabase
+      .from("case_messages")
+      .select("metadata")
+      .eq("case_id", caseData.id)
+      .eq("role", "system")
+      .order("created_at", { ascending: true })
+
+    if (messages) {
+      const docs = messages
+        .filter(m => {
+          const metadata = typeof m.metadata === "string" ? JSON.parse(m.metadata) : m.metadata
+          return metadata?.type === "file_upload"
+        })
+        .map(m => {
+          const metadata = typeof m.metadata === "string" ? JSON.parse(m.metadata) : m.metadata
+          return {
+            filename: metadata.filename || "Document",
+            fileType: metadata.fileType || "file",
+          }
+        })
+      setUploadedDocs(docs)
+    }
+  }
+
+  // Load uploaded docs on page load and when chat modal opens
+  useEffect(() => {
+    if (caseData) {
+      loadUploadedDocs()
+    }
+  }, [caseData?.id])
 
   async function saveEdits() {
     if (!caseData) return
@@ -860,32 +908,29 @@ export default function CaseDetailPage() {
   // Show full-screen loading when generating (including regeneration)
   if (generating || (needsGeneration && !hasGenerated)) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-center justify-center">
-        <div className="text-center px-4">
-          <div className="relative w-20 h-20 mx-auto mb-8">
-            <LumaLogo className="w-20 h-20" variant="loading" />
-          </div>
+      <GeneratingSteps
+        caseId={caseData.id}
+        onComplete={(result) => {
+          // Update local state with the generated documentation
+          setCaseData({ ...caseData, generated_output: result.documentation, status: 'draft' })
+          setEditedOutput(result.documentation)
 
-          <h3 className="text-lg font-semibold text-dark-bg mb-2">
-            Researching & Drafting
-          </h3>
+          // Store LCD validation results if available (biologics PA)
+          if (result.validation) {
+            setLcdValidation(result.validation)
+          }
 
-          {/* Tidbit Carousel */}
-          <div className="h-16 flex items-center justify-center max-w-lg mx-auto px-4">
-            <AnimatePresence mode="wait">
-              <motion.p
-                key={tidbitIndex}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="text-gray-600 italic"
-              >
-                "{tidbits[tidbitIndex]}"
-              </motion.p>
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
+          setGenerating(false)
+        }}
+        onError={(error) => {
+          toast({
+            variant: "destructive",
+            title: "Generation Failed",
+            description: error || "Failed to generate documentation. Please try again.",
+          })
+          setGenerating(false)
+        }}
+      />
     )
   }
 
@@ -939,41 +984,55 @@ export default function CaseDetailPage() {
                   caseData.status === "approved" ? "bg-green-100 text-green-800 border-green-300" :
                   caseData.status === "denied" ? "bg-red-100 text-red-800 border-red-300" :
                   caseData.status === "submitted" ? "bg-blue-100 text-blue-800 border-blue-300" :
+                  caseData.status === "chat" ? "bg-mint/20 text-mint border-mint/30" :
                   "bg-gray-100 text-gray-800 border-gray-300"
                 }`}>
-                  {caseData.status.charAt(0).toUpperCase() + caseData.status.slice(1)}
+                  {caseData.status === "chat" ? (
+                    <>
+                      <MessageSquare className="w-3 h-3 mr-1" />
+                      Chat
+                    </>
+                  ) : (
+                    caseData.status.charAt(0).toUpperCase() + caseData.status.slice(1)
+                  )}
                 </span>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={saveEdits}
-                    className="gap-2 border-dark-bg text-dark-bg hover:bg-dark-bg hover:text-white"
-                  >
-                    <Save className="w-4 h-4" />
-                    Save
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      // Show confirmation modal if regenerating (already has output)
-                      if (caseData.generated_output) {
-                        setRegenerateModalOpen(true)
-                      } else {
-                        generateDocumentation()
-                      }
-                    }}
-                    disabled={generating}
-                    className="gap-2 border-dark-bg text-dark-bg hover:bg-dark-bg hover:text-white"
-                  >
-                    {generating ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4" />
-                    )}
-                    Regenerate
-                  </Button>
+                  {/* Only show Save/Regenerate buttons when not in chat mode */}
+                  {!isInChatMode && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={saveEdits}
+                        className="gap-2 border-dark-bg text-dark-bg hover:bg-dark-bg hover:text-white"
+                      >
+                        <Save className="w-4 h-4" />
+                        Save
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Show confirmation modal if regenerating (already has output)
+                          if (caseData.generated_output) {
+                            setRegenerateModalOpen(true)
+                          } else {
+                            // Clear output and trigger streaming generation
+                            setGenerating(true)
+                          }
+                        }}
+                        disabled={generating}
+                        className="gap-2 border-dark-bg text-dark-bg hover:bg-dark-bg hover:text-white"
+                      >
+                        {generating ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4" />
+                        )}
+                        Regenerate
+                      </Button>
+                    </>
+                  )}
                   {caseData.status === "draft" && (
                     <Button
                       size="sm"
@@ -1078,126 +1137,225 @@ export default function CaseDetailPage() {
               </div>
             </Card>
 
+            {/* Uploaded Documents */}
+            {uploadedDocs.length > 0 && (
+              <Card className="p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
+                <h3 className="font-semibold text-dark-bg mb-3">Uploaded Documents</h3>
+                <div className="space-y-2">
+                  {uploadedDocs.map((doc, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-2 rounded-lg bg-sage-light/20"
+                      title={doc.filename}
+                    >
+                      {["png", "jpg", "jpeg"].includes(doc.fileType) ? (
+                        <Image className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                      ) : (
+                        <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                      )}
+                      <span className="text-sm text-gray-700 truncate">{doc.filename}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
             {/* Suggested Forms */}
           </div>
 
-          {/* Right Column - Generated Documentation */}
+          {/* Right Column - Chat Interface or Generated Documentation */}
           <div className="lg:col-span-2 space-y-4">
-            {/* LCD Validation Panel - Only for Biologics PA */}
-            {lcdValidation && caseData?.doc_type === "biologics_pa" && (
-              <LCDValidationPanel
-                validation={lcdValidation}
-                isCollapsed={false}
-                checklistEdits={checklistEdits}
-                onItemClick={handleChecklistItemClick}
-                isEditable={true}
-              />
-            )}
-
-            <Card className="bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
-              <Collapsible open={!isDocCollapsed} onOpenChange={() => setIsDocCollapsed(!isDocCollapsed)}>
-                <CollapsibleTrigger asChild>
-                  <div className="p-6 cursor-pointer hover:bg-sage-light/10 transition-colors flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-xl font-sans font-semibold text-dark-bg">
-                        {hasGenerated ? "Generated Documentation" : "Generating Documentation..."}
-                      </h2>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isDocCollapsed ? (
-                        <ChevronDown className="w-5 h-5 text-gray-500" />
-                      ) : (
-                        <ChevronUp className="w-5 h-5 text-gray-500" />
-                      )}
-                    </div>
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="px-6 pb-6">
-                    {hasGenerated ? (
-                      <>
-                        <Textarea
-                          value={editedOutput}
-                          onChange={(e) => setEditedOutput(e.target.value)}
-                          className="min-h-[500px] font-mono text-sm mb-4"
-                          placeholder="Generated documentation will appear here..."
-                        />
-
-                        <div className="flex gap-3 flex-wrap">
-                          <Button onClick={copyToClipboard} variant="outline">
-                            <AnimatePresence mode="popLayout" initial={false}>
-                              <motion.div
-                                key={copied ? "check" : "copy"}
-                                initial={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
-                                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                                exit={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
-                                transition={{
-                                  type: "spring",
-                                  duration: 0.3,
-                                  bounce: 0,
-                                }}
-                                className="flex items-center"
-                              >
-                                {copied ? (
-                                  <Check className="w-4 h-4 mr-2" />
-                                ) : (
-                                  <Copy className="w-4 h-4 mr-2" />
-                                )}
-                              </motion.div>
-                            </AnimatePresence>
-                            {copied ? "Copied!" : "Copy to Clipboard"}
-                          </Button>
-                          <Button onClick={downloadAsWord} variant="outline">
-                            <Download className="w-4 h-4 mr-2" />
-                            DOCX
-                          </Button>
-                          <Button onClick={generatePdf} variant="outline">
-                            <Download className="w-4 h-4 mr-2" />
-                            PDF
-                          </Button>
+            <AnimatePresence mode="wait">
+              {/* Chat Interface - Full screen when in chat mode */}
+              {isInChatMode ? (
+                <motion.div
+                  key="chat-interface"
+                  initial={{ opacity: 0, y: 20, filter: "blur(8px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -20, filter: "blur(8px)" }}
+                  transition={{
+                    type: "spring",
+                    duration: 0.5,
+                    bounce: 0.1,
+                  }}
+                >
+                  <Card className="bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] border-0 h-[600px]">
+                    <ChatInterface
+                      caseId={caseData.id}
+                      caseData={caseData}
+                      onGenerate={() => {
+                        // Trigger streaming generation via GeneratingSteps
+                        setGenerating(true)
+                      }}
+                    />
+                  </Card>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="documentation-view"
+                  initial={{ opacity: 0, y: 20, filter: "blur(8px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -20, filter: "blur(8px)" }}
+                  transition={{
+                    type: "spring",
+                    duration: 0.5,
+                    bounce: 0.1,
+                  }}
+                  className="space-y-4"
+                >
+                  {/* Chat with Luma - Opens modal for follow-up questions */}
+                  <button
+                    onClick={() => setIsChatExpanded(true)}
+                    className="w-full group"
+                  >
+                    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-dark-bg to-dark-bg/90 p-5 transition-all hover:shadow-lg hover:shadow-dark-bg/20 hover:scale-[1.01]">
+                      <div className="absolute inset-0 bg-gradient-to-br from-mint/10 via-transparent to-sage-light/10" />
+                      <div className="relative flex items-center gap-4">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-mint/20 flex items-center justify-center">
+                          <MessageSquare className="w-5 h-5 text-mint" />
                         </div>
-                      </>
-                    ) : (
-                      // LOADING STATE
-                      <div className="text-center py-20">
-                        <div className="relative w-20 h-20 mx-auto mb-8">
-                          <LumaLogo className="w-20 h-20 animate-pulse text-mint" />
+                        <div className="flex-1 text-left">
+                          <h2 className="text-lg font-semibold text-white">Chat with Luma</h2>
+                          <p className="text-sm text-white/60">Ask questions or discuss compliance gaps</p>
                         </div>
-
-                        <h3 className="text-lg font-semibold text-dark-bg mb-2">
-                          Researching & Drafting
-                        </h3>
-
-                        {/* Tidbit Carousel */}
-                        <div className="h-16 flex items-center justify-center max-w-lg mx-auto px-4">
-                          <AnimatePresence mode="wait">
-                            <motion.p
-                              key={tidbitIndex}
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -10 }}
-                              className="text-gray-600 italic"
-                            >
-                              "{tidbits[tidbitIndex]}"
-                            </motion.p>
-                          </AnimatePresence>
-                        </div>
+                        <ChevronDown className="w-5 h-5 text-white/40 -rotate-90 group-hover:translate-x-1 transition-transform" />
                       </div>
-                    )}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </Card>
+                    </div>
+                  </button>
+
+                  {/* LCD Validation Panel - Only for Biologics PA */}
+                  {lcdValidation && caseData?.doc_type === "biologics_pa" && (
+                    <LCDValidationPanel
+                      validation={lcdValidation}
+                      isCollapsed={false}
+                      checklistEdits={checklistEdits}
+                      onItemClick={handleChecklistItemClick}
+                    />
+                  )}
+
+                  {/* Generated Documentation */}
+                  <Card className="bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-sans font-semibold text-dark-bg">
+                          Generated Documentation
+                        </h2>
+                        <button
+                          onClick={() => setIsDocCollapsed(!isDocCollapsed)}
+                          className="p-2 hover:bg-sage-light/20 rounded-lg transition-colors"
+                        >
+                          <motion.div
+                            animate={{ rotate: isDocCollapsed ? 0 : 180 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <ChevronDown className="w-5 h-5 text-gray-500" />
+                          </motion.div>
+                        </button>
+                      </div>
+
+                      <AnimatePresence initial={false}>
+                        {!isDocCollapsed && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{
+                              type: "spring",
+                              duration: 0.4,
+                              bounce: 0,
+                            }}
+                            className="overflow-hidden"
+                          >
+                            {hasGenerated ? (
+                              <>
+                                <Textarea
+                                  value={editedOutput}
+                                  onChange={(e) => setEditedOutput(e.target.value)}
+                                  className="min-h-[500px] font-mono text-sm mb-4"
+                                  placeholder="Generated documentation will appear here..."
+                                />
+
+                                <div className="flex gap-3 flex-wrap">
+                                  <Button onClick={copyToClipboard} variant="outline">
+                                    <AnimatePresence mode="popLayout" initial={false}>
+                                      <motion.div
+                                        key={copied ? "check" : "copy"}
+                                        initial={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
+                                        animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                                        exit={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
+                                        transition={{
+                                          type: "spring",
+                                          duration: 0.3,
+                                          bounce: 0,
+                                        }}
+                                        className="flex items-center"
+                                      >
+                                        {copied ? (
+                                          <Check className="w-4 h-4 mr-2" />
+                                        ) : (
+                                          <Copy className="w-4 h-4 mr-2" />
+                                        )}
+                                      </motion.div>
+                                    </AnimatePresence>
+                                    {copied ? "Copied!" : "Copy to Clipboard"}
+                                  </Button>
+                                  <Button onClick={downloadAsWord} variant="outline">
+                                    <Download className="w-4 h-4 mr-2" />
+                                    DOCX
+                                  </Button>
+                                  <Button onClick={generatePdf} variant="outline">
+                                    <Download className="w-4 h-4 mr-2" />
+                                    PDF
+                                  </Button>
+                                </div>
+                              </>
+                            ) : (
+                              // LOADING STATE
+                              <div className="text-center py-20">
+                                <div className="relative w-20 h-20 mx-auto mb-8">
+                                  <LumaLogo className="w-20 h-20 animate-pulse text-mint" />
+                                </div>
+
+                                <h3 className="text-lg font-semibold text-dark-bg mb-2">
+                                  Researching & Drafting
+                                </h3>
+
+                                {/* Tidbit Carousel */}
+                                <div className="h-16 flex items-center justify-center max-w-lg mx-auto px-4">
+                                  <AnimatePresence mode="wait">
+                                    <motion.p
+                                      key={tidbitIndex}
+                                      initial={{ opacity: 0, y: 10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      exit={{ opacity: 0, y: -10 }}
+                                      className="text-gray-600 italic"
+                                    >
+                                      "{tidbits[tidbitIndex]}"
+                                    </motion.p>
+                                  </AnimatePresence>
+                                </div>
+                              </div>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
-        {/* Suggested Forms Section */}
+        {/* Suggested Forms Section - Only show when not in chat mode */}
+        {!isInChatMode && (
         <div className="mt-8">
           <SuggestedForms
             caseId={caseData.id}
             lastGenerated={caseData.generated_output}
           />
         </div>
+        )}
       </div>
 
       {/* Checklist Item Edit Modal */}
@@ -1360,7 +1518,10 @@ export default function CaseDetailPage() {
             <Button
               onClick={() => {
                 setRegenerateModalOpen(false)
-                generateDocumentation()
+                // Clear output so GeneratingSteps will show and handle the regeneration
+                setCaseData({ ...caseData!, generated_output: null })
+                setEditedOutput("")
+                setGenerating(true)
               }}
               className="bg-dark-bg hover:bg-dark-bg/90"
             >
@@ -1368,6 +1529,182 @@ export default function CaseDetailPage() {
               Regenerate
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Chat Modal - For follow-up questions after generation */}
+      <Dialog open={isChatExpanded} onOpenChange={setIsChatExpanded}>
+        <DialogContent className="sm:max-w-4xl h-[80vh] max-h-[700px] p-0 gap-0 flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
+            <DialogTitle className="text-lg">Chat with Luma</DialogTitle>
+            <DialogDescription className="pt-1">
+              All conversations and uploaded documents are saved and will be used to generate more accurate letters.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Action Bar */}
+          <div className="px-6 pb-4 flex-shrink-0 flex items-center gap-3 flex-wrap">
+            <button
+              onClick={copyChatMessages}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-mint focus-visible:ring-offset-2"
+            >
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.div
+                  key={isChatCopied ? "check" : "copy"}
+                  initial={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
+                  transition={{
+                    type: "spring",
+                    duration: 0.3,
+                    bounce: 0,
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  {isChatCopied ? (
+                    <>
+                      <Check className="h-4 w-4 text-mint" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      <span>Copy Responses</span>
+                    </>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </button>
+
+            {/* Uploaded Documents - Click to expand */}
+            {uploadedDocs.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowDocsDropdown(!showDocsDropdown)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sage-light/40 hover:bg-sage-light/60 transition-colors text-xs font-medium text-gray-600"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  <span>{uploadedDocs.length} document{uploadedDocs.length !== 1 ? 's' : ''}</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${showDocsDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {showDocsDropdown && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute top-full left-0 mt-1 z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-2 min-w-[200px] max-w-[280px]"
+                    >
+                      <div className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide">
+                        Uploaded Files
+                      </div>
+                      {uploadedDocs.map((doc, index) => (
+                        <div
+                          key={index}
+                          className="px-3 py-2 flex items-center gap-2 hover:bg-gray-50"
+                          title={doc.filename}
+                        >
+                          {["png", "jpg", "jpeg"].includes(doc.fileType) ? (
+                            <Image className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          ) : (
+                            <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          )}
+                          <span className="text-sm text-gray-700 truncate">{doc.filename}</span>
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
+            {/* Risk Items - Click to copy and discuss */}
+            {riskItems.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowRisksDropdown(!showRisksDropdown)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-100 hover:bg-red-200 transition-colors text-xs font-medium text-red-700"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  <span>{riskItems.length} risk item{riskItems.length !== 1 ? 's' : ''}</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${showRisksDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {showRisksDropdown && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute top-full left-0 mt-1 z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-2 min-w-[280px] max-w-[400px] max-h-[300px] overflow-y-auto"
+                    >
+                      <div className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide">
+                        Click to copy and discuss
+                      </div>
+                      {riskItems.map((item, index) => {
+                        const itemKey = `${item.severity}-${index}`
+                        const isCopied = copiedRiskIndex === itemKey
+                        return (
+                          <button
+                            key={itemKey}
+                            onClick={() => copyRiskItem(item.text, itemKey)}
+                            className="w-full px-3 py-2 flex items-start gap-2 hover:bg-gray-50 text-left transition-colors"
+                            title="Click to copy"
+                          >
+                            <div className={`mt-0.5 flex-shrink-0 w-2 h-2 rounded-full ${
+                              item.severity === 'instant' ? 'bg-red-500' :
+                              item.severity === 'very-high' ? 'bg-orange-500' :
+                              'bg-yellow-500'
+                            }`} />
+                            <span className="text-sm text-gray-700 flex-1 line-clamp-2">{item.label}</span>
+                            <AnimatePresence mode="popLayout" initial={false}>
+                              <motion.div
+                                key={isCopied ? "check" : "copy"}
+                                initial={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
+                                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                                exit={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
+                                transition={{
+                                  type: "spring",
+                                  duration: 0.3,
+                                  bounce: 0,
+                                }}
+                                className="flex-shrink-0"
+                              >
+                                {isCopied ? (
+                                  <Check className="h-4 w-4 text-mint" />
+                                ) : (
+                                  <Copy className="h-4 w-4 text-gray-400" />
+                                )}
+                              </motion.div>
+                            </AnimatePresence>
+                          </button>
+                        )
+                      })}
+                      <div className="px-3 py-2 border-t border-gray-100 mt-1">
+                        <p className="text-xs text-gray-500">
+                          Luma already knows about these risks. You can also just ask about them directly.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 min-h-0 border-t border-gray-100">
+            <ChatInterface
+              caseId={caseData?.id || ""}
+              caseData={caseData}
+              onGenerate={async () => {
+                setIsChatExpanded(false)
+                setRegenerateModalOpen(true)
+              }}
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </div >

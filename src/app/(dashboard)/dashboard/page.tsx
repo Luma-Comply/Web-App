@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -82,6 +83,7 @@ interface UserSubscription {
 export default function DashboardPage() {
   const router = useRouter()
   const supabase = createClient()
+  const { toast } = useToast()
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [userEmail, setUserEmail] = useState("")
@@ -244,14 +246,46 @@ export default function DashboardPage() {
     if (!caseToDelete) return
 
     try {
-      setCases(cases.filter(c => c.id !== caseToDelete.id)); // Optimistic
-      await supabase.from("cases").delete().eq("id", caseToDelete.id);
-      // Reload to recalc stats since delete affects revenue
-      loadDashboardData();
+      // Delete and return deleted rows to verify it worked
+      const { data: deleted, error } = await supabase
+        .from("cases")
+        .delete()
+        .eq("id", caseToDelete.id)
+        .select('id')
+
+      if (error) {
+        throw error
+      }
+
+      // Check if delete was blocked by RLS (returns success but deletes 0 rows)
+      if (!deleted || deleted.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Cannot Delete",
+          description: "You can only delete cases you created. Team member cases must be deleted by their owner.",
+        })
+        setDeleteDialogOpen(false)
+        setCaseToDelete(null)
+        return
+      }
+
+      // Success - update UI
+      setCases(cases.filter(c => c.id !== caseToDelete.id))
+      loadDashboardData() // Recalc stats
       setDeleteDialogOpen(false)
       setCaseToDelete(null)
+
+      toast({
+        title: "Case Deleted",
+        description: "The case has been permanently removed.",
+      })
     } catch (error) {
-      console.error("Error deleting case:", error);
+      console.error("Error deleting case:", error)
+      toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: "Something went wrong. Please try again.",
+      })
       loadDashboardData() // Revert on error
     }
   }

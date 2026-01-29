@@ -10,6 +10,12 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   ChevronDown,
   ChevronUp,
   AlertTriangle,
@@ -19,10 +25,22 @@ import {
   Info,
   StickyNote,
   Check,
+  Pencil,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { LCDValidationResult, ChecklistEdit, ChecklistItemWithEdits } from "@/lib/lcd-validation"
-import { AUDIT_RISK_LEVELS, type AuditRiskLevel } from "@/lib/lcd-requirements"
+import { AUDIT_RISK_LEVELS, type AuditRiskLevel, type WoundType } from "@/lib/lcd-requirements"
+
+const WOUND_TYPE_OPTIONS: { value: WoundType; label: string }[] = [
+  { value: "DFU", label: "Diabetic Foot Ulcer (DFU)" },
+  { value: "VLU", label: "Venous Leg Ulcer (VLU)" },
+  { value: "PRESSURE_ULCER", label: "Pressure Ulcer / Pressure Injury" },
+  { value: "ARTERIAL_ULCER", label: "Arterial Ulcer" },
+  { value: "SURGICAL_WOUND", label: "Surgical Wound (Non-healing)" },
+  { value: "TRAUMATIC_WOUND", label: "Traumatic Wound" },
+  { value: "BURN", label: "Burn Wound" },
+  { value: "OTHER", label: "Other" },
+]
 
 interface LCDValidationPanelProps {
   validation: {
@@ -43,6 +61,7 @@ interface LCDValidationPanelProps {
   isCollapsed?: boolean
   checklistEdits?: Record<string, ChecklistEdit>
   onItemClick?: (item: ChecklistItemWithEdits) => void
+  onWoundTypeChange?: (woundType: WoundType) => void
   isEditable?: boolean
 }
 
@@ -51,6 +70,7 @@ export function LCDValidationPanel({
   isCollapsed: initialCollapsed = false,
   checklistEdits,
   onItemClick,
+  onWoundTypeChange,
   isEditable = true,
 }: LCDValidationPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(initialCollapsed)
@@ -168,13 +188,40 @@ export function LCDValidationPanel({
               </div>
               <div className="bg-white rounded-xl p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Wound Type</div>
-                <div className="text-xl font-bold text-dark-bg">
-                  {validation.detectedWoundType
-                    ? validation.detectedWoundType.split('_').map(word =>
-                        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                      ).join(' ')
-                    : "Unknown"}
-                </div>
+                {isEditable && onWoundTypeChange ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex items-center gap-2 text-xl font-bold text-dark-bg hover:text-mint transition-colors group">
+                        {validation.detectedWoundType
+                          ? WOUND_TYPE_OPTIONS.find(o => o.value === validation.detectedWoundType)?.label.split(' (')[0] || validation.detectedWoundType
+                          : "Unknown"}
+                        <Pencil className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {WOUND_TYPE_OPTIONS.map((option) => (
+                        <DropdownMenuItem
+                          key={option.value}
+                          onClick={() => onWoundTypeChange(option.value)}
+                          className={cn(
+                            "cursor-pointer",
+                            validation.detectedWoundType === option.value && "bg-mint/10 text-mint"
+                          )}
+                        >
+                          {option.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <div className="text-xl font-bold text-dark-bg">
+                    {validation.detectedWoundType
+                      ? validation.detectedWoundType.split('_').map(word =>
+                          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                        ).join(' ')
+                      : "Unknown"}
+                  </div>
+                )}
               </div>
               <div className="bg-white rounded-xl p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CTP Product</div>

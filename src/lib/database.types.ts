@@ -9,6 +9,32 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      case_messages: {
+        Row: {
+          id: string
+          case_id: string
+          role: 'user' | 'assistant' | 'system'
+          content: string
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          case_id: string
+          role: 'user' | 'assistant' | 'system'
+          content: string
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          case_id?: string
+          role?: 'user' | 'assistant' | 'system'
+          content?: string
+          metadata?: Json | null
+          created_at?: string
+        }
+      }
       users: {
         Row: {
           id: string
@@ -64,7 +90,7 @@ export interface Database {
           payer_name: string
           generated_output: string | null
           edited_output: string | null
-          status: 'draft' | 'submitted' | 'approved' | 'denied'
+          status: 'chat' | 'draft' | 'submitted' | 'approved' | 'denied'
           created_at: string
           updated_at: string
           metadata: Json | null

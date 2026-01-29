@@ -1,0 +1,10 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Disallow admin and private pages
+Disallow: /admin/
+Disallow: /api/admin/
+
+# Sitemap
+Sitemap: https://useluma.io/sitemap.xml
