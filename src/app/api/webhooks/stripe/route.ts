@@ -244,18 +244,14 @@ async function handleSubscriptionUpdate(
     cancel_at_period_end: subscription.cancel_at_period_end,
   };
 
-  // If transitioning FROM trial TO active, reset cases
+  // If transitioning FROM trial TO active, clear trial date
   if (status === "active" && sub.trial_end) {
     updateData.trial_ends_at = null;
-    updateData.cases_remaining = 50;
-    updateData.cases_used_this_period = 0;
   }
 
   // If status is trialing, set trial end date
   if (status === "trialing" && sub.trial_end) {
     updateData.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
-    // Ensure trial users get cases
-    updateData.cases_remaining = 50;
   }
 
   // Always ensure we have a default seat count if not present
@@ -321,7 +317,6 @@ async function handleSubscriptionDeleted(
     .from("users")
     .update({
       subscription_status: "canceled",
-      cases_remaining: 0,
     })
     .eq("id", userId);
 
@@ -388,13 +383,11 @@ async function handlePaymentSucceeded(
   // Type cast to access period fields
   const sub = subscription as any;
 
-  // Reset monthly cases counter on successful payment
+  // Update subscription status on successful payment
   const { error } = await supabase
     .from("users")
     .update({
       subscription_status: "active",
-      cases_remaining: 50,
-      cases_used_this_period: 0,
       billing_period_start: new Date(sub.current_period_start * 1000).toISOString(),
       billing_period_end: new Date(sub.current_period_end * 1000).toISOString(),
     })

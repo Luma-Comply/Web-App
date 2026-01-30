@@ -227,10 +227,10 @@ export default function NewCasePage() {
         return
       }
 
-      // Check subscription status and cases remaining
+      // Check subscription status
       const { data: user, error: userError } = await supabase
         .from("users")
-        .select("subscription_status, cases_remaining, trial_ends_at")
+        .select("subscription_status, trial_ends_at")
         .eq("id", session.user.id)
         .single()
 
@@ -250,13 +250,6 @@ export default function NewCasePage() {
         setError("Your trial has ended. Please subscribe to continue creating cases.")
         setLoading(false)
         router.push("/dashboard") // Redirect to dashboard to show upgrade prompt
-        return
-      }
-
-      // Check if user has cases remaining
-      if (user.cases_remaining <= 0) {
-        setError("You've used all 50 cases this month. Upgrade or wait until next billing period.")
-        setLoading(false)
         return
       }
 
@@ -330,17 +323,6 @@ export default function NewCasePage() {
 
       if (!caseData) {
         throw new Error("Case was created but no data was returned")
-      }
-
-      // Charge credit if we have content (notes or files) and will auto-generate
-      if (hasContent) {
-        await supabase
-          .from("users")
-          .update({
-            cases_remaining: user.cases_remaining - 1,
-            cases_used_this_period: (user as any).cases_used_this_period + 1,
-          })
-          .eq("id", session.user.id)
       }
 
       // Upload selected files to the case

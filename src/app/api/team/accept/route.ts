@@ -124,7 +124,6 @@ export async function POST(request: NextRequest) {
         is_team_owner: false,
         subscription_status: "trialing",
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        cases_remaining: 50,
       })
 
       if (insertError) {

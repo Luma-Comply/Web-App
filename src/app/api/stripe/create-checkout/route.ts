@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { stripe } from "@/lib/stripe";
+import { stripe, PRICE_IDS } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   try {
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       payment_method_types: ["card"],
       line_items: [
         {
-          price: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PROFESSIONAL!,
+          price: PRICE_IDS.membership,
           quantity: 1,
         },
       ],

@@ -89,11 +89,11 @@ export default function CheckoutPage() {
           <Card className="p-8 glass-card border-2 border-mint/30">
             <div className="text-center mb-6">
               <div className="flex items-baseline justify-center gap-2 mb-2">
-                <span className="text-5xl font-sans font-semibold text-dark-bg">$149</span>
+                <span className="text-5xl font-sans font-semibold text-dark-bg">$399</span>
                 <span className="text-gray-600">/month</span>
               </div>
               <p className="text-sm text-gray-600">
-                First 14 days free, then $149/mo
+                First 14 days free, then $399/mo
               </p>
             </div>
 
@@ -102,7 +102,7 @@ export default function CheckoutPage() {
                 <div className="w-5 h-5 rounded-full bg-mint/10 flex items-center justify-center flex-shrink-0">
                   <Check className="w-3 h-3 text-mint" />
                 </div>
-                <span className="text-gray-700">50 cases per month</span>
+                <span className="text-gray-700">Unlimited cases</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-mint/10 flex items-center justify-center flex-shrink-0">
@@ -140,7 +140,6 @@ export default function CheckoutPage() {
               <div className="text-sm text-gray-600 mb-2">Need more?</div>
               <div className="space-y-1 text-sm text-gray-700">
                 <div>Extra Seat: <strong>+$15/mo</strong></div>
-                <div>Extra Cases: <strong>+$3/case</strong></div>
               </div>
             </div>
           </Card>
@@ -173,7 +172,7 @@ export default function CheckoutPage() {
                     Try Luma free for 14 days. Cancel anytime during the trial and you won't be charged.
                   </p>
                   <p className="text-sm text-gray-600">
-                    After your trial, you'll be automatically charged $149/month. You can cancel or modify your plan anytime.
+                    After your trial, you'll be automatically charged $399/month. You can cancel or modify your plan anytime.
                   </p>
                 </div>
               </div>

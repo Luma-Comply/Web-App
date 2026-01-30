@@ -3,7 +3,7 @@ import CheckoutButton from "@/components/CheckoutButton"
 import { Check } from "lucide-react"
 
 const features = [
-  "50 cases per month",
+  "Unlimited cases",
   "3 total seats",
   "All documentation types",
   "Word & PDF export",
@@ -13,7 +13,6 @@ const features = [
 
 const addOns = [
   { name: "Extra Seat", price: "+$15/mo" },
-  { name: "Extra Cases", price: "+$3/case" },
 ]
 
 export default function PricingSection() {
@@ -42,11 +41,11 @@ export default function PricingSection() {
                     <div className="flex items-start justify-center gap-1 mb-2">
                       <span className="text-xl text-gray-600 mt-2">$</span>
                       <span className="text-6xl font-mono font-bold text-dark-bg">
-                        149
+                        399
                       </span>
                       <span className="text-xl text-gray-600 mt-6">/mo</span>
                     </div>
-                    <p className="text-gray-600 text-sm">3 seats • 50 cases included</p>
+                    <p className="text-gray-600 text-sm">3 seats • Unlimited cases</p>
                   </div>
 
                   {/* Features */}

@@ -373,36 +373,6 @@ Note: These recommendations are based on AI analysis of current payer policies. 
           return
         }
 
-        // Handle credits
-        const isFromChatMode = caseData.status === 'chat'
-        const isRegeneration = caseData.status !== 'chat' && !!caseData.generated_output
-
-        if (isFromChatMode || isRegeneration) {
-          const { data: currentUser } = await supabase
-            .from("users")
-            .select("team_owner_id, cases_remaining")
-            .eq("id", session.user.id)
-            .single()
-
-          const poolOwnerId = currentUser?.team_owner_id || session.user.id
-
-          const { data: poolOwnerData } = await supabase
-            .from("users")
-            .select("cases_remaining_this_month, cases_remaining")
-            .eq("id", poolOwnerId)
-            .single()
-
-          if (poolOwnerData && poolOwnerData.cases_remaining > 0) {
-            await supabase
-              .from("users")
-              .update({
-                cases_remaining_this_month: Math.max(0, (poolOwnerData.cases_remaining_this_month || 50) - 1),
-                cases_remaining: Math.max(0, (poolOwnerData.cases_remaining || 50) - 1),
-              })
-              .eq("id", poolOwnerId)
-          }
-        }
-
         // Build result
         const result: any = {
           success: true,

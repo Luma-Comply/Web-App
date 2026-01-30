@@ -32,7 +32,6 @@ interface BillingInfo {
   billing_period_start: string | null
   billing_period_end: string | null
   cancel_at_period_end: boolean
-  cases_remaining: number
   seats_count: number
 }
 
@@ -65,7 +64,7 @@ export default function BillingPage() {
       const { data: userData } = await supabase
         .from("users")
         .select(
-          "subscription_status, stripe_customer_id, stripe_subscription_id, subscription_tier, trial_ends_at, billing_period_start, billing_period_end, cancel_at_period_end, cases_remaining, seats_count"
+          "subscription_status, stripe_customer_id, stripe_subscription_id, subscription_tier, trial_ends_at, billing_period_start, billing_period_end, cancel_at_period_end, seats_count"
         )
         .eq("id", session.user.id)
         .single()
@@ -204,7 +203,7 @@ export default function BillingPage() {
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-semibold text-dark-bg">
                   {hasActiveTrial && "Free Trial"}
-                  {isActive && !hasActiveTrial && "Professional Plan"}
+                  {isActive && !hasActiveTrial && "Membership"}
                   {isCanceled && "Subscription Canceled"}
                   {isPastDue && "Payment Failed"}
                   {!isActive && !hasActiveTrial && !isCanceled && !isPastDue && "Subscription"}
@@ -228,7 +227,7 @@ export default function BillingPage() {
                 {hasActiveTrial &&
                   billingInfo?.trial_ends_at &&
                   `Trial ends ${new Date(billingInfo.trial_ends_at).toLocaleDateString()}`}
-                {isActive && !hasActiveTrial && !billingInfo?.cancel_at_period_end && "$149/month"}
+                {isActive && !hasActiveTrial && !billingInfo?.cancel_at_period_end && "$399/month"}
                 {isActive &&
                   !hasActiveTrial &&
                   billingInfo?.cancel_at_period_end &&
@@ -249,7 +248,7 @@ export default function BillingPage() {
                 <ul className="space-y-2 text-sm text-gray-700">
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-mint" />
-                    50 cases per month
+                    Unlimited cases
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-mint" />
@@ -269,16 +268,8 @@ export default function BillingPage() {
 
             <div className="space-y-3">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Usage</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Account</p>
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Cases Remaining</span>
-                    <span className="font-semibold text-dark-bg">
-                      {/* Show explicitly 50 if the subscription is just created, otherwise show DB value */}
-                      {/* For now, relying on DB value which we fixed in webhook to default to 50 */}
-                      {billingInfo?.cases_remaining ?? 50}
-                    </span>
-                  </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Team Seats</span>
                     <span className="font-semibold text-dark-bg">

@@ -10,16 +10,12 @@ import { formatDistanceToNow } from "date-fns"
 interface SubscriptionBannerProps {
   subscriptionStatus: string
   trialEndsAt: string | null
-  casesRemaining: number
-  casesUsedThisPeriod: number
   billingPeriodEnd: string | null
 }
 
 export function SubscriptionBanner({
   subscriptionStatus,
   trialEndsAt,
-  casesRemaining,
-  casesUsedThisPeriod,
   billingPeriodEnd,
 }: SubscriptionBannerProps) {
   const [loading, setLoading] = useState(false)
@@ -112,10 +108,10 @@ export function SubscriptionBanner({
               </div>
               <p className="text-gray-700 mb-2">
                 Your trial ends {formatDistanceToNow(new Date(trialEndsAt), { addSuffix: true })}.
-                You have <strong>{casesRemaining} cases</strong> remaining this period.
+                Enjoy unlimited cases during your trial.
               </p>
               <p className="text-sm text-gray-600">
-                After your trial, you'll be charged $149/month. Cancel anytime.
+                After your trial, you'll be charged $399/month for unlimited usage. Cancel anytime.
               </p>
             </div>
           </div>
@@ -134,47 +130,24 @@ export function SubscriptionBanner({
     )
   }
 
-  // Active subscription - show usage
+  // Active subscription
   if (subscriptionStatus === "active") {
-    const percentUsed = ((50 - casesRemaining) / 50) * 100
-    const isLowOnCases = casesRemaining <= 10
-
     return (
-      <Card className={`p-4 sm:p-6 glass-card border-2 mb-6 ${isLowOnCases ? "border-coral/50 bg-coral/5" : "border-sage-medium/30"}`}>
+      <Card className="p-4 sm:p-6 glass-card border-2 mb-6 border-sage-medium/30">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-start gap-3 flex-1">
-            <CheckCircle className={`w-6 h-6 flex-shrink-0 mt-1 ${isLowOnCases ? "text-coral" : "text-mint"}`} />
+            <CheckCircle className="w-6 h-6 flex-shrink-0 mt-1 text-mint" />
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h3 className="text-lg font-sans font-semibold text-dark-bg">Professional Plan</h3>
+                <h3 className="text-lg font-sans font-semibold text-dark-bg">Membership</h3>
                 <Badge variant="outline" className="bg-mint/10 text-mint border-mint/30">
                   Active
                 </Badge>
               </div>
 
-              {/* Usage Bar */}
-              <div className="mb-3">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm mb-2 gap-1">
-                  <span className="text-gray-700">
-                    <strong>{casesRemaining} cases</strong> remaining this month
-                  </span>
-                  <span className="text-gray-600">
-                    {casesUsedThisPeriod} / 50 used
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all ${isLowOnCases ? "bg-coral" : "bg-mint"}`}
-                    style={{ width: `${percentUsed}%` }}
-                  />
-                </div>
-              </div>
-
-              {isLowOnCases && (
-                <p className="text-sm text-coral mb-2">
-                  You're running low on cases! Need more? Extra cases are $3 each.
-                </p>
-              )}
+              <p className="text-gray-700 mb-2">
+                <strong>Unlimited cases</strong> included with your subscription.
+              </p>
 
               <p className="text-sm text-gray-600">
                 Next billing: {billingPeriodEnd ? formatDistanceToNow(new Date(billingPeriodEnd), { addSuffix: true }) : "N/A"}

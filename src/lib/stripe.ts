@@ -18,9 +18,8 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 // Price IDs from environment
 export const PRICE_IDS = {
-  professional: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PROFESSIONAL!,
+  membership: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MEMBERSHIP!,
   extraSeat: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_EXTRA_SEAT!,
-  extraCases: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_EXTRA_CASES!,
 } as const;
 
 // Subscription status helpers

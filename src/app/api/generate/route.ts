@@ -710,48 +710,12 @@ Note: These recommendations are based on AI analysis of current payer policies. 
       )
     }
 
-    // Charge credits logic:
-    // - For cases with status 'chat': charge on first generation (credit not charged at creation)
-    // - For cases with status 'draft' that already have output: charge for regeneration
-    // - For cases with status 'draft' without output: don't charge (already charged at creation)
-    const isFromChatMode = caseData.status === 'chat'
-    const isRegeneration = caseData.status !== 'chat' && !!caseData.generated_output
-    const shouldChargeCredit = isFromChatMode || isRegeneration
-
     // Update status from 'chat' to 'draft' on first generation
-    if (isFromChatMode) {
+    if (caseData.status === 'chat') {
       await supabase
         .from("cases")
         .update({ status: "draft" })
         .eq("id", caseId)
-    }
-
-    if (shouldChargeCredit) {
-      // Update remaining cases count - use team owner's pool if user is a team member
-      const { data: currentUser } = await supabase
-        .from("users")
-        .select("team_owner_id, cases_remaining_this_month, cases_remaining")
-        .eq("id", session.user.id)
-        .single()
-
-      // Determine whose cases pool to decrement (team owner's or own)
-      const poolOwnerId = currentUser?.team_owner_id || session.user.id
-
-      const { data: poolOwnerData } = await supabase
-        .from("users")
-        .select("cases_remaining_this_month, cases_remaining")
-        .eq("id", poolOwnerId)
-        .single()
-
-      if (poolOwnerData && poolOwnerData.cases_remaining > 0) {
-        await supabase
-          .from("users")
-          .update({
-            cases_remaining_this_month: Math.max(0, (poolOwnerData.cases_remaining_this_month || 50) - 1),
-            cases_remaining: Math.max(0, (poolOwnerData.cases_remaining || 50) - 1),
-          })
-          .eq("id", poolOwnerId)
-      }
     }
 
     // Build response - include validation for biologics PA

@@ -68,15 +68,12 @@ interface Case {
 interface UserStats {
   total_cases: number
   cases_this_month: number
-  cases_remaining: number
   revenue_protected: number
 }
 
 interface UserSubscription {
   subscription_status: string
   trial_ends_at: string | null
-  cases_remaining: number
-  cases_used_this_period: number
   billing_period_end: string | null
 }
 
@@ -98,15 +95,12 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<UserStats>({
     total_cases: 0,
     cases_this_month: 0,
-    cases_remaining: 50,
     revenue_protected: 0,
   })
 
   const [subscription, setSubscription] = useState<UserSubscription>({
     subscription_status: "trialing",
     trial_ends_at: null,
-    cases_remaining: 50,
-    cases_used_this_period: 0,
     billing_period_end: null,
   })
 
@@ -127,10 +121,10 @@ export default function DashboardPage() {
 
       setUserEmail(session.user.email || "")
 
-      // Load user profile for subscription, limits, and practice name
+      // Load user profile for subscription and practice name
       const { data: userData } = await supabase
         .from("users")
-        .select("subscription_status, trial_ends_at, cases_remaining, cases_used_this_period, billing_period_end, practice_name, team_owner_id, is_team_owner")
+        .select("subscription_status, trial_ends_at, billing_period_end, practice_name, team_owner_id, is_team_owner")
         .eq("id", session.user.id)
         .single()
 
@@ -139,23 +133,17 @@ export default function DashboardPage() {
         const userIsTeamOwner = userData.is_team_owner || !userData.team_owner_id
         setIsTeamOwner(userIsTeamOwner)
 
-        // For team members, fetch team owner's data for shared pool values
-        let casesRemaining = userData.cases_remaining || 50
-        let casesUsedThisPeriod = userData.cases_used_this_period || 0
         let ownerPracticeName = userData.practice_name || ""
 
         if (userData.team_owner_id) {
           const { data: ownerData } = await supabase
             .from("users")
-            .select("practice_name, cases_remaining, cases_used_this_period")
+            .select("practice_name")
             .eq("id", userData.team_owner_id)
             .single()
 
           if (ownerData) {
             ownerPracticeName = ownerData.practice_name || ""
-            // Use team owner's cases pool
-            casesRemaining = ownerData.cases_remaining || 50
-            casesUsedThisPeriod = ownerData.cases_used_this_period || 0
           }
         }
 
@@ -164,21 +152,8 @@ export default function DashboardPage() {
         setSubscription({
           subscription_status: userData.subscription_status || "trialing",
           trial_ends_at: userData.trial_ends_at,
-          cases_remaining: casesRemaining,
-          cases_used_this_period: casesUsedThisPeriod,
           billing_period_end: userData.billing_period_end,
         })
-      }
-
-      // Determine shared cases pool (team owner's pool or own)
-      let sharedCasesRemaining = userData?.cases_remaining || 50
-      if (userData?.team_owner_id) {
-        const { data: ownerCases } = await supabase
-          .from("users")
-          .select("cases_remaining")
-          .eq("id", userData.team_owner_id)
-          .single()
-        sharedCasesRemaining = ownerCases?.cases_remaining || 50
       }
 
       // Load cases - RLS handles visibility (team owners see all team cases, members see only their own)
@@ -207,7 +182,6 @@ export default function DashboardPage() {
         setStats({
           total_cases: casesData.length,
           cases_this_month: casesThisMonth,
-          cases_remaining: sharedCasesRemaining,
           revenue_protected: totalRevenue,
         })
       }
@@ -405,14 +379,12 @@ export default function DashboardPage() {
           <SubscriptionBanner
             subscriptionStatus={subscription.subscription_status}
             trialEndsAt={subscription.trial_ends_at}
-            casesRemaining={subscription.cases_remaining}
-            casesUsedThisPeriod={subscription.cases_used_this_period}
             billingPeriodEnd={subscription.billing_period_end}
           />
         )}
 
         {/* Stats Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card className="p-6 glass-card border border-sage-medium/30">
             <p className="text-sm text-gray-600 mb-1">Total Cases</p>
             <p className="text-3xl font-mono font-bold text-dark-bg">{stats.total_cases}</p>
@@ -427,10 +399,6 @@ export default function DashboardPage() {
               ${stats.revenue_protected.toLocaleString()}
             </p>
             <p className="text-xs text-gray-500 mt-1">Includes archived cases</p>
-          </Card>
-          <Card className="p-6 glass-card border border-sage-medium/30">
-            <p className="text-sm text-gray-600 mb-1">Cases Remaining</p>
-            <p className="text-3xl font-mono font-bold text-dark-bg">{stats.cases_remaining}</p>
           </Card>
         </div>
 
