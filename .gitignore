@@ -39,3 +39,54 @@ next-env.d.ts
 # Sentry
 .sentryclirc
 sentry.properties
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Internal docs (keep locally, never commit)
+.kiro/
+*_PLAN.md
+*_REPORT.md
+*_COMPLETE.md
+*_SUMMARY.md
+IMPLEMENTATION_SUMMARY.md
+CHECKOUT_FIX.md
+TROUBLESHOOTING_LOG.md
+SECURITY_AUDIT.md
+*_DEBUG*.md
+*_GUIDE.md
+*_CHECKLIST.md
+*_SETUP*.md
+*_INSTRUCTIONS.md
+
+# One-off scripts and fixes
+scripts/
+*.mjs
+!postcss.config.mjs
+FIX_*.sql
+manual-*.sql
+fix-*.sql
+verify-*.sql
+migration.sql
+
+# Temp and backup files
+examples/
+temp/
+tmp/
+*-backup.*
+*.bak
+*.old
+
+# Internal documents
+*.pdf
+.git-secrets-info.md
+example-chat.md
+
+# macOS
+Icon?
+
+# Never commit secrets
+# .env* patterns above should catch these
