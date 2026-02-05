@@ -35,6 +35,7 @@ import {
   X,
   AlertCircle,
 } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
 export default function NewCasePage() {
   const router = useRouter()
@@ -107,6 +108,10 @@ export default function NewCasePage() {
 
     if (validFiles.length > 0) {
       setSelectedFiles(prev => [...prev, ...validFiles])
+      toast({
+        title: "File uploaded",
+        description: `${validFiles.length} file${validFiles.length > 1 ? 's' : ''} added successfully`,
+      })
     }
   }
 
