@@ -245,6 +245,7 @@ Medication: ${caseData.requested_medication}`
       // --- PHASE: generating ---
       await sendEvent({ phase: 'generating' })
 
+      // Load chat messages for context
       let chatConversationContext = ""
       const { data: chatMessages } = await supabase
         .from("case_messages")
@@ -263,6 +264,36 @@ Medication: ${caseData.requested_medication}`
         }
       }
 
+      // Build checklist edits context - include user's notes and addressed items
+      let checklistEditsContext = ""
+      const existingChecklistEdits = caseData.metadata?.checklist_edits as ChecklistEditsData | undefined
+      if (existingChecklistEdits?.edits && lcdValidationResult) {
+        const editEntries = Object.entries(existingChecklistEdits.edits)
+        if (editEntries.length > 0) {
+          const editsForPrompt: string[] = []
+
+          // Find the item labels from the validation checklist
+          const allItems = lcdValidationResult.checklist.flatMap(cat => cat.items)
+
+          for (const [itemId, edit] of editEntries) {
+            const item = allItems.find(i => i.id === itemId)
+            const itemLabel = item?.label || itemId
+
+            if (edit.marked_addressed && edit.user_notes) {
+              editsForPrompt.push(`- "${itemLabel}": ADDRESSED by provider. Notes: "${edit.user_notes}"`)
+            } else if (edit.marked_addressed) {
+              editsForPrompt.push(`- "${itemLabel}": ADDRESSED by provider`)
+            } else if (edit.user_notes) {
+              editsForPrompt.push(`- "${itemLabel}": Provider notes: "${edit.user_notes}"`)
+            }
+          }
+
+          if (editsForPrompt.length > 0) {
+            checklistEditsContext = `\nPROVIDER CHECKLIST UPDATES (incorporate these into the documentation):\n${editsForPrompt.join('\n')}\n`
+          }
+        }
+      }
+
       const systemContext = isBiologicsPA && lcdValidationResult
         ? `You are an AI for CTP prior authorization documentation. Generate professional medical documentation.
 LCD Validation: Risk ${lcdValidationResult.auditRisk.overallScore}, ${lcdValidationResult.summary.foundCount}/${lcdValidationResult.summary.totalRequirements} requirements met.`
@@ -276,10 +307,10 @@ Payer: ${caseData.payer_name}
 Medication: ${caseData.requested_medication}
 
 RESEARCH: ${researchContext.substring(0, 3000)}
-${chatConversationContext}
+${chatConversationContext}${checklistEditsContext}
 CLINICAL NOTES: ${caseData.disease_activity || ''} ${caseData.prior_treatments || ''} ${caseData.lab_values || ''}
 
-Generate a professional, persuasive prior authorization letter. Do not use markdown formatting like ** or #. Use plain text only.`
+Generate a professional, persuasive prior authorization letter. Do not use markdown formatting like ** or #. Use plain text only. If provider checklist updates are provided above, incorporate that information into the letter.`
 
       const docModel = genAI.getGenerativeModel({
         model: "gemini-2.0-flash",
