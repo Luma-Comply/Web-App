@@ -64,6 +64,12 @@ export async function POST(request: NextRequest) {
         return
       }
 
+      // Mark case as generating so polling can detect when complete
+      await supabase
+        .from("cases")
+        .update({ status: "generating" })
+        .eq("id", caseId)
+
       const pp_apiKey = process.env.PERPLEXITY_API_KEY
       let lcdValidationResult: LCDValidationResult | null = null
       const isBiologicsPA = caseData.doc_type === "biologics_pa"

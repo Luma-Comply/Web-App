@@ -154,13 +154,13 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
 
     async function runGeneration() {
       try {
-        // Start polling after 10 seconds as a fallback
+        // Start polling after 5 seconds as a fallback (SSE events may be buffered)
         setTimeout(() => {
           if (!receivedComplete && !isCancelled) {
             console.log('Starting polling fallback...')
-            pollInterval = setInterval(pollForCompletion, 5000)
+            pollInterval = setInterval(pollForCompletion, 3000) // Poll every 3 seconds
           }
-        }, 10000)
+        }, 5000)
 
         const response = await fetch('/api/generate/stream', {
           method: 'POST',
