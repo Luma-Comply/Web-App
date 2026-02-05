@@ -13,6 +13,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
 // Helper to send SSE events
 function sendEvent(controller: ReadableStreamDefaultController, encoder: TextEncoder, data: any) {
+  console.log('[SSE] Sending event:', JSON.stringify(data))
   controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
 }
 
@@ -107,9 +108,13 @@ Clinical context: ${clinicalNotes.substring(0, 1000)}
 Find: coverage criteria, step therapy requirements, medical necessity requirements.`
             }
 
-            // Add 30 second timeout to prevent hanging
+            // Add 20 second timeout to prevent hanging
             const abortController = new AbortController()
-            const timeoutId = setTimeout(() => abortController.abort(), 30000)
+            const timeoutId = setTimeout(() => {
+              console.log('[SSE] Perplexity timeout - aborting')
+              abortController.abort()
+            }, 20000)
+            console.log('[SSE] Starting Perplexity research call...')
 
             // Build state-aware system prompt for biologics PA
             const systemPrompt = isBiologicsPA
@@ -134,20 +139,23 @@ Find: coverage criteria, step therapy requirements, medical necessity requiremen
             })
 
             clearTimeout(timeoutId)
+            console.log('[SSE] Perplexity response status:', researchResponse.status)
 
             if (researchResponse.ok) {
               const researchData = await researchResponse.json()
               researchContext = researchData.choices[0]?.message?.content || "No research data returned."
+              console.log('[SSE] Perplexity research completed, length:', researchContext.length)
             }
           } catch (ppError: any) {
             if (ppError.name === 'AbortError') {
-              console.error("Perplexity Call Timed Out after 30s")
+              console.error("[SSE] Perplexity Call Timed Out after 20s")
             } else {
-              console.error("Perplexity Call Failed:", ppError)
+              console.error("[SSE] Perplexity Call Failed:", ppError)
             }
             // Continue with default context - don't block generation
           }
         }
+        console.log('[SSE] Research phase complete, moving to validating...')
 
         // --- PHASE: validating ---
         sendEvent(controller, encoder, { phase: 'validating' })
@@ -415,8 +423,9 @@ Note: These recommendations are based on AI analysis of current payer policies. 
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
       "Connection": "keep-alive",
+      "X-Accel-Buffering": "no",
     },
   })
 }
