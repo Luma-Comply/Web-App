@@ -123,9 +123,45 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
   useEffect(() => {
     let isCancelled = false
     let receivedComplete = false
+    let pollInterval: NodeJS.Timeout | null = null
+
+    // Poll the database every 5 seconds as a fallback for buffered SSE
+    async function pollForCompletion() {
+      if (isCancelled || receivedComplete) return
+
+      try {
+        const checkResponse = await fetch(`/api/cases/${caseId}`)
+        if (checkResponse.ok) {
+          const caseData = await checkResponse.json()
+          if (caseData.generated_output && caseData.status === 'draft') {
+            // Generation completed, trigger onComplete
+            console.log('Polling detected completion!')
+            receivedComplete = true
+            if (pollInterval) clearInterval(pollInterval)
+            steps.forEach(s => markPhaseComplete(s.id))
+            setCurrentPhase('complete')
+            onComplete?.({
+              success: true,
+              documentation: caseData.generated_output,
+              validation: caseData.metadata?.lcd_validation_full,
+            })
+          }
+        }
+      } catch (err) {
+        console.log('Polling check failed:', err)
+      }
+    }
 
     async function runGeneration() {
       try {
+        // Start polling after 10 seconds as a fallback
+        setTimeout(() => {
+          if (!receivedComplete && !isCancelled) {
+            console.log('Starting polling fallback...')
+            pollInterval = setInterval(pollForCompletion, 5000)
+          }
+        }, 10000)
+
         const response = await fetch('/api/generate/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -144,7 +180,7 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
 
         while (true) {
           const { done, value } = await reader.read()
-          if (done || isCancelled) break
+          if (done || isCancelled || receivedComplete) break
 
           const chunk = decoder.decode(value, { stream: true })
           const lines = chunk.split('\n')
@@ -171,12 +207,14 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
                 if (parsed.complete) {
                   // Mark all phases complete
                   receivedComplete = true
+                  if (pollInterval) clearInterval(pollInterval)
                   steps.forEach(s => markPhaseComplete(s.id))
                   setCurrentPhase('complete')
                   onComplete?.(parsed.result)
                 }
 
                 if (parsed.error) {
+                  if (pollInterval) clearInterval(pollInterval)
                   setError(parsed.error)
                   setCurrentPhase('error')
                   onError?.(parsed.error)
@@ -191,27 +229,12 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
         // Fallback: If stream ended without receiving complete event, check the database
         if (!isCancelled && !receivedComplete) {
           console.log('Stream ended without complete event, checking database...')
-          // Give the DB a moment to finish any pending writes
           await new Promise(resolve => setTimeout(resolve, 1000))
-
-          // Fetch the case to check if it was actually generated
-          const checkResponse = await fetch(`/api/cases/${caseId}`)
-          if (checkResponse.ok) {
-            const caseData = await checkResponse.json()
-            if (caseData.generated_output) {
-              // Generation completed, trigger onComplete with available data
-              steps.forEach(s => markPhaseComplete(s.id))
-              setCurrentPhase('complete')
-              onComplete?.({
-                success: true,
-                documentation: caseData.generated_output,
-                validation: caseData.metadata?.lcd_validation_full,
-              })
-            }
-          }
+          await pollForCompletion()
         }
       } catch (err: any) {
         if (!isCancelled) {
+          if (pollInterval) clearInterval(pollInterval)
           setError(err.message || 'Generation failed')
           setCurrentPhase('error')
           onError?.(err.message)
@@ -223,6 +246,7 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
 
     return () => {
       isCancelled = true
+      if (pollInterval) clearInterval(pollInterval)
     }
   }, [caseId, markPhaseComplete, onComplete, onError])
 
