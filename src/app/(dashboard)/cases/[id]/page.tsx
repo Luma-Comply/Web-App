@@ -77,6 +77,8 @@ export default function CaseDetailPage() {
   const [isDocCollapsed, setIsDocCollapsed] = useState(false)
   const [isSavingEdits, setIsSavingEdits] = useState(false)
   const [regenerateModalOpen, setRegenerateModalOpen] = useState(false)
+  const [regenerateAcknowledged, setRegenerateAcknowledged] = useState(false)
+  const [generationKey, setGenerationKey] = useState(0) // Forces GeneratingSteps remount on regeneration
   const [isChatExpanded, setIsChatExpanded] = useState(false) // Opens when user clicks "Chat with Luma" card
   const [isChatCopied, setIsChatCopied] = useState(false)
   const [uploadedDocs, setUploadedDocs] = useState<{ filename: string; fileType: string }[]>([])
@@ -909,6 +911,7 @@ export default function CaseDetailPage() {
   if (generating || (needsGeneration && !hasGenerated)) {
     return (
       <GeneratingSteps
+        key={generationKey} // Forces remount on regeneration
         caseId={caseData.id}
         onComplete={(result) => {
           // Update local state with the generated documentation
@@ -1000,35 +1003,10 @@ export default function CaseDetailPage() {
                 )}
               </div>
               <div className="flex flex-col items-end gap-3">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${
-                  caseData.status === "approved" ? "bg-green-100 text-green-800 border-green-300" :
-                  caseData.status === "denied" ? "bg-red-100 text-red-800 border-red-300" :
-                  caseData.status === "submitted" ? "bg-blue-100 text-blue-800 border-blue-300" :
-                  caseData.status === "chat" ? "bg-mint/20 text-mint border-mint/30" :
-                  "bg-gray-100 text-gray-800 border-gray-300"
-                }`}>
-                  {caseData.status === "chat" ? (
-                    <>
-                      <MessageSquare className="w-3 h-3 mr-1" />
-                      Chat
-                    </>
-                  ) : (
-                    caseData.status.charAt(0).toUpperCase() + caseData.status.slice(1)
-                  )}
-                </span>
                 <div className="flex items-center gap-2">
-                  {/* Only show Save/Regenerate buttons when not in chat mode */}
+                  {/* Only show Regenerate button when not in chat mode */}
                   {!isInChatMode && (
                     <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={saveEdits}
-                        className="gap-2 border-dark-bg text-dark-bg hover:bg-dark-bg hover:text-white"
-                      >
-                        <Save className="w-4 h-4" />
-                        Save
-                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -1512,21 +1490,90 @@ export default function CaseDetailPage() {
       </Dialog>
 
       {/* Regenerate Confirmation Modal */}
-      <Dialog open={regenerateModalOpen} onOpenChange={setRegenerateModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+      <Dialog open={regenerateModalOpen} onOpenChange={(open) => {
+        setRegenerateModalOpen(open)
+        if (open) {
+          setRegenerateAcknowledged(false)
+        }
+      }}>
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
             <DialogTitle>Regenerate Documentation?</DialogTitle>
             <DialogDescription>
               Your current documentation will be replaced with a new version incorporating the latest payer research, your chat conversations with Luma, and any checklist updates.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-4">
             <div className="flex items-center gap-3 p-3 bg-sage-light/30 border border-sage-medium/30 rounded-lg">
               <RefreshCw className="w-5 h-5 text-mint flex-shrink-0" />
               <p className="text-sm text-gray-700">
                 This will re-run payer research and generate updated documentation based on all your inputs.
               </p>
             </div>
+
+            {/* List of addressed checklist items */}
+            {(() => {
+              const addressedItems: { id: string; label: string; notes?: string }[] = []
+              if (lcdValidation?.checklist && checklistEdits) {
+                lcdValidation.checklist.forEach((category) => {
+                  category.items.forEach((item) => {
+                    const edit = checklistEdits[item.id]
+                    if (edit?.marked_addressed) {
+                      addressedItems.push({
+                        id: item.id,
+                        label: item.label,
+                        notes: edit.user_notes
+                      })
+                    }
+                  })
+                })
+              }
+
+              if (addressedItems.length > 0) {
+                return (
+                  <>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-700">Addressed Checklist Items:</p>
+                      <div className="max-h-40 overflow-y-auto space-y-2 bg-gray-50 rounded-lg p-3">
+                        {addressedItems.map((item) => (
+                          <div key={item.id} className="flex items-start gap-2">
+                            <CheckCircle className="w-4 h-4 text-mint flex-shrink-0 mt-0.5" />
+                            <div className="text-sm">
+                              <p className="text-gray-700">{item.label}</p>
+                              {item.notes && (
+                                <p className="text-gray-500 text-xs mt-0.5 italic">"{item.notes}"</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-amber-800">
+                          The addressed items listed above will be incorporated into the regenerated documentation as if they are met criteria.
+                        </p>
+                      </div>
+                    </div>
+
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={regenerateAcknowledged}
+                        onChange={(e) => setRegenerateAcknowledged(e.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-mint focus:ring-mint cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-700 leading-relaxed">
+                        I acknowledge that the addressed items listed above will be included in the regenerated documentation. I confirm that the information I've provided is accurate and I take responsibility for its clinical validity.
+                      </span>
+                    </label>
+                  </>
+                )
+              }
+              return null
+            })()}
           </div>
           <DialogFooter>
             <Button
@@ -1536,14 +1583,38 @@ export default function CaseDetailPage() {
               Cancel
             </Button>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 setRegenerateModalOpen(false)
-                // Clear output so GeneratingSteps will show and handle the regeneration
-                setCaseData({ ...caseData!, generated_output: null })
+                // Clear output in database FIRST to prevent polling race condition
+                // The polling fallback checks database for generated_output + status='draft'
+                // Without this, old output would make polling think regeneration already completed
+                const supabase = createClient()
+                await supabase
+                  .from("cases")
+                  .update({ generated_output: null, status: "generating" })
+                  .eq("id", caseData!.id)
+                // Then update client state to match
+                setCaseData({ ...caseData!, generated_output: null, status: "generating" })
                 setEditedOutput("")
+                setGenerationKey(k => k + 1) // Force GeneratingSteps to remount fresh
                 setGenerating(true)
               }}
               className="bg-dark-bg hover:bg-dark-bg/90"
+              disabled={(() => {
+                // Check if there are any addressed items
+                let hasAddressedItems = false
+                if (lcdValidation?.checklist && checklistEdits) {
+                  lcdValidation.checklist.forEach((category) => {
+                    category.items.forEach((item) => {
+                      if (checklistEdits[item.id]?.marked_addressed) {
+                        hasAddressedItems = true
+                      }
+                    })
+                  })
+                }
+                // Only require acknowledgment if there are addressed items
+                return hasAddressedItems && !regenerateAcknowledged
+              })()}
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Regenerate
