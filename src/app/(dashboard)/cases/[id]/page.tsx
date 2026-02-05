@@ -912,7 +912,27 @@ export default function CaseDetailPage() {
         caseId={caseData.id}
         onComplete={(result) => {
           // Update local state with the generated documentation
-          setCaseData({ ...caseData, generated_output: result.documentation, status: 'draft' })
+          // Also update metadata to include lcd_validation_full so it persists on subsequent saves
+          setCaseData({
+            ...caseData,
+            generated_output: result.documentation,
+            status: 'draft',
+            metadata: {
+              ...caseData.metadata,
+              ...(result.validation && {
+                lcd_validation_full: result.validation,
+                lcd_validation: {
+                  run_at: new Date().toISOString(),
+                  risk_level: result.validation.riskLevel,
+                  denial_probability: result.validation.denialProbability,
+                  found_count: result.validation.foundCount,
+                  missing_count: result.validation.missingCount,
+                  detected_wound_type: result.validation.detectedWoundType,
+                  ctp_covered: result.validation.ctpCovered,
+                },
+              }),
+            },
+          })
           setEditedOutput(result.documentation)
 
           // Store LCD validation results if available (biologics PA)
