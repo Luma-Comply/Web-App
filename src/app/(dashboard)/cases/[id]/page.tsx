@@ -1517,14 +1517,14 @@ export default function CaseDetailPage() {
           <DialogHeader>
             <DialogTitle>Regenerate Documentation?</DialogTitle>
             <DialogDescription>
-              Regenerating will use <span className="font-semibold text-dark-bg">1 credit</span> from your account. Your current documentation will be replaced with a new version.
+              Your current documentation will be replaced with a new version based on the latest payer research.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <RefreshCw className="w-5 h-5 text-amber-600 flex-shrink-0" />
-              <p className="text-sm text-amber-800">
-                This action will deduct 1 credit from your remaining cases.
+            <div className="flex items-center gap-3 p-3 bg-sage-light/30 border border-sage-medium/30 rounded-lg">
+              <RefreshCw className="w-5 h-5 text-mint flex-shrink-0" />
+              <p className="text-sm text-gray-700">
+                This will re-run payer research and generate updated documentation.
               </p>
             </div>
           </div>
