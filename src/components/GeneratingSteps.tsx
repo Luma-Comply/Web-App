@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LumaLogo } from './LumaLogo'
 
@@ -96,6 +96,9 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
   const [elapsedTime, setElapsedTime] = useState(0)
   const [tidbitIndex, setTidbitIndex] = useState(0)
 
+  // Use ref to track if we've seen 'generating' status - persists across remounts
+  const sawGeneratingRef = useRef(false)
+
   // Update elapsed time every second
   useEffect(() => {
     const interval = setInterval(() => {
@@ -125,17 +128,25 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
     let receivedComplete = false
     let pollInterval: NodeJS.Timeout | null = null
 
-    // Poll the database every 5 seconds as a fallback for buffered SSE
+    // Poll the database as a fallback for buffered SSE
     async function pollForCompletion() {
       if (isCancelled || receivedComplete) return
 
       try {
-        const checkResponse = await fetch(`/api/cases/${caseId}`)
+        const checkResponse = await fetch(`/api/cases/${caseId}?t=${Date.now()}`, {
+          cache: 'no-store',
+        })
+
         if (checkResponse.ok) {
           const caseData = await checkResponse.json()
-          if (caseData.generated_output && caseData.status === 'draft') {
-            // Generation completed, trigger onComplete
-            console.log('Polling detected completion!')
+
+          // Track if we've seen 'generating' status (using ref to persist across remounts)
+          if (caseData.status === 'generating') {
+            sawGeneratingRef.current = true
+          }
+
+          // Only consider complete if we've seen 'generating' first (prevents false positive on regeneration)
+          if (caseData.generated_output && caseData.status === 'draft' && sawGeneratingRef.current) {
             receivedComplete = true
             if (pollInterval) clearInterval(pollInterval)
             steps.forEach(s => markPhaseComplete(s.id))
@@ -147,8 +158,8 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
             })
           }
         }
-      } catch (err) {
-        console.log('Polling check failed:', err)
+      } catch {
+        // Polling failed, will retry on next interval
       }
     }
 
@@ -157,8 +168,8 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
         // Start polling after 5 seconds as a fallback (SSE events may be buffered)
         setTimeout(() => {
           if (!receivedComplete && !isCancelled) {
-            console.log('Starting polling fallback...')
-            pollInterval = setInterval(pollForCompletion, 3000) // Poll every 3 seconds
+            pollForCompletion() // Poll immediately
+            pollInterval = setInterval(pollForCompletion, 3000) // Then every 3 seconds
           }
         }, 5000)
 
