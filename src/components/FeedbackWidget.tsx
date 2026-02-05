@@ -77,6 +77,14 @@ export function FeedbackWidget({ user: propUser }: FeedbackWidgetProps) {
         }
     };
 
+    const getPlaceholder = (t: FeedbackType) => {
+        switch (t) {
+            case 'bug': return "What's wrong with this page?";
+            case 'feature': return "What feature are you thinking about?";
+            case 'general': return "Tell us what's on your mind...";
+        }
+    };
+
     const handleSubmit = async () => {
         if (!description.trim()) {
             toast({
@@ -182,7 +190,7 @@ export function FeedbackWidget({ user: propUser }: FeedbackWidgetProps) {
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             className="min-h-[120px]"
-                            placeholder="Tell us what you think..."
+                            placeholder={getPlaceholder(type)}
                         />
                     </div>
                 </div>
