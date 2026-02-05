@@ -122,6 +122,7 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
   // Start the streaming generation request
   useEffect(() => {
     let isCancelled = false
+    let receivedComplete = false
 
     async function runGeneration() {
       try {
@@ -169,6 +170,7 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
 
                 if (parsed.complete) {
                   // Mark all phases complete
+                  receivedComplete = true
                   steps.forEach(s => markPhaseComplete(s.id))
                   setCurrentPhase('complete')
                   onComplete?.(parsed.result)
@@ -182,6 +184,29 @@ export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingSteps
               } catch {
                 // Not JSON, skip
               }
+            }
+          }
+        }
+
+        // Fallback: If stream ended without receiving complete event, check the database
+        if (!isCancelled && !receivedComplete) {
+          console.log('Stream ended without complete event, checking database...')
+          // Give the DB a moment to finish any pending writes
+          await new Promise(resolve => setTimeout(resolve, 1000))
+
+          // Fetch the case to check if it was actually generated
+          const checkResponse = await fetch(`/api/cases/${caseId}`)
+          if (checkResponse.ok) {
+            const caseData = await checkResponse.json()
+            if (caseData.generated_output) {
+              // Generation completed, trigger onComplete with available data
+              steps.forEach(s => markPhaseComplete(s.id))
+              setCurrentPhase('complete')
+              onComplete?.({
+                success: true,
+                documentation: caseData.generated_output,
+                validation: caseData.metadata?.lcd_validation_full,
+              })
             }
           }
         }
