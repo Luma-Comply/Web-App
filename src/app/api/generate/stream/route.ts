@@ -169,42 +169,7 @@ Find: coverage criteria, step therapy requirements, medical necessity requiremen
               woundTypeFromMeta,
               caseData.patient_state // For policy change detection
             )
-
-            // Store validation in metadata
-            const existingChecklistEdits = caseData.metadata?.checklist_edits as ChecklistEditsData | undefined
-            await supabase
-              .from("cases")
-              .update({
-                metadata: {
-                  ...caseData.metadata,
-                  lcd_validation: {
-                    run_at: new Date().toISOString(),
-                    risk_level: lcdValidationResult.auditRisk.overallScore,
-                    denial_probability: lcdValidationResult.auditRisk.estimatedDenialProbability,
-                    found_count: lcdValidationResult.summary.foundCount,
-                    missing_count: lcdValidationResult.summary.missingCount,
-                    detected_wound_type: lcdValidationResult.detectedWoundType,
-                    ctp_covered: lcdValidationResult.ctpProductCheck.covered,
-                  },
-                  lcd_validation_full: {
-                    riskLevel: lcdValidationResult.auditRisk.overallScore,
-                    denialProbability: lcdValidationResult.auditRisk.estimatedDenialProbability,
-                    foundCount: lcdValidationResult.summary.foundCount,
-                    missingCount: lcdValidationResult.summary.missingCount,
-                    totalRequirements: lcdValidationResult.summary.totalRequirements,
-                    detectedWoundType: lcdValidationResult.detectedWoundType,
-                    ctpCovered: lcdValidationResult.ctpProductCheck.covered,
-                    instantDenialTriggers: lcdValidationResult.auditRisk.instantDenialTriggers,
-                    veryHighRiskItems: lcdValidationResult.auditRisk.veryHighRiskItems,
-                    highRiskItems: lcdValidationResult.auditRisk.highRiskItems,
-                    checklist: lcdValidationResult.checklist,
-                    recommendations: lcdValidationResult.recommendations,
-                    perplexityFindings: lcdValidationResult.perplexityFindings,
-                  },
-                  ...(existingChecklistEdits && { checklist_edits: existingChecklistEdits }),
-                },
-              })
-              .eq("id", caseId)
+            // Validation metadata will be saved with the final update in the saving phase
           } catch (validationError) {
             console.error("LCD Validation Error:", validationError)
           }
@@ -357,17 +322,54 @@ Note: These recommendations are based on AI analysis of current payer policies. 
         // --- PHASE: saving ---
         sendEvent(controller, encoder, { phase: 'saving' })
 
-        // Update case
+        // Build the update object - include validation metadata to ensure it persists
+        const updateData: any = {
+          generated_output: documentation,
+          edited_output: documentation,
+          status: "draft",
+        }
+
+        // Include validation metadata in the final save to ensure it persists
+        if (isBiologicsPA && lcdValidationResult) {
+          const existingChecklistEdits = caseData.metadata?.checklist_edits as ChecklistEditsData | undefined
+          updateData.metadata = {
+            ...caseData.metadata,
+            lcd_validation: {
+              run_at: new Date().toISOString(),
+              risk_level: lcdValidationResult.auditRisk.overallScore,
+              denial_probability: lcdValidationResult.auditRisk.estimatedDenialProbability,
+              found_count: lcdValidationResult.summary.foundCount,
+              missing_count: lcdValidationResult.summary.missingCount,
+              detected_wound_type: lcdValidationResult.detectedWoundType,
+              ctp_covered: lcdValidationResult.ctpProductCheck.covered,
+            },
+            lcd_validation_full: {
+              riskLevel: lcdValidationResult.auditRisk.overallScore,
+              denialProbability: lcdValidationResult.auditRisk.estimatedDenialProbability,
+              foundCount: lcdValidationResult.summary.foundCount,
+              missingCount: lcdValidationResult.summary.missingCount,
+              totalRequirements: lcdValidationResult.summary.totalRequirements,
+              detectedWoundType: lcdValidationResult.detectedWoundType,
+              ctpCovered: lcdValidationResult.ctpProductCheck.covered,
+              instantDenialTriggers: lcdValidationResult.auditRisk.instantDenialTriggers,
+              veryHighRiskItems: lcdValidationResult.auditRisk.veryHighRiskItems,
+              highRiskItems: lcdValidationResult.auditRisk.highRiskItems,
+              checklist: lcdValidationResult.checklist,
+              recommendations: lcdValidationResult.recommendations,
+              perplexityFindings: lcdValidationResult.perplexityFindings,
+            },
+            ...(existingChecklistEdits && { checklist_edits: existingChecklistEdits }),
+          }
+        }
+
+        // Update case with documentation and metadata together
         const { error: updateError } = await supabase
           .from("cases")
-          .update({
-            generated_output: documentation,
-            edited_output: documentation,
-            status: "draft",
-          })
+          .update(updateData)
           .eq("id", caseId)
 
         if (updateError) {
+          console.error("Failed to save documentation:", updateError)
           sendEvent(controller, encoder, { error: "Failed to save documentation" })
           controller.close()
           return
