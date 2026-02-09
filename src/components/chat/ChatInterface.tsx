@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { Button } from '@/components/ui/button'
@@ -30,7 +30,11 @@ interface ChatInterfaceProps {
   onGenerate: () => void
 }
 
-export function ChatInterface({ caseId, caseData, onGenerate }: ChatInterfaceProps) {
+export interface ChatInterfaceRef {
+  sendMessage: (content: string) => Promise<void>
+}
+
+export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(function ChatInterface({ caseId, caseData, onGenerate }, ref) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isStreaming, setIsStreaming] = useState(false)
@@ -196,6 +200,11 @@ export function ChatInterface({ caseId, caseData, onGenerate }: ChatInterfacePro
     }
   }
 
+  // Expose sendMessage to parent via ref
+  useImperativeHandle(ref, () => ({
+    sendMessage: (content: string) => sendMessage(content),
+  }))
+
   const handleFileUpload = (files: File[]) => {
     setPendingFiles(files)
     setShowHipaaWarning(true)
@@ -324,4 +333,4 @@ export function ChatInterface({ caseId, caseData, onGenerate }: ChatInterfacePro
       </Dialog>
     </div>
   )
-}
+})
