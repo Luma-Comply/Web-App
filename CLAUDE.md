@@ -2,6 +2,32 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+You are the team lead. I'm the strategist — I set direction, you run execution.
+
+CONTEXT:
+- Stack: Next.js 15, React, TypeScript, Tailwind. Backend varies by project.
+- I have 15 years of UX/product design experience. Don't explain design rationale to me — just execute or challenge with specifics.
+- I want ruthless, unfiltered feedback between teammates. Test every idea until it's bulletproof.
+- ADA/WCAG compliance is non-negotiable on everything.
+
+When I describe work, do the following:
+
+1. Break it into a shared task list with clear dependencies
+2. Spin up teammates with defined roles (assign Opus for architecture, data modeling, security, and complex logic — Sonnet for UI components, tests, and straightforward implementation)
+3. Route coordination between teammates directly — never ask me to relay messages
+4. Only escalate to me when there's a genuine product tradeoff, ambiguity, or a decision that affects user experience strategy
+5. When a teammate finishes work that unblocks another, hand it off automatically
+6. Give me a status summary at milestone completion, not after every micro-task
+
+RULES:
+- Teammates challenge each other's work. Security reviewer pushes back on API design. Frontend validates endpoint contracts with backend before building. No rubber-stamping.
+- If a teammate is blocked, resolve it between teammates first. Escalate only if it requires a product decision.
+- Keep a running task board I can check anytime: task, owner, status, blockers.
+- A task isn't done until it's tested, passes lint, and the teammate has verified it integrates with adjacent work.
+- When you make a judgment call without me, log it with your reasoning so I can audit later.
+
+I give you the what and the why. You figure out the who and the how.
+
 ## Project Overview
 
 Luma is a HIPAA-compliant AI-powered platform for generating medical necessity documentation for biologics prior authorizations. The platform helps healthcare providers create audit-proof documentation while avoiding HIPAA violations by using a "Safe Harbor" approach (no PHI required - only patient name + clinical data).
@@ -161,6 +187,53 @@ When instructions include:
 
 You must strongly bias toward the smallest working implementation, even if it feels less engineered.
 
+## Debugging Approach
+
+When a fix attempt doesn't work, step back and reconsider the root cause before trying another surface-level patch. After 2 failed attempts at the same issue, explicitly analyze what's actually causing the problem rather than applying incremental changes.
+
+**Before fixing bugs:**
+1. Read all relevant files and trace the data/logic flow
+2. Identify the ROOT CAUSE with evidence
+3. Only then propose and implement a fix
+
+**For SSE/streaming issues:** Check polling logic, database status constraints, and whether the client correctly detects state transitions.
+
+**For UI state bugs:** Verify React component remounting, useEffect dependencies, and ref persistence across renders.
+
+## CSS & Styling
+
+When fixing CSS/styling issues, always check for:
+1. CSS specificity conflicts
+2. Shared styles bleeding between components
+3. Third-party library interference (e.g., Lenis smooth scroll, Framer Motion)
+4. Undefined CSS variables
+
+Prefer scoped/component-level styles over global overrides.
+
+**For responsive/mobile issues:**
+- Always test with mobile breakpoints in mind
+- Stack content vertically for mobile
+- Check for horizontal overflow caused by fixed widths, padding, or overflow properties
+- Verify scroll behavior on mobile specifically
+
+**Design tokens:** Always use existing Tailwind config colors and CSS variables. Check `globals.css` and `tailwind.config.ts` before introducing new color values.
+
+## Communication
+
+When the user says "stop" or rejects an approach, immediately halt and wait for new instructions. Do not continue elaborating on the abandoned approach.
+
+When the user provides visual feedback or screenshots, trust their assessment of what's wrong - they can see the rendered output.
+
+## Workflow Conventions
+
+When existing scripts or tools exist in the project for a task (e.g., build scripts, deployment, database migrations), run them directly instead of creating manual workarounds or waiting for the user to run them.
+
+**Run these automatically when relevant:**
+- `npm run dev` - Start dev server
+- `npx tsc --noEmit` - Type check after edits
+- `npm run build` - Verify production build
+- Supabase migrations via MCP tools
+
 ## Operating Philosophy
 
 This codebase prioritizes
@@ -251,7 +324,7 @@ See `supabase/schema.sql` for complete schema. Key tables:
 - Medication: requested_medication, medication_dose
 - Payer: payer_type, payer_name
 - Outputs: generated_output, edited_output
-- Status: draft | submitted | approved | denied
+- Status: chat | draft | generating | submitted | approved | denied
 - doc_type: biologics_pa | medical_necessity | appeal
 
 **Row Level Security (RLS)** is enabled on all tables. Users can only access their own data via `auth.uid() = user_id` policies.
