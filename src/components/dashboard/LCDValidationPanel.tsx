@@ -70,6 +70,21 @@ interface LCDValidationPanelProps {
   onItemClick?: (item: ChecklistItemWithEdits) => void;
   onWoundTypeChange?: (woundType: WoundType) => void;
   isEditable?: boolean;
+  docType?: string;
+}
+
+// Get panel title based on document type
+function getPanelTitle(docType?: string): string {
+  switch (docType) {
+    case "biologics_pa":
+      return "LCD L35041 Validation";
+    case "medical_necessity":
+      return "Medical Necessity Checklist";
+    case "appeal":
+      return "Appeal Documentation Checklist";
+    default:
+      return "Documentation Checklist";
+  }
 }
 
 export function LCDValidationPanel({
@@ -79,6 +94,7 @@ export function LCDValidationPanel({
   onItemClick,
   onWoundTypeChange,
   isEditable = true,
+  docType,
 }: LCDValidationPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(initialCollapsed);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
@@ -195,19 +211,27 @@ export function LCDValidationPanel({
       >
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-sage-light/10 transition-colors">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div className="flex items-center gap-3">
                 <CardTitle className="text-lg font-sans font-semibold">
-                  LCD L35041 Validation
+                  {getPanelTitle(docType)}
                 </CardTitle>
+                {/* Badge - hidden on mobile, shown on desktop inline */}
                 <Badge
                   variant="outline"
-                  className={cn("ml-2", getRiskBadgeColor(riskLevel))}
+                  className={cn("ml-2 hidden sm:inline-flex", getRiskBadgeColor(riskLevel))}
                 >
                   {riskConfig.label}
                 </Badge>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between sm:justify-end gap-2">
+                {/* Badge - shown on mobile before the count */}
+                <Badge
+                  variant="outline"
+                  className={cn("sm:hidden", getRiskBadgeColor(riskLevel))}
+                >
+                  {riskConfig.label}
+                </Badge>
                 <span className="text-sm text-gray-500">
                   {validation.foundCount}/{validation.totalRequirements} found
                 </span>
@@ -224,8 +248,11 @@ export function LCDValidationPanel({
         <CollapsibleContent>
           <CardContent className="space-y-6">
             {/* Summary Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-white rounded-xl p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
+            <div className={cn(
+              "grid gap-2 md:gap-4",
+              docType === "biologics_pa" ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2"
+            )}>
+              <div className="bg-white rounded-xl p-3 md:p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                   Denial Risk
                 </div>
@@ -252,7 +279,7 @@ export function LCDValidationPanel({
                   );
                 })()}
               </div>
-              <div className="bg-white rounded-xl p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
+              <div className="bg-white rounded-xl p-3 md:p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                   Missing
                 </div>
@@ -274,75 +301,84 @@ export function LCDValidationPanel({
                   )}
                 </div>
               </div>
-              <div className="bg-white rounded-xl p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                  Wound Type
-                </div>
-                {isEditable && onWoundTypeChange ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-2 text-xl font-bold text-dark-bg hover:text-mint transition-colors group">
-                        {validation.detectedWoundType
-                          ? WOUND_TYPE_OPTIONS.find(
-                              (o) => o.value === validation.detectedWoundType,
-                            )?.label.split(" (")[0] ||
-                            validation.detectedWoundType
-                          : "Unknown"}
-                        <Pencil className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      {WOUND_TYPE_OPTIONS.map((option) => (
-                        <DropdownMenuItem
-                          key={option.value}
-                          onClick={() => onWoundTypeChange(option.value)}
-                          className={cn(
-                            "cursor-pointer",
-                            validation.detectedWoundType === option.value &&
-                              "bg-mint/10 text-mint",
-                          )}
-                        >
-                          {option.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : (
-                  <div className="text-xl font-bold text-dark-bg">
-                    {validation.detectedWoundType
-                      ? validation.detectedWoundType
-                          .split("_")
-                          .map(
-                            (word) =>
-                              word.charAt(0).toUpperCase() +
-                              word.slice(1).toLowerCase(),
-                          )
-                          .join(" ")
-                      : "Unknown"}
+              {/* Wound Type - Only for Biologics PA */}
+              {docType === "biologics_pa" && (
+                <div className="bg-white rounded-xl p-3 md:p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    Wound Type
                   </div>
-                )}
-              </div>
-              <div className="bg-white rounded-xl p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                  CTP Product
-                </div>
-                <div
-                  className={cn(
-                    "text-xl font-bold",
-                    validation.ctpCovered ? "text-green-600" : "text-red-600",
+                  {isEditable && onWoundTypeChange ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="flex items-center gap-2 text-xl font-bold text-dark-bg hover:text-mint transition-colors group">
+                          {validation.detectedWoundType
+                            ? WOUND_TYPE_OPTIONS.find(
+                                (o) => o.value === validation.detectedWoundType,
+                              )?.label.split(" (")[0] ||
+                              validation.detectedWoundType
+                            : "Unknown"}
+                          <Pencil className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        {WOUND_TYPE_OPTIONS.map((option) => (
+                          <DropdownMenuItem
+                            key={option.value}
+                            onClick={() => onWoundTypeChange(option.value)}
+                            className={cn(
+                              "cursor-pointer",
+                              validation.detectedWoundType === option.value &&
+                                "bg-mint/10 text-mint",
+                            )}
+                          >
+                            {option.label}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <div className="text-xl font-bold text-dark-bg">
+                      {validation.detectedWoundType
+                        ? validation.detectedWoundType
+                            .split("_")
+                            .map(
+                              (word) =>
+                                word.charAt(0).toUpperCase() +
+                                word.slice(1).toLowerCase(),
+                            )
+                            .join(" ")
+                        : "Unknown"}
+                    </div>
                   )}
-                >
-                  {validation.ctpCovered ? "Covered" : "Verify"}
                 </div>
-              </div>
-              <div className="bg-white rounded-xl p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                  LCD Date
+              )}
+              {/* CTP Product - Only for Biologics PA */}
+              {docType === "biologics_pa" && (
+                <div className="bg-white rounded-xl p-3 md:p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    CTP Product
+                  </div>
+                  <div
+                    className={cn(
+                      "text-xl font-bold",
+                      validation.ctpCovered ? "text-green-600" : "text-red-600",
+                    )}
+                  >
+                    {validation.ctpCovered ? "Covered" : "Verify"}
+                  </div>
                 </div>
-                <div className="text-xl font-bold text-dark-bg">
-                  {validation.perplexityFindings.lcdEffectiveDate}
+              )}
+              {/* LCD Date - Only for Biologics PA */}
+              {docType === "biologics_pa" && validation.perplexityFindings.lcdEffectiveDate && (
+                <div className="bg-white rounded-xl p-3 md:p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    LCD Date
+                  </div>
+                  <div className="text-xl font-bold text-dark-bg">
+                    {validation.perplexityFindings.lcdEffectiveDate}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Instant Denial Warnings */}
@@ -584,35 +620,39 @@ export function LCDValidationPanel({
             )}
 
             {/* Perplexity Research Notes */}
-            {(validation.perplexityFindings.currentAuditFocusAreas.length > 0 ||
-              validation.perplexityFindings.recentLcdChanges.length > 0) && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-800 mb-2">
-                  Research Notes
-                </h4>
-                {validation.perplexityFindings.recentLcdChanges.length > 0 && (
-                  <div className="mb-2">
-                    <span className="text-xs font-medium text-blue-700">
-                      Recent LCD Changes:
-                    </span>
-                    <ul className="text-xs text-blue-600 ml-4">
-                      {validation.perplexityFindings.recentLcdChanges.map(
-                        (change, i) => (
+            {(() => {
+              // Handle both LCD fields (currentAuditFocusAreas, recentLcdChanges)
+              // and generic fields (auditFocusAreas, recentChanges)
+              const findings = validation.perplexityFindings as any
+              const auditAreas = findings?.currentAuditFocusAreas || findings?.auditFocusAreas || []
+              const recentChanges = findings?.recentLcdChanges || findings?.recentChanges || []
+
+              if (auditAreas.length === 0 && recentChanges.length === 0) return null
+
+              return (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-800 mb-2">
+                    Research Notes
+                  </h4>
+                  {recentChanges.length > 0 && (
+                    <div className="mb-2">
+                      <span className="text-xs font-medium text-blue-700">
+                        {docType === "biologics_pa" ? "Recent LCD Changes:" : "Recent Policy Changes:"}
+                      </span>
+                      <ul className="text-xs text-blue-600 ml-4">
+                        {recentChanges.map((change: string, i: number) => (
                           <li key={i}>- {change}</li>
-                        ),
-                      )}
-                    </ul>
-                  </div>
-                )}
-                {validation.perplexityFindings.currentAuditFocusAreas.length >
-                  0 && (
-                  <div>
-                    <span className="text-xs font-medium text-blue-700">
-                      Audit Focus Areas:
-                    </span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {validation.perplexityFindings.currentAuditFocusAreas.map(
-                        (area, i) => (
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {auditAreas.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-blue-700">
+                        {docType === "biologics_pa" ? "Audit Focus Areas:" : "Payer Focus Areas:"}
+                      </span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {auditAreas.map((area: string, i: number) => (
                           <Badge
                             key={i}
                             variant="outline"
@@ -620,13 +660,13 @@ export function LCDValidationPanel({
                           >
                             {area}
                           </Badge>
-                        ),
-                      )}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )
+            })()}
           </CardContent>
         </CollapsibleContent>
       </Collapsible>

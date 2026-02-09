@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -25,7 +25,7 @@ import { LumaLogo } from "@/components/LumaLogo"
 import { SuggestedForms } from "@/components/dashboard/SuggestedForms"
 import { LCDValidationPanel } from "@/components/dashboard/LCDValidationPanel"
 import { ChecklistItemEditModal } from "@/components/dashboard/ChecklistItemEditModal"
-import { ChatInterface } from "@/components/chat/ChatInterface"
+import { ChatInterface, ChatInterfaceRef } from "@/components/chat/ChatInterface"
 import { GeneratingSteps } from "@/components/GeneratingSteps"
 import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X, Plus, RefreshCw, Send, Save, ChevronDown, MessageSquare, FileText, Image, AlertTriangle } from "lucide-react"
 import type { LCDValidationResult, ChecklistEdit, ChecklistEditsData, ChecklistItemWithEdits } from "@/lib/lcd-validation"
@@ -85,6 +85,7 @@ export default function CaseDetailPage() {
   const [showDocsDropdown, setShowDocsDropdown] = useState(false)
   const [showRisksDropdown, setShowRisksDropdown] = useState(false)
   const [copiedRiskIndex, setCopiedRiskIndex] = useState<string | null>(null)
+  const chatRef = useRef<ChatInterfaceRef>(null)
   const [lcdValidation, setLcdValidation] = useState<{
     riskLevel: string
     denialProbability: number
@@ -1047,12 +1048,12 @@ export default function CaseDetailPage() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-3 gap-4 lg:gap-8">
           {/* Left Column - Case Details */}
           <div className="lg:col-span-1 space-y-6">
-            <Card className="p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
+            <Card className="p-4 md:p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-sans font-semibold text-dark-bg">Case Details</h2>
+                <h2 className="text-lg md:text-xl font-sans font-semibold text-dark-bg">Case Details</h2>
                 <button
                   onClick={openEditModal}
                   className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors px-3 py-1.5 h-7 text-xs text-gray-700 hover:text-gray-900 font-medium"
@@ -1119,7 +1120,7 @@ export default function CaseDetailPage() {
               </div>
             </Card>
 
-            <Card className="p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
+            <Card className="p-4 md:p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
               <h3 className="font-semibold text-dark-bg mb-3">Clinical Details</h3>
               <div className="space-y-3 text-sm">
                 {caseData.disease_activity && (
@@ -1137,7 +1138,7 @@ export default function CaseDetailPage() {
 
             {/* Uploaded Documents */}
             {uploadedDocs.length > 0 && (
-              <Card className="p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
+              <Card className="p-4 md:p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
                 <h3 className="font-semibold text-dark-bg mb-3">Uploaded Documents</h3>
                 <div className="space-y-2">
                   {uploadedDocs.map((doc, index) => (
@@ -1221,13 +1222,14 @@ export default function CaseDetailPage() {
                     </div>
                   </button>
 
-                  {/* LCD Validation Panel - Only for Biologics PA */}
-                  {lcdValidation && caseData?.doc_type === "biologics_pa" && (
+                  {/* Documentation Validation Panel - Available for all doc types */}
+                  {lcdValidation && (
                     <LCDValidationPanel
                       validation={lcdValidation}
                       isCollapsed={false}
                       checklistEdits={checklistEdits}
                       onItemClick={handleChecklistItemClick}
+                      docType={caseData?.doc_type}
                     />
                   )}
 
@@ -1711,83 +1713,37 @@ export default function CaseDetailPage() {
               </div>
             )}
 
-            {/* Risk Items - Click to copy and discuss */}
-            {riskItems.length > 0 && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowRisksDropdown(!showRisksDropdown)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-100 hover:bg-red-200 transition-colors text-xs font-medium text-red-700"
-                >
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  <span>{riskItems.length} risk item{riskItems.length !== 1 ? 's' : ''}</span>
-                  <ChevronDown className={`h-3 w-3 transition-transform ${showRisksDropdown ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {showRisksDropdown && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -4, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute top-full left-0 mt-1 z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-2 min-w-[280px] max-w-[400px] max-h-[300px] overflow-y-auto"
-                    >
-                      <div className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide">
-                        Click to copy and discuss
-                      </div>
-                      {riskItems.map((item, index) => {
-                        const itemKey = `${item.severity}-${index}`
-                        const isCopied = copiedRiskIndex === itemKey
-                        return (
-                          <button
-                            key={itemKey}
-                            onClick={() => copyRiskItem(item.text, itemKey)}
-                            className="w-full px-3 py-2 flex items-start gap-2 hover:bg-gray-50 text-left transition-colors"
-                            title="Click to copy"
-                          >
-                            <div className={`mt-0.5 flex-shrink-0 w-2 h-2 rounded-full ${
-                              item.severity === 'instant' ? 'bg-red-500' :
-                              item.severity === 'very-high' ? 'bg-orange-500' :
-                              'bg-yellow-500'
-                            }`} />
-                            <span className="text-sm text-gray-700 flex-1 line-clamp-2">{item.label}</span>
-                            <AnimatePresence mode="popLayout" initial={false}>
-                              <motion.div
-                                key={isCopied ? "check" : "copy"}
-                                initial={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
-                                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                                exit={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
-                                transition={{
-                                  type: "spring",
-                                  duration: 0.3,
-                                  bounce: 0,
-                                }}
-                                className="flex-shrink-0"
-                              >
-                                {isCopied ? (
-                                  <Check className="h-4 w-4 text-mint" />
-                                ) : (
-                                  <Copy className="h-4 w-4 text-gray-400" />
-                                )}
-                              </motion.div>
-                            </AnimatePresence>
-                          </button>
-                        )
-                      })}
-                      <div className="px-3 py-2 border-t border-gray-100 mt-1">
-                        <p className="text-xs text-gray-500">
-                          Luma already knows about these risks. You can also just ask about them directly.
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
           </div>
+
+          {/* Risk Items - Simple select with colored dots */}
+          {riskItems.length > 0 && (
+            <div className="px-6 pb-4">
+              <select
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-mint focus:border-transparent cursor-pointer"
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    const selectedItem = riskItems[parseInt(e.target.value)]
+                    if (selectedItem && chatRef.current) {
+                      chatRef.current.sendMessage(`I'd like to discuss this compliance gap: "${selectedItem.text}". What specific documentation or evidence do I need to address this?`)
+                    }
+                    e.target.value = "" // Reset selection
+                  }
+                }}
+              >
+                <option value="" disabled>Discuss a compliance gap ({riskItems.length})...</option>
+                {riskItems.map((item, index) => (
+                  <option key={index} value={index}>
+                    {item.severity === 'instant' ? '● ' : item.severity === 'very-high' ? '● ' : '● '}{item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex-1 min-h-0 border-t border-gray-100">
             <ChatInterface
+              ref={chatRef}
               caseId={caseData?.id || ""}
               caseData={caseData}
               onGenerate={async () => {

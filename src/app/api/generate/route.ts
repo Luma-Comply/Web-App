@@ -6,9 +6,16 @@ import {
   formatValidationSummary,
   LCDValidationResult,
   ChecklistEditsData,
+  PerplexityFindings,
 } from "@/lib/lcd-validation"
+import { ResearchFindings } from "@/lib/validation/validation-types"
 import { WoundType } from "@/lib/lcd-requirements"
 import { getMACInfo, buildStateSpecificContext, isWiserActiveForSkinSubs } from "@/lib/mac-jurisdictions"
+import { validateMedicalNecessity, MedicalNecessityValidationResult } from "@/lib/validation/medical-necessity-validation"
+import { validateAppeal, AppealValidationResult } from "@/lib/validation/appeal-validation"
+
+// Unified validation result type for all doc types
+type ValidationResult = LCDValidationResult | MedicalNecessityValidationResult | AppealValidationResult
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
@@ -46,9 +53,11 @@ export async function POST(request: NextRequest) {
 
     const pp_apiKey = process.env.PERPLEXITY_API_KEY
 
-    // Track validation results for biologics PA
-    let lcdValidationResult: LCDValidationResult | null = null
+    // Track validation results for all doc types
+    let validationResult: ValidationResult | null = null
     const isBiologicsPA = caseData.doc_type === "biologics_pa"
+    const isMedicalNecessity = caseData.doc_type === "medical_necessity"
+    const isAppeal = caseData.doc_type === "appeal"
 
     // --- STEP 1: RESEARCH WITH PERPLEXITY ---
     let researchContext = "No specific payer guidelines found."
@@ -210,23 +219,26 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
       }
     }
 
-    // --- STEP 1.25: LCD VALIDATION FOR BIOLOGICS PA ---
+    // --- STEP 1.25: DOCUMENT VALIDATION (ALL DOC TYPES) ---
+    const clinicalNotesForValidation = [
+      caseData.disease_activity,
+      caseData.prior_treatments,
+      caseData.lab_values,
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+
+    // Preserve existing checklist edits during regeneration
+    const existingChecklistEdits = caseData.metadata?.checklist_edits as ChecklistEditsData | undefined
+
     if (isBiologicsPA) {
       try {
         console.log("Running LCD L35041 validation for CTP/wound care...")
 
-        const clinicalNotesForValidation = [
-          caseData.disease_activity,
-          caseData.prior_treatments,
-          caseData.lab_values,
-        ]
-          .filter(Boolean)
-          .join("\n\n")
-
         // Get wound type from metadata if available, otherwise auto-detect
         const woundTypeFromMeta = caseData.metadata?.wound_type as WoundType | undefined
 
-        lcdValidationResult = await validateAgainstLCD(
+        validationResult = await validateAgainstLCD(
           clinicalNotesForValidation,
           caseData.requested_medication || "",
           researchContext,
@@ -234,15 +246,13 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
           caseData.patient_state // For policy change detection
         )
 
+        const lcdResult = validationResult as LCDValidationResult
         console.log(
-          `LCD Validation Complete - Risk: ${lcdValidationResult.auditRisk.overallScore}, ` +
-            `Found: ${lcdValidationResult.summary.foundCount}/${lcdValidationResult.summary.totalRequirements}`
+          `LCD Validation Complete - Risk: ${lcdResult.auditRisk.overallScore}, ` +
+            `Found: ${lcdResult.summary.foundCount}/${lcdResult.summary.totalRequirements}`
         )
 
         // Store validation result in case metadata for future reference
-        // Preserve existing checklist edits during regeneration
-        const existingChecklistEdits = caseData.metadata?.checklist_edits as ChecklistEditsData | undefined
-
         await supabase
           .from("cases")
           .update({
@@ -250,28 +260,28 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
               ...caseData.metadata,
               lcd_validation: {
                 run_at: new Date().toISOString(),
-                risk_level: lcdValidationResult.auditRisk.overallScore,
-                denial_probability: lcdValidationResult.auditRisk.estimatedDenialProbability,
-                found_count: lcdValidationResult.summary.foundCount,
-                missing_count: lcdValidationResult.summary.missingCount,
-                detected_wound_type: lcdValidationResult.detectedWoundType,
-                ctp_covered: lcdValidationResult.ctpProductCheck.covered,
+                risk_level: lcdResult.auditRisk.overallScore,
+                denial_probability: lcdResult.auditRisk.estimatedDenialProbability,
+                found_count: lcdResult.summary.foundCount,
+                missing_count: lcdResult.summary.missingCount,
+                detected_wound_type: lcdResult.detectedWoundType,
+                ctp_covered: lcdResult.ctpProductCheck.covered,
               },
               // Store full validation for persistence across page loads
               lcd_validation_full: {
-                riskLevel: lcdValidationResult.auditRisk.overallScore,
-                denialProbability: lcdValidationResult.auditRisk.estimatedDenialProbability,
-                foundCount: lcdValidationResult.summary.foundCount,
-                missingCount: lcdValidationResult.summary.missingCount,
-                totalRequirements: lcdValidationResult.summary.totalRequirements,
-                detectedWoundType: lcdValidationResult.detectedWoundType,
-                ctpCovered: lcdValidationResult.ctpProductCheck.covered,
-                instantDenialTriggers: lcdValidationResult.auditRisk.instantDenialTriggers,
-                veryHighRiskItems: lcdValidationResult.auditRisk.veryHighRiskItems,
-                highRiskItems: lcdValidationResult.auditRisk.highRiskItems,
-                checklist: lcdValidationResult.checklist,
-                recommendations: lcdValidationResult.recommendations,
-                perplexityFindings: lcdValidationResult.perplexityFindings,
+                riskLevel: lcdResult.auditRisk.overallScore,
+                denialProbability: lcdResult.auditRisk.estimatedDenialProbability,
+                foundCount: lcdResult.summary.foundCount,
+                missingCount: lcdResult.summary.missingCount,
+                totalRequirements: lcdResult.summary.totalRequirements,
+                detectedWoundType: lcdResult.detectedWoundType,
+                ctpCovered: lcdResult.ctpProductCheck.covered,
+                instantDenialTriggers: lcdResult.auditRisk.instantDenialTriggers,
+                veryHighRiskItems: lcdResult.auditRisk.veryHighRiskItems,
+                highRiskItems: lcdResult.auditRisk.highRiskItems,
+                checklist: lcdResult.checklist,
+                recommendations: lcdResult.recommendations,
+                perplexityFindings: lcdResult.perplexityFindings,
               },
               // Preserve checklist edits during regeneration
               ...(existingChecklistEdits && { checklist_edits: existingChecklistEdits }),
@@ -281,6 +291,107 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
       } catch (validationError) {
         console.error("LCD Validation Error:", validationError)
         // Continue without validation - don't block generation
+      }
+    } else if (isMedicalNecessity) {
+      try {
+        console.log("Running Medical Necessity validation...")
+
+        validationResult = await validateMedicalNecessity(
+          clinicalNotesForValidation,
+          caseData.requested_medication || "",
+          researchContext,
+          caseData.payer_name
+        )
+
+        console.log(
+          `Medical Necessity Validation Complete - Risk: ${validationResult.auditRisk.overallScore}, ` +
+            `Found: ${validationResult.summary.foundCount}/${validationResult.summary.totalRequirements}`
+        )
+
+        // Store validation result in case metadata
+        await supabase
+          .from("cases")
+          .update({
+            metadata: {
+              ...caseData.metadata,
+              lcd_validation: {
+                run_at: new Date().toISOString(),
+                risk_level: validationResult.auditRisk.overallScore,
+                denial_probability: validationResult.auditRisk.estimatedDenialProbability,
+                found_count: validationResult.summary.foundCount,
+                missing_count: validationResult.summary.missingCount,
+              },
+              lcd_validation_full: {
+                riskLevel: validationResult.auditRisk.overallScore,
+                denialProbability: validationResult.auditRisk.estimatedDenialProbability,
+                foundCount: validationResult.summary.foundCount,
+                missingCount: validationResult.summary.missingCount,
+                totalRequirements: validationResult.summary.totalRequirements,
+                ctpCovered: true, // Not applicable for medical necessity
+                instantDenialTriggers: validationResult.auditRisk.instantDenialTriggers,
+                veryHighRiskItems: validationResult.auditRisk.veryHighRiskItems,
+                highRiskItems: validationResult.auditRisk.highRiskItems,
+                checklist: validationResult.checklist,
+                recommendations: validationResult.recommendations,
+                perplexityFindings: validationResult.perplexityFindings,
+              },
+              ...(existingChecklistEdits && { checklist_edits: existingChecklistEdits }),
+            },
+          })
+          .eq("id", caseId)
+      } catch (validationError) {
+        console.error("Medical Necessity Validation Error:", validationError)
+      }
+    } else if (isAppeal) {
+      try {
+        console.log("Running Appeal validation...")
+
+        validationResult = await validateAppeal(
+          clinicalNotesForValidation,
+          caseData.requested_medication || "",
+          researchContext,
+          undefined, // denialContext - could be extracted from notes in future
+          caseData.payer_name
+        )
+
+        console.log(
+          `Appeal Validation Complete - Risk: ${validationResult.auditRisk.overallScore}, ` +
+            `Found: ${validationResult.summary.foundCount}/${validationResult.summary.totalRequirements}`
+        )
+
+        // Store validation result in case metadata
+        await supabase
+          .from("cases")
+          .update({
+            metadata: {
+              ...caseData.metadata,
+              lcd_validation: {
+                run_at: new Date().toISOString(),
+                risk_level: validationResult.auditRisk.overallScore,
+                denial_probability: validationResult.auditRisk.estimatedDenialProbability,
+                found_count: validationResult.summary.foundCount,
+                missing_count: validationResult.summary.missingCount,
+              },
+              lcd_validation_full: {
+                riskLevel: validationResult.auditRisk.overallScore,
+                denialProbability: validationResult.auditRisk.estimatedDenialProbability,
+                foundCount: validationResult.summary.foundCount,
+                missingCount: validationResult.summary.missingCount,
+                totalRequirements: validationResult.summary.totalRequirements,
+                ctpCovered: true, // Not applicable for appeals
+                instantDenialTriggers: validationResult.auditRisk.instantDenialTriggers,
+                veryHighRiskItems: validationResult.auditRisk.veryHighRiskItems,
+                highRiskItems: validationResult.auditRisk.highRiskItems,
+                checklist: validationResult.checklist,
+                recommendations: validationResult.recommendations,
+                perplexityFindings: validationResult.perplexityFindings,
+              },
+              ...(existingChecklistEdits && { checklist_edits: existingChecklistEdits }),
+            },
+          })
+          .eq("id", caseId)
+      } catch (validationError) {
+        console.error("Appeal Validation Error:", validationError)
       }
     }
 
@@ -460,7 +571,8 @@ END OF CHAT CONTEXT
     // Build prompt for AI - enhanced for biologics PA with validation results
     let systemPrompt: string
 
-    if (isBiologicsPA && lcdValidationResult) {
+    if (isBiologicsPA && validationResult) {
+      const lcdResult = validationResult as LCDValidationResult
       // Enhanced CTP/wound care specific prompt with validation
       systemPrompt = `You are an AI assistant specialized in CTP (Cellular Tissue Products) / skin substitute prior authorization documentation for Medicare Part B.
 
@@ -468,14 +580,14 @@ CRITICAL CONTEXT - LCD L35041 COMPLIANCE:
 This is a Biologics Prior Authorization for a CTP/skin substitute. The documentation has been validated against LCD L35041 requirements.
 
 VALIDATION RESULTS:
-- Audit Risk Level: ${lcdValidationResult.auditRisk.overallScore}
-- Estimated Denial Probability: ${lcdValidationResult.auditRisk.estimatedDenialProbability}%
-- CTP Product Coverage: ${lcdValidationResult.ctpProductCheck.covered ? "COVERED" : "VERIFY COVERAGE"}
-- Detected Wound Type: ${lcdValidationResult.detectedWoundType || "Unknown"}
-- Documentation Found: ${lcdValidationResult.summary.foundCount}/${lcdValidationResult.summary.totalRequirements}
-- Missing Items: ${lcdValidationResult.summary.missingCount}
-${lcdValidationResult.auditRisk.instantDenialTriggers.length > 0 ? `- INSTANT DENIAL TRIGGERS: ${lcdValidationResult.auditRisk.instantDenialTriggers.join(", ")}` : ""}
-${lcdValidationResult.auditRisk.veryHighRiskItems.length > 0 ? `- VERY HIGH RISK MISSING: ${lcdValidationResult.auditRisk.veryHighRiskItems.join(", ")}` : ""}
+- Audit Risk Level: ${lcdResult.auditRisk.overallScore}
+- Estimated Denial Probability: ${lcdResult.auditRisk.estimatedDenialProbability}%
+- CTP Product Coverage: ${lcdResult.ctpProductCheck.covered ? "COVERED" : "VERIFY COVERAGE"}
+- Detected Wound Type: ${lcdResult.detectedWoundType || "Unknown"}
+- Documentation Found: ${lcdResult.summary.foundCount}/${lcdResult.summary.totalRequirements}
+- Missing Items: ${lcdResult.summary.missingCount}
+${lcdResult.auditRisk.instantDenialTriggers.length > 0 ? `- INSTANT DENIAL TRIGGERS: ${lcdResult.auditRisk.instantDenialTriggers.join(", ")}` : ""}
+${lcdResult.auditRisk.veryHighRiskItems.length > 0 ? `- VERY HIGH RISK MISSING: ${lcdResult.auditRisk.veryHighRiskItems.join(", ")}` : ""}
 
 OUTPUT FORMAT REQUIREMENTS:
 1. START with the LCD L35041 Validation Summary section (formatted as shown below)
@@ -486,14 +598,14 @@ The validation summary should appear FIRST in this format:
 LCD L35041 VALIDATION SUMMARY
 
 Denial Risk: [RISK LEVEL] ([X]% estimated)
-LCD Effective Date: ${lcdValidationResult.perplexityFindings.lcdEffectiveDate}
-Wound Type: ${lcdValidationResult.detectedWoundType || "See clinical notes"}
-CTP Product: ${lcdValidationResult.ctpProductCheck.covered ? "Covered" : "Verify Coverage Required"}
+LCD Effective Date: ${lcdResult.perplexityFindings.lcdEffectiveDate}
+Wound Type: ${lcdResult.detectedWoundType || "See clinical notes"}
+CTP Product: ${lcdResult.ctpProductCheck.covered ? "Covered" : "Verify Coverage Required"}
 
 Documentation Status:
-- Found: ${lcdValidationResult.summary.foundCount}
-- Missing: ${lcdValidationResult.summary.missingCount}
-- Partial: ${lcdValidationResult.summary.partialCount}
+- Found: ${lcdResult.summary.foundCount}
+- Missing: ${lcdResult.summary.missingCount}
+- Partial: ${lcdResult.summary.partialCount}
 
 [If there are missing high-risk items, list them with recommended language to add]
 
@@ -718,7 +830,7 @@ Note: These recommendations are based on AI analysis of current payer policies. 
         .eq("id", caseId)
     }
 
-    // Build response - include validation for biologics PA
+    // Build response - include validation for all doc types
     const response: {
       success: boolean
       documentation: string
@@ -735,29 +847,50 @@ Note: These recommendations are based on AI analysis of current payer policies. 
         highRiskItems: string[]
         checklist: LCDValidationResult["checklist"]
         recommendations: LCDValidationResult["recommendations"]
-        perplexityFindings: LCDValidationResult["perplexityFindings"]
+        perplexityFindings: PerplexityFindings | ResearchFindings  // LCD uses PerplexityFindings, others use ResearchFindings
       }
     } = {
       success: true,
       documentation,
     }
 
-    // Add validation results for biologics PA
-    if (isBiologicsPA && lcdValidationResult) {
-      response.validation = {
-        riskLevel: lcdValidationResult.auditRisk.overallScore,
-        denialProbability: lcdValidationResult.auditRisk.estimatedDenialProbability,
-        foundCount: lcdValidationResult.summary.foundCount,
-        missingCount: lcdValidationResult.summary.missingCount,
-        totalRequirements: lcdValidationResult.summary.totalRequirements,
-        detectedWoundType: lcdValidationResult.detectedWoundType,
-        ctpCovered: lcdValidationResult.ctpProductCheck.covered,
-        instantDenialTriggers: lcdValidationResult.auditRisk.instantDenialTriggers,
-        veryHighRiskItems: lcdValidationResult.auditRisk.veryHighRiskItems,
-        highRiskItems: lcdValidationResult.auditRisk.highRiskItems,
-        checklist: lcdValidationResult.checklist,
-        recommendations: lcdValidationResult.recommendations,
-        perplexityFindings: lcdValidationResult.perplexityFindings,
+    // Add validation results for all doc types that have validation
+    if (validationResult) {
+      if (isBiologicsPA) {
+        const lcdResult = validationResult as LCDValidationResult
+        response.validation = {
+          riskLevel: lcdResult.auditRisk.overallScore,
+          denialProbability: lcdResult.auditRisk.estimatedDenialProbability,
+          foundCount: lcdResult.summary.foundCount,
+          missingCount: lcdResult.summary.missingCount,
+          totalRequirements: lcdResult.summary.totalRequirements,
+          detectedWoundType: lcdResult.detectedWoundType,
+          ctpCovered: lcdResult.ctpProductCheck.covered,
+          instantDenialTriggers: lcdResult.auditRisk.instantDenialTriggers,
+          veryHighRiskItems: lcdResult.auditRisk.veryHighRiskItems,
+          highRiskItems: lcdResult.auditRisk.highRiskItems,
+          checklist: lcdResult.checklist,
+          recommendations: lcdResult.recommendations,
+          perplexityFindings: lcdResult.perplexityFindings,
+        }
+      } else {
+        // Medical Necessity and Appeal share the same response structure (without CTP-specific fields)
+        // Cast to access perplexityFindings - all validation result types have it
+        const genericResult = validationResult as MedicalNecessityValidationResult | AppealValidationResult
+        response.validation = {
+          riskLevel: genericResult.auditRisk.overallScore,
+          denialProbability: genericResult.auditRisk.estimatedDenialProbability,
+          foundCount: genericResult.summary.foundCount,
+          missingCount: genericResult.summary.missingCount,
+          totalRequirements: genericResult.summary.totalRequirements,
+          ctpCovered: true, // Not applicable, always true for non-CTP
+          instantDenialTriggers: genericResult.auditRisk.instantDenialTriggers,
+          veryHighRiskItems: genericResult.auditRisk.veryHighRiskItems,
+          highRiskItems: genericResult.auditRisk.highRiskItems,
+          checklist: genericResult.checklist,
+          recommendations: genericResult.recommendations,
+          perplexityFindings: genericResult.perplexityFindings,
+        }
       }
     }
 
