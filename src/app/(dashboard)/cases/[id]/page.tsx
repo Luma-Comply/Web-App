@@ -914,6 +914,7 @@ export default function CaseDetailPage() {
       <GeneratingSteps
         key={generationKey} // Forces remount on regeneration
         caseId={caseData.id}
+        docType={caseData.doc_type}
         onComplete={(result) => {
           // Update local state with the generated documentation
           // Also update metadata to include lcd_validation_full so it persists on subsequent saves

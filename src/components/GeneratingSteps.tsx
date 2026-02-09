@@ -29,7 +29,8 @@ interface Step {
   label: string
 }
 
-const steps: Step[] = [
+// Doc-type specific steps
+const biologicsSteps: Step[] = [
   { id: 'loading_case', label: 'Loading case data' },
   { id: 'researching', label: 'Researching payer requirements' },
   { id: 'validating', label: 'Validating against LCD criteria' },
@@ -37,6 +38,34 @@ const steps: Step[] = [
   { id: 'generating', label: 'Generating documentation' },
   { id: 'saving', label: 'Finalizing your letter' },
 ]
+
+const medicalNecessitySteps: Step[] = [
+  { id: 'loading_case', label: 'Loading case data' },
+  { id: 'researching', label: 'Researching payer policies' },
+  { id: 'validating', label: 'Checking documentation completeness' },
+  { id: 'generating', label: 'Generating medical necessity letter' },
+  { id: 'saving', label: 'Finalizing your letter' },
+]
+
+const appealSteps: Step[] = [
+  { id: 'loading_case', label: 'Loading case data' },
+  { id: 'researching', label: 'Researching appeal requirements' },
+  { id: 'validating', label: 'Analyzing denial & building rebuttal' },
+  { id: 'generating', label: 'Generating appeal letter' },
+  { id: 'saving', label: 'Finalizing your appeal' },
+]
+
+function getStepsForDocType(docType?: string): Step[] {
+  switch (docType) {
+    case 'medical_necessity':
+      return medicalNecessitySteps
+    case 'appeal':
+      return appealSteps
+    case 'biologics_pa':
+    default:
+      return biologicsSteps
+  }
+}
 
 // Animated checkmark using pathLength
 function AnimatedCheck({ isComplete }: { isComplete: boolean }) {
@@ -84,11 +113,13 @@ function EmptyCircle() {
 
 interface GeneratingStepsProps {
   caseId: string
+  docType?: string
   onComplete?: (result: any) => void
   onError?: (error: string) => void
 }
 
-export function GeneratingSteps({ caseId, onComplete, onError }: GeneratingStepsProps) {
+export function GeneratingSteps({ caseId, docType, onComplete, onError }: GeneratingStepsProps) {
+  const steps = getStepsForDocType(docType)
   const [currentPhase, setCurrentPhase] = useState<GenerationPhase>('loading_case')
   const [completedPhases, setCompletedPhases] = useState<GenerationPhase[]>([])
   const [error, setError] = useState<string | null>(null)
