@@ -85,6 +85,10 @@ tmp/
 .git-secrets-info.md
 example-chat.md
 
+# Claude Code (local only)
+CLAUDE.md
+.claude/
+
 # macOS
 Icon?
 
