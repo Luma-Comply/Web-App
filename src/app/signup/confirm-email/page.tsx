@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { LumaLogo } from "@/components/LumaLogo"
 import { Mail, CheckCircle, Loader2 } from "lucide-react"
-import MedicalGrid from "@/components/MedicalGrid"
 
 import { resendVerificationEmail } from "@/app/auth/actions"
 
@@ -42,10 +41,8 @@ function ConfirmEmailContent() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white relative overflow-hidden">
-      <MedicalGrid intensity="light" />
-
-      <div className="container mx-auto px-4 py-8 relative z-10">
+    <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <Link href="/" className="inline-flex items-center gap-2 mb-8">
           <LumaLogo className="w-10 h-10" />
