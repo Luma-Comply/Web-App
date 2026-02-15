@@ -159,7 +159,7 @@ function AcceptInvitationContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-center justify-center">
+      <div className="min-h-screen bg-light-gray flex items-center justify-center">
         <div className="text-center">
           <LumaLogo className="w-16 h-16 mx-auto mb-4 animate-pulse text-mint" />
           <p className="text-gray-600">Loading invitation...</p>
@@ -169,7 +169,7 @@ function AcceptInvitationContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-light-gray flex items-center justify-center p-4">
       <Card className="w-full max-w-md glass-card border border-sage-medium/30 p-8">
         <div className="text-center mb-6">
           <LumaLogo className="w-12 h-12 mx-auto mb-4 text-dark-bg" />
@@ -340,7 +340,7 @@ export default function AcceptInvitationPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-center justify-center">
+        <div className="min-h-screen bg-light-gray flex items-center justify-center">
           <div className="text-center">
             <LumaLogo className="w-16 h-16 mx-auto mb-4 animate-pulse text-mint" />
             <p className="text-gray-600">Loading...</p>

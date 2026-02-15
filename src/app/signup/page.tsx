@@ -43,7 +43,7 @@ export default function SignupPage() {
   const [signInOpen, setSignInOpen] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white">
+    <div className="flex min-h-screen bg-light-gray">
 
       <div className="container mx-auto px-4 py-8">
         {/* Header */}

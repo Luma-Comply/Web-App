@@ -73,7 +73,7 @@ function AuthConfirmContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-light-gray flex items-center justify-center p-4">
       <Card className="glass-card border border-sage-medium/30 p-8 max-w-md w-full">
         <div className="flex flex-col items-center text-center space-y-6">
           <div className="flex items-center gap-2 mb-4">
@@ -129,7 +129,7 @@ function AuthConfirmContent() {
 export default function AuthConfirmPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-center justify-center">
+      <div className="min-h-screen bg-light-gray flex items-center justify-center">
         <Loader2 className="w-16 h-16 text-mint animate-spin" />
       </div>
     }>

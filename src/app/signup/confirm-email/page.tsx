@@ -41,7 +41,7 @@ function ConfirmEmailContent() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white">
+    <div className="flex min-h-screen bg-light-gray">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <Link href="/" className="inline-flex items-center gap-2 mb-8">
@@ -132,7 +132,7 @@ function ConfirmEmailContent() {
 export default function ConfirmEmailPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white items-center justify-center">
+      <div className="flex min-h-screen bg-light-gray items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mint mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>

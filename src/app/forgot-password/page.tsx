@@ -23,7 +23,7 @@ function ForgotPasswordForm() {
     }
 
     return (
-        <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white">
+        <div className="flex min-h-screen bg-light-gray">
             <div className="container mx-auto px-4 py-8">
                 {/* Header */}
                 <Link href="/" className="inline-flex items-center gap-2 mb-8">
@@ -111,7 +111,7 @@ function ForgotPasswordForm() {
 export default function ForgotPasswordPage() {
     return (
         <Suspense fallback={
-            <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-light-gray to-white">
+            <div className="flex min-h-screen items-center justify-center bg-light-gray">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mint mx-auto mb-4"></div>
                     <p className="text-gray-600">Loading...</p>

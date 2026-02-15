@@ -56,7 +56,7 @@ export default function CheckoutPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-center justify-center">
+      <div className="min-h-screen bg-light-gray flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mint mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
@@ -70,7 +70,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-light-gray to-white">
+    <div className="min-h-screen bg-light-gray">
       {/* Header */}
       <header className="border-b border-sage-medium/50 glass-card">
         <div className="mx-auto px-4 max-w-4xl h-16 flex items-center">

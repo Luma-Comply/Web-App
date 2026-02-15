@@ -16,7 +16,7 @@ function LoginForm() {
   const error = searchParams.get('error')
   const redirectTo = searchParams.get('redirect') || '/dashboard'
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white">
+    <div className="flex min-h-screen bg-light-gray">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <Link href="/" className="inline-flex items-center gap-2 mb-8">

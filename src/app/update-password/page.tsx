@@ -46,7 +46,7 @@ function UpdatePasswordForm() {
     }
 
     return (
-        <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white relative overflow-hidden">
+        <div className="flex min-h-screen bg-light-gray relative overflow-hidden">
             <MedicalGrid intensity="light" />
 
             <div className="container mx-auto px-4 py-8 relative z-10">
@@ -191,7 +191,7 @@ function UpdatePasswordForm() {
 export default function UpdatePasswordPage() {
     return (
         <Suspense fallback={
-            <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-light-gray to-white">
+            <div className="flex min-h-screen items-center justify-center bg-light-gray">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mint mx-auto mb-4"></div>
                     <p className="text-gray-600">Loading...</p>

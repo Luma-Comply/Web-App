@@ -302,14 +302,14 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-light-gray to-white">
+      <div className="flex min-h-screen items-center justify-center bg-light-gray">
         <LumaLogo className="w-16 h-16 animate-pulse text-mint" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-light-gray to-white">
+    <div className="min-h-screen bg-light-gray">
       {/* Header */}
       <header className="border-b border-sage-medium/50 glass-card sticky top-0 z-40">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">

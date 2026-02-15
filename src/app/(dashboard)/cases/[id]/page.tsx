@@ -898,7 +898,7 @@ export default function CaseDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-light-gray to-white">
+      <div className="flex min-h-screen items-center justify-center bg-light-gray">
         <div className="text-center">
           <LumaLogo className="w-16 h-16 mx-auto mb-4" />
           <p className="text-gray-600">Loading case details...</p>
@@ -909,7 +909,7 @@ export default function CaseDetailPage() {
 
   if (!caseData) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-light-gray to-white">
+      <div className="flex min-h-screen items-center justify-center bg-light-gray">
         <div className="text-center">
           <p className="text-gray-600 mb-4">Case not found</p>
           <Link href="/dashboard">
@@ -1007,7 +1007,7 @@ export default function CaseDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-light-gray to-white">
+    <div className="min-h-screen bg-light-gray">
       {/* Header */}
       <header className="border-b border-sage-medium/50 glass-card sticky top-0 z-40">
         <div className="mx-auto px-4 max-w-6xl h-16 flex items-center justify-between">
