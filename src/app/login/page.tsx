@@ -28,9 +28,9 @@ function LoginForm() {
           <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Side - Branding */}
             <div className="hidden lg:block animate-fade-in-up">
-              <h1 className="text-5xl font-sans font-semibold text-dark-bg mb-6 leading-tight">
+              <h1 className="text-5xl font-serif font-semibold mb-6 leading-[1.1]" style={{ color: "#1A2749" }}>
                 Welcome back to
-                <span className="text-mint block">Luma</span>
+                <span className="block">Luma.</span>
               </h1>
               <p className="text-xl text-gray-700 mb-8 leading-relaxed">
                 HIPAA-compliant medical necessity documentation for healthcare providers.

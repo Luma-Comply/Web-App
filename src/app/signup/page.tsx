@@ -43,9 +43,9 @@ export default function SignupPage() {
   const [signInOpen, setSignInOpen] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   return (
-    <div className="flex min-h-screen relative overflow-hidden" style={{ backgroundColor: "#F4F4EE" }}>
+    <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white">
 
-      <div className="container mx-auto px-4 py-8 relative z-10">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <Link href="/" className="inline-flex items-center gap-2 mb-8">
           <LumaLogo className="w-10 h-10" />
@@ -56,7 +56,7 @@ export default function SignupPage() {
           <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Side - Branding */}
             <div className="hidden lg:block animate-fade-in-up">
-              <h1 className="text-5xl font-sans font-semibold mb-6 leading-[1.1]" style={{ color: "#1A2749" }}>
+              <h1 className="text-5xl font-serif font-semibold mb-6 leading-[1.1]" style={{ color: "#1A2749" }}>
                 Focus on patients,
                 <span className="block">not paperwork.</span>
               </h1>

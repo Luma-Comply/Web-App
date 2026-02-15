@@ -33,6 +33,25 @@ export async function login(formData: FormData) {
         redirect('/login?error=' + encodeURIComponent(errorMessage) + (redirectTo !== '/dashboard' ? `&redirect=${encodeURIComponent(redirectTo)}` : ''))
     }
 
+    // Sync practice_name from auth metadata if missing in public.users
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+        const practiceName = user.user_metadata?.practice_name
+        if (practiceName) {
+            const { data: userData } = await supabase
+                .from('users')
+                .select('practice_name')
+                .eq('id', user.id)
+                .single()
+            if (userData && !userData.practice_name) {
+                await supabase
+                    .from('users')
+                    .update({ practice_name: practiceName })
+                    .eq('id', user.id)
+            }
+        }
+    }
+
     revalidatePath('/', 'layout')
     redirect(redirectTo)
 }
