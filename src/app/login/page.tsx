@@ -7,8 +7,7 @@ import { login } from "@/app/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Shield, Lock, Eye, EyeOff, AlertCircle } from "lucide-react"
-import MedicalGrid from "@/components/MedicalGrid"
+import { Shield, Lock, Eye, EyeOff, AlertCircle } from "lucide-react"
 import { LumaLogo } from "@/components/LumaLogo"
 
 function LoginForm() {
@@ -17,10 +16,8 @@ function LoginForm() {
   const error = searchParams.get('error')
   const redirectTo = searchParams.get('redirect') || '/dashboard'
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white relative overflow-hidden">
-      <MedicalGrid intensity="light" />
-
-      <div className="container mx-auto px-4 py-8 relative z-10">
+    <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <Link href="/" className="inline-flex items-center gap-2 mb-8">
           <LumaLogo className="w-10 h-10" />
