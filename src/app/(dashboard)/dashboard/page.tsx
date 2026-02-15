@@ -374,30 +374,66 @@ export default function DashboardPage() {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Subscription Banner - Only shown to team owners */}
-        {isTeamOwner && (
+        {/* Stats Bar */}
+        <Card className="flex items-center gap-8 p-5 px-8 glass-card border border-sage-medium/30 mb-8">
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Cases</p>
+            <p className="text-[1.75rem] font-bold leading-none text-dark-bg">{stats.total_cases}</p>
+          </div>
+
+          <div className="w-px h-12 bg-sage-medium/30" />
+
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">This Month</p>
+            <p className="text-[1.75rem] font-bold leading-none text-dark-bg">{stats.cases_this_month}</p>
+          </div>
+
+          <div className="w-px h-12 bg-sage-medium/30" />
+
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Revenue Protected</p>
+            <p className="text-[1.75rem] font-bold leading-none text-dark-bg">${stats.revenue_protected.toLocaleString()}</p>
+          </div>
+
+          {isTeamOwner && subscription.subscription_status === "trialing" && subscription.trial_ends_at && (
+            <button
+              onClick={async () => {
+                const response = await fetch("/api/stripe/create-portal", { method: "POST" })
+                const data = await response.json()
+                if (data.url) window.location.href = data.url
+              }}
+              className="ml-auto flex items-center gap-2 bg-mint/10 border border-mint/30 rounded-lg px-4 py-2 text-sm font-semibold text-dark-bg hover:bg-mint/20 transition-colors cursor-pointer"
+            >
+              Trial Active
+              <span className="bg-mint text-white text-xs font-bold px-2 py-0.5 rounded">
+                {Math.ceil((new Date(subscription.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
+              </span>
+            </button>
+          )}
+
+          {isTeamOwner && subscription.subscription_status === "active" && (
+            <button
+              onClick={async () => {
+                const response = await fetch("/api/stripe/create-portal", { method: "POST" })
+                const data = await response.json()
+                if (data.url) window.location.href = data.url
+              }}
+              className="ml-auto flex items-center gap-2 bg-mint/10 border border-mint/30 rounded-lg px-4 py-2 text-sm font-semibold text-dark-bg hover:bg-mint/20 transition-colors cursor-pointer"
+            >
+              <span className="w-2 h-2 rounded-full bg-mint" />
+              Active
+            </button>
+          )}
+        </Card>
+
+        {/* Subscription alerts (canceled, past due, trial ended) */}
+        {isTeamOwner && (subscription.subscription_status === "canceled" || subscription.subscription_status === "past_due" || (subscription.subscription_status === "trialing" && subscription.trial_ends_at && new Date(subscription.trial_ends_at) < new Date())) && (
           <SubscriptionBanner
             subscriptionStatus={subscription.subscription_status}
             trialEndsAt={subscription.trial_ends_at}
             billingPeriodEnd={subscription.billing_period_end}
           />
         )}
-
-        {/* Stats Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <Card className="p-6 glass-card border border-sage-medium/30">
-            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Cases</p>
-            <p className="text-2xl font-mono font-bold text-dark-bg">{stats.total_cases}</p>
-          </Card>
-          <Card className="p-6 glass-card border border-sage-medium/30">
-            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">This Month</p>
-            <p className="text-2xl font-mono font-bold text-dark-bg">{stats.cases_this_month}</p>
-          </Card>
-          <Card className="p-6 glass-card border border-sage-medium/30">
-            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Revenue Protected</p>
-            <p className="text-2xl font-mono font-bold text-mint">${stats.revenue_protected.toLocaleString()}</p>
-          </Card>
-        </div>
 
         {/* Improved Table Layout with Tabs */}
         <div className="space-y-4">

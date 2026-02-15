@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -22,6 +22,13 @@ import { LumaLogo } from "@/components/LumaLogo"
 import { searchPayers } from "@/lib/payers"
 import { getActiveWiserSkinSubStates, isWiserActiveForSkinSubs, getMACInfo } from "@/lib/mac-jurisdictions"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   ArrowLeft,
   Loader2,
   Sparkles,
@@ -34,6 +41,11 @@ import {
   Image,
   X,
   AlertCircle,
+  ChevronDown,
+  User,
+  Users,
+  CreditCard,
+  LogOut,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 
@@ -50,6 +62,35 @@ export default function NewCasePage() {
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [showFullHipaaList, setShowFullHipaaList] = useState(false)
   const [payerSelected, setPayerSelected] = useState(false) // Track if payer was selected from dropdown
+
+  // User/org state for nav
+  const [userEmail, setUserEmail] = useState("")
+  const [practiceName, setPracticeName] = useState("")
+  const [isTeamOwner, setIsTeamOwner] = useState(false)
+
+  useEffect(() => {
+    async function loadUser() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserEmail(user.email || "")
+        const { data } = await supabase
+          .from("users")
+          .select("practice_name, is_team_owner")
+          .eq("id", user.id)
+          .single()
+        if (data) {
+          setPracticeName(data.practice_name || "")
+          setIsTeamOwner(data.is_team_owner || false)
+        }
+      }
+    }
+    loadUser()
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push("/")
+  }
 
   // File upload configuration
   const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'png', 'jpg', 'jpeg']
@@ -366,19 +407,58 @@ export default function NewCasePage() {
   return (
     <div className="min-h-screen bg-light-gray">
       {/* Header */}
-      <header className="border-b border-sage-medium/50 glass-card">
+      <header className="border-b border-sage-medium/50 glass-card sticky top-0 z-40">
         <div className="mx-auto px-4 max-w-4xl h-16 flex items-center justify-between">
+          <Link href="/dashboard">
+            <Button variant="ghost" size="sm" className="hover:bg-gray-100">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
           <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Button>
-            </Link>
-          </div>
-          <div className="flex items-center gap-2">
-            <LumaLogo className="w-8 h-8" />
-            <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex items-center gap-2 hover:bg-gray-100">
+                  <span className="text-sm text-gray-600 hidden md:block max-w-[200px] truncate">{practiceName || userEmail}</span>
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-white border border-sage-medium/30">
+                <DropdownMenuItem
+                  onClick={() => router.push('/settings/profile')}
+                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </DropdownMenuItem>
+                {isTeamOwner && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => router.push('/settings/team')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Team
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => router.push('/settings/billing')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Billing
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="focus:bg-coral/10 focus:text-coral cursor-pointer"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
