@@ -56,7 +56,7 @@ export default function SignupPage() {
           <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Side - Branding */}
             <div className="hidden lg:block animate-fade-in-up">
-              <h1 className="text-5xl font-serif font-semibold mb-6 leading-[1.1]" style={{ color: "#1A2749" }}>
+              <h1 className="text-5xl font-sans font-semibold mb-6 leading-[1.1]" style={{ color: "#1A2749" }}>
                 Focus on patients,
                 <span className="block">not paperwork.</span>
               </h1>
