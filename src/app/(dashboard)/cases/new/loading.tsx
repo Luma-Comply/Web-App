@@ -7,7 +7,7 @@ export default function NewCaseLoading() {
     <div className="min-h-screen bg-gradient-to-b from-light-gray to-white">
       {/* Header */}
       <header className="border-b border-sage-medium/50 glass-card sticky top-0 z-40">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="mx-auto px-4 max-w-3xl h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LumaLogo className="w-8 h-8" />
             <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>

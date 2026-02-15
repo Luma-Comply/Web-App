@@ -21,17 +21,25 @@ export default function AnimatedNumber({
   decimals = 0,
 }: AnimatedNumberProps) {
   const [displayValue, setDisplayValue] = useState(0)
-  const [hasAnimated, setHasAnimated] = useState(false)
   const elementRef = useRef<HTMLSpanElement>(null)
+  const hasAnimatedRef = useRef(false)
 
   // Use a ref to hold the animating value so GSAP can target it
   const valueRef = useRef({ val: 0 })
 
   useEffect(() => {
+    const el = elementRef.current
+    if (!el) return
+
+    // Reset on each effect run (handles React strict mode double-mount)
+    hasAnimatedRef.current = false
+    valueRef.current.val = 0
+    setDisplayValue(0)
+
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !hasAnimated) {
-          setHasAnimated(true)
+        if (entry.isIntersecting && !hasAnimatedRef.current) {
+          hasAnimatedRef.current = true
 
           gsap.to(valueRef.current, {
             val: value,
@@ -46,16 +54,17 @@ export default function AnimatedNumber({
         }
       },
       {
-        threshold: 0.5,
+        threshold: 0.1,
       }
     )
 
-    if (elementRef.current) {
-      observer.observe(elementRef.current)
-    }
+    observer.observe(el)
 
-    return () => observer.disconnect()
-  }, [value, duration, hasAnimated])
+    return () => {
+      observer.disconnect()
+      gsap.killTweensOf(valueRef.current)
+    }
+  }, [value, duration])
 
   // Format the number with commas and specified decimals
   const formattedValue = displayValue.toLocaleString(undefined, {

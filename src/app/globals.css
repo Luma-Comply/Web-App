@@ -4,58 +4,60 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --background: 60 24% 95%; /* beige #F4F4EE */
+    --foreground: 224 47% 19%; /* navy #1A2749 */
+    --card: 0 0% 100%; /* white surface */
+    --card-foreground: 224 47% 19%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 159 28% 52%; /* mint */
-    --primary-foreground: 210 40% 98%;
-    --secondary: 146 26% 71%; /* sage-light */
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 146 21% 71%; /* sage-medium */
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 30 45% 59%; /* tan */
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 6 78% 61%; /* coral */
-    --destructive-foreground: 210 40% 98%;
-    --border: 146 26% 71%;
-    --input: 146 26% 71%;
-    --ring: 159 28% 52%;
+    --popover-foreground: 224 47% 19%;
+    --primary: 224 47% 19%; /* navy */
+    --primary-foreground: 60 24% 95%;
+    --secondary: 60 15% 93%; /* medium beige #EDEDE7 */
+    --secondary-foreground: 224 47% 19%;
+    --muted: 60 10% 91%; /* dark beige #E7E7D9 */
+    --muted-foreground: 215 16% 47%; /* muted navy text */
+    --accent: 219 80% 43%; /* blue #1652C5 */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 17 90% 40%; /* error red #C4320A */
+    --destructive-foreground: 0 0% 100%;
+    --border: 225 14% 90%; /* navy-tinted light border */
+    --input: 225 12% 85%; /* slightly darker for input borders */
+    --ring: 219 80% 43%; /* blue focus ring */
     --radius: 0.5rem;
-    --chart-1: 159 28% 52%;
-    --chart-2: 146 26% 71%;
-    --chart-3: 30 45% 59%;
-    --chart-4: 6 78% 61%;
-    --chart-5: 146 21% 71%;
+    --chart-1: 219 80% 43%; /* blue */
+    --chart-2: 224 47% 19%; /* navy */
+    --chart-3: 160 82% 24%; /* success green */
+    --chart-4: 35 92% 44%; /* warning amber */
+    --chart-5: 224 66% 32%; /* medium blue #19408B */
+    --emphasis: 6 78% 61%; /* coral — signature accent for moments of emphasis */
   }
 
   .dark {
-    --background: 240 10% 8%; /* dark-bg */
-    --foreground: 60 9.1% 87.8%; /* light-gray */
-    --card: 240 10% 8%;
-    --card-foreground: 60 9.1% 87.8%;
-    --popover: 240 10% 8%;
-    --popover-foreground: 60 9.1% 87.8%;
-    --primary: 159 28% 52%; /* mint */
-    --primary-foreground: 210 40% 98%;
-    --secondary: 146 26% 71%; /* sage-light */
-    --secondary-foreground: 240 10% 8%;
-    --muted: 146 21% 71%;
-    --muted-foreground: 215.4 16.3% 56.9%;
-    --accent: 30 45% 59%; /* tan */
-    --accent-foreground: 240 10% 8%;
-    --destructive: 6 78% 61%; /* coral */
-    --destructive-foreground: 210 40% 98%;
-    --border: 146 26% 71%;
-    --input: 146 26% 71%;
-    --ring: 159 28% 52%;
-    --chart-1: 159 28% 52%;
-    --chart-2: 146 26% 71%;
-    --chart-3: 30 45% 59%;
-    --chart-4: 6 78% 61%;
-    --chart-5: 146 21% 71%;
+    --background: 226 47% 11%; /* deep navy #0F1629 */
+    --foreground: 228 24% 93%; /* light #E8EAF0 */
+    --card: 226 40% 17%; /* surface #182040 */
+    --card-foreground: 228 24% 93%;
+    --popover: 226 40% 17%;
+    --popover-foreground: 228 24% 93%;
+    --primary: 228 24% 93%; /* light text becomes primary in dark */
+    --primary-foreground: 226 47% 11%;
+    --secondary: 226 43% 22%; /* #1E2A52 */
+    --secondary-foreground: 228 24% 93%;
+    --muted: 226 43% 22%;
+    --muted-foreground: 215 16% 57%; /* muted light text */
+    --accent: 220 80% 65%; /* brighter blue #5B8DEF */
+    --accent-foreground: 226 47% 11%;
+    --destructive: 0 86% 71%; /* brighter red #F87171 */
+    --destructive-foreground: 226 47% 11%;
+    --border: 224 30% 20%; /* subtle border in dark mode */
+    --input: 224 28% 24%; /* input borders slightly stronger */
+    --ring: 220 80% 65%;
+    --chart-1: 220 80% 65%; /* bright blue */
+    --chart-2: 228 24% 93%; /* light */
+    --chart-3: 160 68% 51%; /* bright green #34D399 */
+    --chart-4: 45 94% 56%; /* bright amber #FBBF24 */
+    --chart-5: 221 90% 73%; /* light blue #7BA8F7 */
+    --emphasis: 6 78% 61%; /* coral accent — unchanged in dark */
   }
 }
 
@@ -65,80 +67,6 @@
   }
   body {
     @apply bg-background text-foreground;
-  }
-}
-
-/* Custom Animations */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-
-@keyframes glowPulse {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(126, 161, 141, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 30px rgba(126, 161, 141, 0.5);
   }
 }
 
@@ -152,130 +80,63 @@
   }
 
   .glass-card-dark {
-    background: rgba(19, 19, 23, 0.6);
+    background: rgba(15, 22, 41, 0.6);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  .medical-grid {
-    background-image:
-      linear-gradient(rgba(183, 208, 193, 0.15) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(183, 208, 193, 0.15) 1px, transparent 1px);
-    background-size: 40px 40px;
-  }
-
   .text-shadow-soft {
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   }
-
-  .animate-fade-in-up {
-    animation: fadeInUp 0.6s ease-out forwards;
-  }
-
-  .animate-fade-in-down {
-    animation: fadeInDown 0.6s ease-out forwards;
-  }
-
-  .animate-slide-in-left {
-    animation: slideInLeft 0.6s ease-out forwards;
-  }
-
-  .animate-slide-in-right {
-    animation: slideInRight 0.6s ease-out forwards;
-  }
-
-  .animate-scale-in {
-    animation: scaleIn 0.6s ease-out forwards;
-  }
-
-  .animate-glow-pulse {
-    animation: glowPulse 2s ease-in-out infinite;
-  }
-
-  /* Animation delays */
-  .animation-delay-100 {
-    animation-delay: 100ms;
-  }
-
-  .animation-delay-200 {
-    animation-delay: 200ms;
-  }
-
-  .animation-delay-300 {
-    animation-delay: 300ms;
-  }
-
-  .animation-delay-400 {
-    animation-delay: 400ms;
-  }
-
-  .animation-delay-500 {
-    animation-delay: 500ms;
-  }
-
-  .animation-delay-600 {
-    animation-delay: 600ms;
-  }
-
-  /* Respect prefers-reduced-motion */
-  @media (prefers-reduced-motion: reduce) {
-    .animate-fade-in-up,
-    .animate-fade-in-down,
-    .animate-slide-in-left,
-    .animate-slide-in-right,
-    .animate-scale-in,
-    .animate-glow-pulse {
-      animation: none;
-      opacity: 1;
-      transform: none;
-    }
-  }
 }
 
-/* Logo Animation Keyframes - Random Red and Green with Fade */
+/* Arrow loop animation */
+@keyframes arrow-loop {
+  0% { transform: translateX(0); opacity: 1; }
+  20% { transform: translateX(-4px); opacity: 1; }
+  40% { transform: translateX(20px); opacity: 0; }
+  41% { transform: translateX(-20px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+.group:hover .arrow-loop {
+  animation: arrow-loop 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Logo Animation Keyframes */
 @keyframes logo-shimmer {
-  0% {
-    opacity: 0.4;
-    fill: #ABC5B6; /* Base Gray/Green */
-  }
-  20% {
-    opacity: 1;
-    fill: #7FA68F; /* Brighter Green */
-  }
-  35% {
-    opacity: 0.5;
-    fill: #94B7A3; /* Medium Green */
-  }
-  50% {
-    opacity: 0.4;
-    fill: #ABC5B6; /* Base Gray/Green */
-  }
-  65% {
-    opacity: 1;
-    fill: #7FA68F; /* Brighter Green */
-  }
-  80% {
-    opacity: 1;
-    fill: #EC624F; /* Red/Coral */
-  }
-  100% {
-    opacity: 0.4;
-    fill: #ABC5B6; /* Base Gray/Green */
-  }
+  0% { opacity: 0.35; fill: #B8C1D4; }
+  20% { opacity: 0.75; fill: #5B8DEF; }
+  35% { opacity: 0.4; fill: #8AA3CC; }
+  50% { opacity: 0.35; fill: #B8C1D4; }
+  65% { opacity: 0.75; fill: #1652C5; }
+  80% { opacity: 0.75; fill: #C4320A; }
+  100% { opacity: 0.35; fill: #B8C1D4; }
 }
 
-/* Logo Animation Utility Classes */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(22, 82, 197, 0.2); }
+  50% { box-shadow: 0 0 30px rgba(22, 82, 197, 0.35); }
+}
+
 .animate-logo-dot {
-  /* 
-     Runs the shimmer animation over 4 seconds endlessly.
-     Each dot has its own delay creating a wave/random effect.
-  */
   animation: logo-shimmer 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .animate-logo-pulse-fast {
-  /* Faster version for loading states - each dot pulses independently with random timing */
   animation: logo-shimmer 1.5s ease-in-out infinite;
-  /* Keep individual delays for random effect - don't override */
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-logo-dot,
+  .animate-logo-pulse-fast,
+  .animate-glow-pulse {
+    animation: none;
+    opacity: 1;
+  }
 }

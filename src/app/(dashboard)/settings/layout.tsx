@@ -7,6 +7,7 @@ import { User, Users, CreditCard, ChevronLeft, Plus, ChevronDown, LogOut } from 
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { motion, AnimatePresence } from "motion/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,11 @@ export default function SettingsLayout({
   const [userEmail, setUserEmail] = useState("")
   const [practiceName, setPracticeName] = useState("")
   const [isTeamOwner, setIsTeamOwner] = useState(true) // Default to true to avoid flash
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     async function loadUser() {
@@ -87,7 +93,7 @@ export default function SettingsLayout({
     <div className="min-h-screen bg-gradient-to-b from-light-gray to-white">
       {/* Header */}
       <header className="border-b border-sage-medium/50 glass-card sticky top-0 z-40">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="mx-auto px-4 max-w-5xl h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LumaLogo className="w-8 h-8" />
             <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
@@ -103,7 +109,7 @@ export default function SettingsLayout({
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" className="flex items-center gap-2 hover:bg-gray-100">
                   <span className="text-sm text-gray-600 hidden md:block">{practiceName || userEmail}</span>
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 </Button>
@@ -150,41 +156,78 @@ export default function SettingsLayout({
 
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         {/* Back to Dashboard */}
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-1 text-gray-600 hover:text-mint transition-colors mb-6 group"
+        <motion.div
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
         >
-          <ChevronLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-          <span className="text-sm">Back to Dashboard</span>
-        </Link>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-1 text-gray-600 hover:text-mint transition-colors mb-6 group"
+          >
+            <ChevronLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+            <span className="text-sm">Back to Dashboard</span>
+          </Link>
+        </motion.div>
 
-        <h1 className="text-3xl font-sans font-bold text-dark-bg mb-2">Settings</h1>
-        <p className="text-gray-600 mb-8">Manage your account settings and preferences.</p>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut", delay: 0.05 }}
+        >
+          <h1 className="text-3xl font-sans font-bold text-dark-bg mb-2">Settings</h1>
+          <p className="text-gray-600 mb-8">Manage your account settings and preferences.</p>
+        </motion.div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 border-b border-sage-medium/30">
+        {/* Tabs - Sliding Indicator */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut", delay: 0.1 }}
+          className="flex gap-1 p-1 mb-6 rounded-lg bg-white/60 border border-sage-medium/30 w-fit overflow-hidden"
+        >
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = pathname === tab.href
             return (
-              <Link
+              <motion.button
                 key={tab.href}
-                href={tab.href}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  isActive
-                    ? "border-dark-bg text-dark-bg"
-                    : "border-transparent text-gray-600 hover:text-dark-bg hover:border-gray-300"
-                }`}
+                onClick={() => router.push(tab.href)}
+                className="relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md cursor-pointer z-[1]"
+                style={{
+                  color: isActive ? "#131317" : "#6b7280",
+                  transition: "color 0.15s ease",
+                }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ type: "spring", stiffness: 300, damping: 22 }}
               >
+                {isActive && mounted && (
+                  <motion.div
+                    layoutId="settings-tab-indicator"
+                    className="absolute inset-0 rounded-md bg-white shadow-sm border border-sage-medium/40"
+                    style={{ zIndex: -1 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30, mass: 1 }}
+                  />
+                )}
                 <Icon className="w-4 h-4" />
                 {tab.name}
-              </Link>
+              </motion.button>
             )
           })}
-        </div>
+        </motion.div>
 
-        {/* Content */}
-        <div>{children}</div>
+        {/* Content with entrance animation */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   )

@@ -57,7 +57,7 @@ export function SubscriptionBanner({
   // Trial expired or canceled
   if (subscriptionStatus === "canceled" || (subscriptionStatus === "trialing" && trialEndsAt && new Date(trialEndsAt) < new Date())) {
     return (
-      <Card className="p-6 glass-card border-2 border-coral/50 bg-coral/5 mb-6">
+      <Card className="p-6 border-2 border-coral/50 bg-coral/5 mb-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3 flex-1">
             <AlertCircle className="w-6 h-6 text-coral flex-shrink-0 mt-1" />
@@ -68,7 +68,7 @@ export function SubscriptionBanner({
               <p className="text-gray-700 mb-3">
                 {subscriptionStatus === "canceled"
                   ? "Your subscription has been canceled. Upgrade to continue creating cases."
-                  : "Your 14-day free trial has ended. Subscribe to continue using Luma."}
+                  : "Your 7-day free trial has ended. Subscribe to continue using Luma."}
               </p>
               <Button onClick={handleUpgrade} disabled={loading}>
                 {loading ? (
@@ -95,7 +95,7 @@ export function SubscriptionBanner({
     const daysLeft = Math.ceil((new Date(trialEndsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
 
     return (
-      <Card className="p-4 sm:p-6 glass-card border-2 border-mint/50 bg-mint/5 mb-6">
+      <Card className="p-4 sm:p-6 border-2 border-mint/50 bg-mint/5 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-start gap-3 flex-1">
             <Clock className="w-6 h-6 text-mint flex-shrink-0 mt-1" />
@@ -172,7 +172,7 @@ export function SubscriptionBanner({
   // Past due
   if (subscriptionStatus === "past_due") {
     return (
-      <Card className="p-6 glass-card border-2 border-coral/50 bg-coral/5 mb-6">
+      <Card className="p-6 border-2 border-coral/50 bg-coral/5 mb-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3 flex-1">
             <AlertCircle className="w-6 h-6 text-coral flex-shrink-0 mt-1" />

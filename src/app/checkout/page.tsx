@@ -13,6 +13,7 @@ export default function CheckoutPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isReturningUser, setIsReturningUser] = useState(false)
 
   useEffect(() => {
     async function checkAuth() {
@@ -33,6 +34,17 @@ export default function CheckoutPage() {
         // Email not confirmed yet, redirect to confirmation page
         router.push(`/signup/confirm-email?email=${encodeURIComponent(user.email || '')}`)
         return
+      }
+
+      // Check if returning user (has had a prior subscription)
+      const { data: userData } = await supabase
+        .from("users")
+        .select("stripe_subscription_id")
+        .eq("id", user.id)
+        .single()
+
+      if (userData?.stripe_subscription_id) {
+        setIsReturningUser(true)
       }
 
       setIsAuthenticated(true)
@@ -61,7 +73,7 @@ export default function CheckoutPage() {
     <div className="min-h-screen bg-gradient-to-b from-light-gray to-white">
       {/* Header */}
       <header className="border-b border-sage-medium/50 glass-card">
-        <div className="container mx-auto px-4 h-16 flex items-center">
+        <div className="mx-auto px-4 max-w-4xl h-16 flex items-center">
           <div className="flex items-center gap-2">
             <LumaLogo className="w-10 h-10" />
             <span className="text-2xl font-serif font-bold text-dark-bg">Luma</span>
@@ -73,14 +85,15 @@ export default function CheckoutPage() {
         <div className="text-center mb-12">
           <Badge variant="outline" className="mb-4">
             <Shield className="w-4 h-4 mr-2 text-mint" />
-            14-Day Free Trial
+            {isReturningUser ? "Welcome Back" : "7-Day Free Trial"}
           </Badge>
           <h1 className="text-4xl md:text-5xl font-sans font-semibold text-dark-bg mb-4">
-            Complete Your Registration
+            {isReturningUser ? "Re-activate Your Subscription" : "Complete Your Registration"}
           </h1>
           <p className="text-xl text-gray-600">
-            Add your payment method to start your 14-day free trial.
-            You won't be charged until the trial ends.
+            {isReturningUser
+              ? "Pick up where you left off. Your existing cases are waiting for you."
+              : "Add your payment method to start your 7-day free trial. You won't be charged until the trial ends."}
           </p>
         </div>
 
@@ -93,7 +106,7 @@ export default function CheckoutPage() {
                 <span className="text-gray-600">/month</span>
               </div>
               <p className="text-sm text-gray-600">
-                First 14 days free, then $399/mo
+                {isReturningUser ? "$399/mo — billed monthly" : "First 7 days free, then $399/mo"}
               </p>
             </div>
 
@@ -166,14 +179,23 @@ export default function CheckoutPage() {
                 <Shield className="w-6 h-6 text-mint flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="text-lg font-sans font-semibold text-dark-bg mb-2">
-                    Risk-Free Trial
+                    {isReturningUser ? "Instant Re-activation" : "Risk-Free Trial"}
                   </h3>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Try Luma free for 14 days. Cancel anytime during the trial and you won't be charged.
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    After your trial, you'll be automatically charged $399/month. You can cancel or modify your plan anytime.
-                  </p>
+                  {isReturningUser ? (
+                    <p className="text-sm text-gray-600">
+                      Your subscription will be activated immediately upon payment.
+                      Cancel or modify your plan anytime.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Try Luma free for 7 days. Cancel anytime during the trial and you won't be charged.
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        After your trial, you'll be automatically charged $399/month. You can cancel or modify your plan anytime.
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </Card>
@@ -197,9 +219,14 @@ export default function CheckoutPage() {
 
         {/* CTA */}
         <div className="text-center">
-          <SubscribeButton className="w-full md:w-auto px-12 py-6 text-lg" />
+          <SubscribeButton
+            className="w-full md:w-auto px-12 py-6 text-lg"
+            isReturningUser={isReturningUser}
+          />
           <p className="text-sm text-gray-600 mt-4">
-            By clicking "Start 14-Day Free Trial", you agree to our Terms of Service and Privacy Policy.
+            {isReturningUser
+              ? "By clicking \"Subscribe Now\", you agree to our Terms of Service and Privacy Policy."
+              : "By clicking \"Start 7-Day Free Trial\", you agree to our Terms of Service and Privacy Policy."}
           </p>
         </div>
       </div>

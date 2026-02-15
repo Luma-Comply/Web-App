@@ -367,7 +367,7 @@ export default function NewCasePage() {
     <div className="min-h-screen bg-gradient-to-b from-light-gray to-white">
       {/* Header */}
       <header className="border-b border-sage-medium/50 glass-card">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="mx-auto px-4 max-w-4xl h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/dashboard">
               <Button variant="ghost" size="sm">
@@ -410,7 +410,7 @@ export default function NewCasePage() {
               name="doc_type"
               value={formData.doc_type}
               onChange={handleChange}
-              className="w-full mt-2 h-11 px-4 rounded-md border border-sage-medium bg-white focus:border-mint focus:ring-2 focus:ring-mint focus:ring-offset-0 outline-none"
+              className="w-full mt-2 h-11 px-4 rounded-md border border-input bg-white focus:border-ring focus:ring-2 focus:ring-ring focus:ring-offset-0 outline-none"
               required
             >
               <option value="" disabled>Select Document Type</option>
@@ -428,7 +428,7 @@ export default function NewCasePage() {
                   name="wound_type"
                   value={formData.wound_type}
                   onChange={handleChange}
-                  className="w-full mt-2 h-11 px-4 rounded-md border border-sage-medium bg-white focus:border-mint focus:ring-2 focus:ring-mint focus:ring-offset-0 outline-none"
+                  className="w-full mt-2 h-11 px-4 rounded-md border border-input bg-white focus:border-ring focus:ring-2 focus:ring-ring focus:ring-offset-0 outline-none"
                   required
                 >
                   <option value="" disabled>Select Wound Type</option>
@@ -774,7 +774,7 @@ Requesting Rinvoq 15mg daily."
                 type="checkbox"
                 checked={agreedToTerms}
                 onChange={(e) => setAgreedToTerms(e.target.checked)}
-                className="mt-0.5 w-6 h-6 rounded-md border-2 border-sage-medium text-mint focus:ring-mint focus:ring-offset-0 cursor-pointer accent-mint"
+                className="mt-0.5 w-6 h-6 rounded-md border-2 border-input text-mint focus:ring-ring focus:ring-offset-0 cursor-pointer accent-mint"
               />
               <span className="text-sm text-gray-700 leading-relaxed">
                 I confirm that my clinical notes do not contain PHI identifiers (SSN, full addresses, phone numbers, MRN, DOB, etc.). I understand that I am responsible for de-identifying patient data before submission.

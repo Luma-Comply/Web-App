@@ -1,28 +1,24 @@
 import Hero from "@/components/landing/Hero"
 import StatsBar from "@/components/landing/StatsBar"
-import ProblemSection from "@/components/landing/ProblemSection"
-import FeaturesSection from "@/components/landing/FeaturesSection"
+import ProblemSolutionSection from "@/components/landing/ProblemSolutionSection"
 import TimelineSection from "@/components/landing/TimelineSection"
 import TestimonialsSection from "@/components/landing/TestimonialsSection"
-import PricingSection from "@/components/landing/PricingSection"
 import { ComplianceSection } from "@/components/landing/ComplianceSection"
-import { FAQSection } from "@/components/landing/FAQSection"
-import CTASection from "@/components/landing/CTASection"
+import PricingFAQSection from "@/components/landing/PricingFAQSection"
 import Footer from "@/components/landing/Footer"
+import SmoothScroll from "@/components/landing/SmoothScroll"
 
 export default function Home() {
   return (
     <main className="min-h-screen">
+      <SmoothScroll />
       <Hero />
       <StatsBar />
-      <ProblemSection />
-      <FeaturesSection />
+      <ProblemSolutionSection />
       <TimelineSection />
       <TestimonialsSection />
-      <PricingSection />
       <ComplianceSection />
-      <FAQSection />
-      <CTASection />
+      <PricingFAQSection />
       <Footer />
     </main>
   )

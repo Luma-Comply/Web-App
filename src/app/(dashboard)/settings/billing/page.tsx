@@ -1,5 +1,6 @@
 "use client"
 
+import BillingLoading from "./loading"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -143,11 +144,7 @@ export default function BillingPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-pulse text-gray-600">Loading...</div>
-      </div>
-    )
+    return <BillingLoading />
   }
 
   const isTrialing = billingInfo?.subscription_status === "trialing"

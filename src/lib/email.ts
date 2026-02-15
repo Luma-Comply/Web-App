@@ -51,12 +51,12 @@ export async function sendInvitationEmail({
     </p>
 
     <a href="${invitationLink}"
-       style="display: inline-block; background-color: #131317; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 16px;">
+       style="display: inline-block; background-color: #1A2749; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 16px;">
       Accept Invitation
     </a>
 
     <p style="color: #64748b; font-size: 14px; line-height: 1.5; margin-top: 32px;">
-      This invitation will expire in 7 days. If you have any questions, contact us at <a href="mailto:hello@useluma.io" style="color: #5A8270; text-decoration: none; font-weight: 500;">hello@useluma.io</a>.
+      This invitation will expire in 7 days. If you have any questions, contact us at <a href="mailto:hello@useluma.io" style="color: #1652C5; text-decoration: none; font-weight: 500;">hello@useluma.io</a>.
     </p>
 
     <div style="border-top: 1px solid #e2e8f0; margin-top: 32px; padding-top: 16px;">

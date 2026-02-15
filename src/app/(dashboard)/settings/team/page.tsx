@@ -1,5 +1,6 @@
 "use client"
 
+import TeamLoading from "./loading"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -267,11 +268,7 @@ export default function TeamPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-pulse text-gray-600">Loading...</div>
-      </div>
-    )
+    return <TeamLoading />
   }
 
   const availableSeats = seatsCount - seatsUsed - invitations.length
@@ -463,7 +460,6 @@ export default function TeamPage() {
                     handleInviteTeamMember()
                   }
                 }}
-                className="bg-white border-sage-medium/30"
               />
             </div>
             <p className="text-xs text-gray-500">

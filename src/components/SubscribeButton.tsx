@@ -6,7 +6,13 @@ import { Loader2, CreditCard } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
-export function SubscribeButton({ className }: { className?: string }) {
+export function SubscribeButton({
+  className,
+  isReturningUser = false,
+}: {
+  className?: string
+  isReturningUser?: boolean
+}) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -68,7 +74,7 @@ export function SubscribeButton({ className }: { className?: string }) {
       ) : (
         <>
           <CreditCard className="w-5 h-5 mr-2" />
-          Start 14-Day Free Trial
+          {isReturningUser ? "Subscribe Now" : "Start 7-Day Free Trial"}
         </>
       )}
     </Button>

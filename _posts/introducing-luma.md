@@ -86,7 +86,7 @@ Our roadmap includes:
 
 Ready to reclaim your time and focus on patient care? Start your journey with Luma now.
 
-<a href="https://useluma.io/signup">Begin your 14-day free trial</a> and experience the future of medical necessity documentation. No credit card required to start.
+<a href="https://useluma.io/signup">Begin your 7-day free trial</a> and experience the future of medical necessity documentation. No credit card required to start.
 
 Have questions about how Luma fits your practice? Explore more resources on our <a href="https://useluma.io/blog">blog</a> or reach out directly.
 

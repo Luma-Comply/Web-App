@@ -7,8 +7,7 @@ import { signup } from "@/app/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Check, Zap, Shield, Loader2, Eye, EyeOff } from "lucide-react"
-import MedicalGrid from "@/components/MedicalGrid"
+import { Check, Zap, Shield, Loader2, Eye, EyeOff } from "lucide-react"
 import { LumaLogo } from "@/components/LumaLogo"
 import SignInDialog from "@/components/SignInDialog"
 
@@ -44,8 +43,7 @@ export default function SignupPage() {
   const [signInOpen, setSignInOpen] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-light-gray to-white relative overflow-hidden">
-      <MedicalGrid intensity="light" />
+    <div className="flex min-h-screen relative overflow-hidden" style={{ backgroundColor: "#F4F4EE" }}>
 
       <div className="container mx-auto px-4 py-8 relative z-10">
         {/* Header */}
@@ -58,9 +56,9 @@ export default function SignupPage() {
           <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Side - Branding */}
             <div className="hidden lg:block animate-fade-in-up">
-              <h1 className="text-5xl font-sans font-semibold text-dark-bg mb-6 leading-tight">
+              <h1 className="text-5xl font-serif font-semibold mb-6 leading-[1.1]" style={{ color: "#1A2749" }}>
                 Focus on patients,
-                <span className="text-mint block">not paperwork</span>
+                <span className="block">not paperwork.</span>
               </h1>
               <p className="text-xl text-gray-700 mb-8 leading-relaxed">
                 Join providers who are getting treatments approved faster while protecting their practice.
@@ -99,7 +97,7 @@ export default function SignupPage() {
                     Create account
                   </h2>
                   <p className="text-gray-600">
-                    Start your free 14-day trial
+                    Start your free 7-day trial
                   </p>
                 </div>
 

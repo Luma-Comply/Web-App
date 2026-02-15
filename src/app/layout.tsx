@@ -1,39 +1,19 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono } from "next/font/google";
-import localFont from "next/font/local";
+import { IBM_Plex_Mono, Inter, Newsreader } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
-const blacklist = localFont({
-  src: [
-    {
-      path: "../../public/fonts/blacklist-complete-family-webfont-full/blacklist-regular/webfonts/blacklist-regular.woff2",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "../../public/fonts/blacklist-complete-family-webfont-full/blacklist-italic/webfonts/blacklist-italic.woff2",
-      weight: "400",
-      style: "italic",
-    },
-    {
-      path: "../../public/fonts/blacklist-complete-family-webfont-full/blacklist-medium-italic/webfonts/blacklist-medium-italic.woff2",
-      weight: "500",
-      style: "italic",
-    },
-    {
-      path: "../../public/fonts/blacklist-complete-family-webfont-full/blacklist-bold/webfonts/blacklist-bold.woff2",
-      weight: "700",
-      style: "normal",
-    },
-  ],
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
   variable: "--font-serif",
   display: "swap",
 });
 
-const natux = localFont({
-  src: "../../public/fonts/ywft-natux-variable-webfont-full/webfonts/ywft-natux-variable.woff2",
+const inter = Inter({
+  subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
 });
@@ -141,7 +121,7 @@ export default function RootLayout({
         `}
       </Script>
 
-      <body className={`${blacklist.variable} ${natux.variable} ${ibmPlexMono.variable} font-sans antialiased`}>
+      <body className={`${newsreader.variable} ${inter.variable} ${ibmPlexMono.variable} font-sans antialiased`}>
         {children}
         <Toaster />
       </body>

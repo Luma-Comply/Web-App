@@ -116,8 +116,8 @@ BEGIN
     NEW.id,
     NEW.email,
     'trialing',
-    NOW() + INTERVAL '14 days',
-    NOW() + INTERVAL '14 days',
+    NOW() + INTERVAL '7 days',
+    NOW() + INTERVAL '7 days',
     50,
     3
   )

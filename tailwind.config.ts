@@ -50,22 +50,27 @@ const config: Config = {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
-        // Luma custom colors
-        "dark-bg": "#131317",
-        "light-gray": "#E0E0D9",
-        "sage-light": "#B7D0C1",
-        "sage-medium": "#AFC6B9",
-        "sage-dark": "#B5CDB9",
-        mint: "#5A8270", // Darkened from #7EA18D for ADA compliance (4.5:1 contrast on white)
-        "mint-light": "#7EA18D", // Original lighter mint for backgrounds
-        tan: "#BB966D",
-        "tan-light": "#A4784A",
-        coral: "#EC624F",
+        // Luma custom colors — navy/blue/beige system
+        "dark-bg": "#0F1629",
+        "light-gray": "#E8EAF0",
+        "sage-light": "#EDEDE7", // now beige-light (kept name for Tailwind class compat)
+        "sage-medium": "#E7E7D9", // now beige-medium (kept name for Tailwind class compat)
+        "sage-dark": "#DDD9CC", // now beige-dark (kept name for Tailwind class compat)
+        mint: "#1652C5", // now brand blue (kept name for Tailwind class compat)
+        "mint-light": "#5B8DEF", // now bright blue (kept name for Tailwind class compat)
+        tan: "#19408B", // now medium blue accent
+        "tan-light": "#7BA8F7", // now light blue
+        coral: "#EC624F", // signature accent — moments of emphasis only
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        "elevation-sm": "0 2px 4px rgba(0,0,0,.04), 0 4px 8px rgba(0,0,0,.06)",
+        "elevation-md": "0 2px 8px rgba(0,0,0,.08), 0 8px 16px rgba(0,0,0,.08)",
+        "elevation-lg": "0 4px 12px rgba(0,0,0,.08), 0 12px 24px rgba(0,0,0,.10)",
       },
       fontFamily: {
         serif: ["var(--font-serif)", "Georgia", "serif"],
@@ -74,8 +79,8 @@ const config: Config = {
       },
       keyframes: {
         "logo-pulse-red": {
-          "0%, 100%": { fill: "#ABC5B6" },
-          "50%": { fill: "#D68F85" }, // Softer/muted red (was #EC624F)
+          "0%, 100%": { fill: "#B8C1D4" },
+          "50%": { fill: "#D68F85" }, // Softer coral emphasis
         },
       },
       animation: {

@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { LumaLogo } from "@/components/LumaLogo"
 import { Eye, EyeOff } from "lucide-react"
 
 interface SignInDialogProps {
@@ -28,10 +27,6 @@ export default function SignInDialog({ open, onOpenChange }: SignInDialogProps) 
       <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-sage-medium/30">
         {/* Header with gradient - outer radius 20px */}
         <div className="relative bg-gradient-to-br from-mint/10 via-sage-light/20 to-white p-6 border-b border-sage-medium/20">
-          <div className="flex items-center gap-3 mb-2">
-            <LumaLogo className="w-8 h-8" />
-            <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
-          </div>
           <DialogHeader className="text-left space-y-1">
             <DialogTitle className="text-2xl font-sans font-semibold text-dark-bg">
               Welcome back
@@ -123,7 +118,7 @@ export default function SignInDialog({ open, onOpenChange }: SignInDialogProps) 
           <Link href="/signup" onClick={() => onOpenChange(false)}>
             <Button
               variant="outline"
-              className="w-full h-11 border-sage-medium hover:bg-sage-light/50"
+              className="w-full h-11 border border-border hover:bg-muted/50"
             >
               Create a free account
             </Button>

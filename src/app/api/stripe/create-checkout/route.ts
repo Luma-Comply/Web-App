@@ -107,6 +107,9 @@ export async function POST(req: NextRequest) {
         .eq("id", authUser.id);
     }
 
+    // Determine if user has had a prior subscription (no second free trial)
+    const isReturningUser = !!user.stripe_subscription_id;
+
     // Create Checkout Session
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -122,7 +125,7 @@ export async function POST(req: NextRequest) {
         supabase_user_id: authUser.id,
       },
       subscription_data: {
-        trial_period_days: 14,
+        ...(isReturningUser ? {} : { trial_period_days: 7 }),
         metadata: {
           supabase_user_id: authUser.id,
         },

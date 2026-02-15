@@ -317,6 +317,7 @@ async function handleSubscriptionDeleted(
     .from("users")
     .update({
       subscription_status: "canceled",
+      cancel_at_period_end: false,
     })
     .eq("id", userId);
 

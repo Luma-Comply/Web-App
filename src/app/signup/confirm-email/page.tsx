@@ -91,7 +91,7 @@ function ConfirmEmailContent() {
                     <ol className="list-decimal list-inside space-y-1 text-gray-600">
                       <li>Check your inbox (and spam folder)</li>
                       <li>Click the confirmation link in the email</li>
-                      <li>Complete your 14-day free trial setup</li>
+                      <li>Complete your 7-day free trial setup</li>
                     </ol>
                   </div>
                 </div>

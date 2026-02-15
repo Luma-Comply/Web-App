@@ -1,134 +1,117 @@
 "use client"
 
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { ShieldCheck } from "lucide-react"
-
 export function ComplianceSection() {
   return (
-    <section className="py-20 bg-white relative overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-light-gray/30 to-white pointer-events-none" />
-
-      <div className="container mx-auto px-4 relative">
+    <section className="py-24 bg-background">
+      <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <Badge variant="outline" className="mb-4">
-              <ShieldCheck className="w-4 h-4 mr-2" />
-              HIPAA Compliant
-            </Badge>
-            <h2 className="text-4xl md:text-5xl font-serif text-dark-bg mb-6">
-              Built to avoid PHI
-            </h2>
-            <p className="text-lg text-gray-700 max-w-2xl mx-auto">
-              Luma is designed so your clinic can generate compliant documentation without entering protected health information. We collect only the minimum clinical context needed for AI generation.
-            </p>
-          </div>
+          <h2 className="text-4xl md:text-5xl font-serif text-dark-bg mb-4">
+            Built to Avoid PHI
+          </h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mb-12">
+            Luma collects only the minimum clinical context needed for AI generation.
+            <br />
+            No protected health information required.
+          </p>
 
           {/* Two column grid */}
           <div className="grid md:grid-cols-2 gap-6 mb-8">
             {/* What we do NOT collect */}
-            <Card className="p-6 glass-card border border-coral/20">
-              <h3 className="text-xl font-serif text-dark-bg mb-4">
+            <div className="bg-white border border-border rounded-lg p-8">
+              <h3 className="text-xl font-semibold text-dark-bg mb-6">
                 What we do not collect
               </h3>
-              <ul className="space-y-3 text-gray-700">
-                <li className="flex items-start">
-                  <span className="text-coral mr-3 mt-1">×</span>
+              <ul className="space-y-3 text-foreground/80">
+                <li className="flex items-start gap-3">
+                  <span className="text-coral mt-0.5 font-medium">×</span>
                   <span>Date of birth</span>
                 </li>
-                <li className="flex items-start">
-                  <span className="text-coral mr-3 mt-1">×</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-coral mt-0.5 font-medium">×</span>
                   <span>Medical record numbers</span>
                 </li>
-                <li className="flex items-start">
-                  <span className="text-coral mr-3 mt-1">×</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-coral mt-0.5 font-medium">×</span>
                   <span>Full street addresses</span>
                 </li>
-                <li className="flex items-start">
-                  <span className="text-coral mr-3 mt-1">×</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-coral mt-0.5 font-medium">×</span>
                   <span>Phone numbers or email addresses</span>
                 </li>
-                <li className="flex items-start">
-                  <span className="text-coral mr-3 mt-1">×</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-coral mt-0.5 font-medium">×</span>
                   <span>Insurance member IDs</span>
                 </li>
-                <li className="flex items-start">
-                  <span className="text-coral mr-3 mt-1">×</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-coral mt-0.5 font-medium">×</span>
                   <span>Exact dates of service</span>
                 </li>
               </ul>
-            </Card>
+            </div>
 
             {/* What we DO collect */}
-            <Card className="p-6 glass-card border border-mint/20">
-              <h3 className="text-xl font-serif text-dark-bg mb-4">
+            <div className="bg-white border border-border rounded-lg p-8">
+              <h3 className="text-xl font-semibold text-dark-bg mb-6">
                 What we do collect
               </h3>
-              <ul className="space-y-3 text-gray-700">
-                <li className="flex items-start">
-                  <span className="text-mint mr-3 mt-1">✓</span>
+              <ul className="space-y-3 text-foreground/80">
+                <li className="flex items-start gap-3">
+                  <span className="text-mint mt-0.5 font-medium">✓</span>
                   <span>First name only</span>
                 </li>
-                <li className="flex items-start">
-                  <span className="text-mint mr-3 mt-1">✓</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-mint mt-0.5 font-medium">✓</span>
                   <span>Age or age range</span>
                 </li>
-                <li className="flex items-start">
-                  <span className="text-mint mr-3 mt-1">✓</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-mint mt-0.5 font-medium">✓</span>
                   <span>State only (no city or zip)</span>
                 </li>
-                <li className="flex items-start">
-                  <span className="text-mint mr-3 mt-1">✓</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-mint mt-0.5 font-medium">✓</span>
                   <span>Payer name (insurance company)</span>
                 </li>
-                <li className="flex items-start">
-                  <span className="text-mint mr-3 mt-1">✓</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-mint mt-0.5 font-medium">✓</span>
                   <span>Diagnosis codes and clinical details</span>
                 </li>
-                <li className="flex items-start">
-                  <span className="text-mint mr-3 mt-1">✓</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-mint mt-0.5 font-medium">✓</span>
                   <span>Treatment history and medication names</span>
                 </li>
               </ul>
-            </Card>
+            </div>
           </div>
 
           {/* BAA Statement */}
-          <Card className="p-6 glass-card border border-sage-medium/30 text-center">
-            <p className="text-gray-700 mb-2">
-              <strong>Business Associate Agreement:</strong> Because PHI is not collected or processed in this workflow, a BAA is generally not required. For organizations with internal policies requiring a BAA regardless of PHI handling, we can discuss enterprise arrangements.
+          <div className="bg-white border border-border rounded-lg p-8">
+            <p className="text-foreground/80">
+              <strong className="text-dark-bg">Business Associate Agreement:</strong>{" "}
+              Because PHI is not collected or processed in this workflow, a BAA is generally not required. For organizations with internal policies requiring a BAA regardless of PHI handling, we can discuss enterprise arrangements.
             </p>
-            <p className="text-sm text-gray-600 mt-4">
+            <p className="text-sm text-muted-foreground mt-4">
               Users are responsible for ensuring they do not paste PHI into free text fields. Our platform blocks common PHI patterns like Social Security numbers and dates of birth.
             </p>
-          </Card>
-
+          </div>
         </div>
       </div>
     </section>
   )
 }
 
-// Compact version for pricing page or sidebar
+// Compact version for sidebar
 export function ComplianceBlock() {
   return (
-    <Card className="p-6 glass-card border border-sage-medium/30">
-      <div className="flex items-start gap-3 mb-4">
-        <ShieldCheck className="w-6 h-6 text-mint flex-shrink-0 mt-1" />
-        <div>
-          <h3 className="text-lg font-serif text-dark-bg mb-2">
-            HIPAA Compliant by Design
-          </h3>
-          <p className="text-sm text-gray-700 mb-3">
-            Luma collects only limited patient context (first name, age, state, diagnosis) and does not store PHI such as date of birth, MRN, full address, or insurance member IDs.
-          </p>
-          <p className="text-xs text-gray-600">
-            <strong>BAA:</strong> Generally not required for this workflow. Enterprise arrangements available for organizations with specific policy requirements.
-          </p>
-        </div>
-      </div>
-    </Card>
+    <div className="bg-white border border-border rounded-lg p-6">
+      <h3 className="text-lg font-semibold text-dark-bg mb-2">
+        HIPAA Compliant by Design
+      </h3>
+      <p className="text-sm text-foreground/80 mb-3">
+        Luma collects only limited patient context (first name, age, state, diagnosis) and does not store PHI such as date of birth, MRN, full address, or insurance member IDs.
+      </p>
+      <p className="text-xs text-muted-foreground">
+        <strong>BAA:</strong> Generally not required for this workflow. Enterprise arrangements available.
+      </p>
+    </div>
   )
 }

@@ -10,9 +10,9 @@ export const metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-light-gray">
+    <div className="min-h-screen" style={{ backgroundColor: "#F4F4EE" }}>
       {/* Header */}
-      <nav className="sticky top-0 z-50 border-b border-sage-medium/50 glass-card">
+      <nav className="sticky top-0 z-50 border-b border-border" style={{ backgroundColor: "#F4F4EE" }}>
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2">
             <LumaLogo className="w-10 h-10" />
@@ -37,7 +37,7 @@ export default function PrivacyPage() {
             Last updated: January 20, 2026
           </p>
 
-          <div className="prose prose-lg max-w-none">
+          <div className="prose max-w-none prose-p:text-base prose-li:text-base">
             <section className="mb-12">
               <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">Introduction</h2>
               <p className="text-gray-700 mb-4">
@@ -213,7 +213,7 @@ export default function PrivacyPage() {
       </main>
 
       {/* Simple Footer */}
-      <footer className="border-t border-sage-medium/50 bg-sage-light/20 py-8">
+      <footer className="border-t border-border py-8">
         <div className="container mx-auto px-4 text-center text-gray-600 text-sm">
           © 2026 Luma Health. All rights reserved.
         </div>

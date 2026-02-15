@@ -21,11 +21,11 @@ export default function DashboardLoading() {
 
       <div className="container mx-auto px-4 py-8">
         {/* Stats Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {[...Array(4)].map((_, i) => (
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
+          {[...Array(3)].map((_, i) => (
             <Card key={i} className="p-6 glass-card border border-sage-medium/30">
-              <Skeleton className="h-4 w-24 mb-3" />
-              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-3 w-24 mb-3" />
+              <Skeleton className="h-7 w-16" />
             </Card>
           ))}
         </div>

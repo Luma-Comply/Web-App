@@ -328,7 +328,7 @@ export default function DashboardPage() {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" className="flex items-center gap-2 hover:bg-gray-100">
                   <span className="text-sm text-gray-600 hidden md:block max-w-[200px] truncate">{practiceName || userEmail}</span>
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 </Button>
@@ -386,19 +386,16 @@ export default function DashboardPage() {
         {/* Stats Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card className="p-6 glass-card border border-sage-medium/30">
-            <p className="text-sm text-gray-600 mb-1">Total Cases</p>
-            <p className="text-3xl font-mono font-bold text-dark-bg">{stats.total_cases}</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Cases</p>
+            <p className="text-2xl font-mono font-bold text-dark-bg">{stats.total_cases}</p>
           </Card>
           <Card className="p-6 glass-card border border-sage-medium/30">
-            <p className="text-sm text-gray-600 mb-1">This Month</p>
-            <p className="text-3xl font-mono font-bold text-dark-bg">{stats.cases_this_month}</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">This Month</p>
+            <p className="text-2xl font-mono font-bold text-dark-bg">{stats.cases_this_month}</p>
           </Card>
           <Card className="p-6 glass-card border border-sage-medium/30">
-            <p className="text-sm text-gray-600 mb-1">Revenue Protected</p>
-            <p className="text-3xl font-mono font-bold text-mint">
-              ${stats.revenue_protected.toLocaleString()}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">Includes archived cases</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Revenue Protected</p>
+            <p className="text-2xl font-mono font-bold text-mint">${stats.revenue_protected.toLocaleString()}</p>
           </Card>
         </div>
 
@@ -411,8 +408,8 @@ export default function DashboardPage() {
           <Tabs defaultValue="active" onValueChange={setActiveTab} className="w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <TabsList className="bg-white/50 border border-sage-medium/30">
-                <TabsTrigger value="active">Active Cases</TabsTrigger>
-                <TabsTrigger value="archived" className="gap-2">
+                <TabsTrigger value="active" className="data-[state=active]:bg-white">Active Cases</TabsTrigger>
+                <TabsTrigger value="archived" className="gap-2 data-[state=active]:bg-white">
                   Archived
                   <Archive className="w-3 h-3" />
                 </TabsTrigger>
@@ -426,7 +423,7 @@ export default function DashboardPage() {
                   placeholder="Search cases..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 bg-white border-sage-medium/30"
+                  className="pl-9"
                 />
               </div>
             </div>

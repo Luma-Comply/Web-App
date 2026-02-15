@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { sendNewSignupNotification } from '@/lib/email-service'
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
@@ -71,6 +72,7 @@ export async function GET(request: Request) {
                             is_team_owner: true,  // New signups are team owners
                         })
                         .select()
+
                 } else {
                     // User exists - update email if changed, and set practice_name if missing
                     const updates: any = {}
@@ -89,6 +91,14 @@ export async function GET(request: Request) {
                             .update(updates)
                             .eq('id', userId)
                     }
+                }
+
+                // Notify admin of new signups (fire and forget — don't block the redirect)
+                if (type === 'signup') {
+                    sendNewSignupNotification({
+                        userEmail: userEmail,
+                        practiceName: practiceName,
+                    }).catch((err) => console.error('Failed to send signup notification:', err))
                 }
             }
 

@@ -1,62 +1,13 @@
-"use client"
-
 import Link from "next/link"
-import { FileText } from "lucide-react"
-import { LumaLogo } from "@/components/LumaLogo"
-import { useEffect, useRef } from "react"
-import gsap from "gsap"
 
 export default function Footer() {
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && containerRef.current) {
-          gsap.fromTo(
-            containerRef.current.children,
-            {
-              y: 50,
-              opacity: 0,
-            },
-            {
-              y: 0,
-              opacity: 1,
-              duration: 1.5,
-              stagger: 0.2,
-              ease: "elastic.out(1, 0.5)",
-            }
-          )
-          observer.disconnect()
-        }
-      },
-      {
-        threshold: 0.2,
-      }
-    )
-
-    if (containerRef.current) {
-      observer.observe(containerRef.current)
-    }
-
-    return () => observer.disconnect()
-  }, [])
-
   return (
     <footer className="border-t border-sage-medium/50 bg-sage-light/20 py-12 overflow-hidden">
       <div className="container mx-auto px-4">
-        <div ref={containerRef} className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Logo */}
-          <div className="flex items-center gap-2">
-            <LumaLogo className="w-8 h-8" />
-            <span className="text-xl font-serif font-bold text-dark-bg">
-              Luma
-            </span>
-          </div>
-
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Copyright */}
           <p className="text-gray-600 text-sm">
-            © 2026 Luma Health. All rights reserved.
+            &copy; 2026 Luma Health. All rights reserved.
           </p>
 
           {/* Links */}

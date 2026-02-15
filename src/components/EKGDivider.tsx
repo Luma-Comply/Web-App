@@ -8,7 +8,7 @@ interface EKGDividerProps {
 }
 
 export default function EKGDivider({
-  color = "#7EA18D",
+  color = "#1A2749",
   height = 40,
   animated = true,
   className,

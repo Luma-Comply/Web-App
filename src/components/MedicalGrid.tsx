@@ -19,7 +19,7 @@ export default function MedicalGrid({
     strong: "0.25",
   }
 
-  const gridColor = color || `rgba(183, 208, 193, ${opacityMap[intensity]})`
+  const gridColor = color || `rgba(26, 39, 73, ${opacityMap[intensity]})`
 
   return (
     <div

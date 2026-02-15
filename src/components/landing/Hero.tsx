@@ -1,153 +1,102 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Shield, FileText, ShieldCheck } from "lucide-react"
-import MedicalGrid from "@/components/MedicalGrid"
+import { ArrowRight } from "lucide-react"
+
 import { LumaLogo } from "@/components/LumaLogo"
 import SignInDialog from "@/components/SignInDialog"
-import gsap from "gsap"
-import { ScrollToPlugin } from "gsap/ScrollToPlugin"
+
+const pillars = [
+  {
+    title: "No PHI Required",
+    description: "Only patient name and clinical data. No BAA needed with AI providers.",
+  },
+  {
+    title: "Payer-Specific Criteria",
+    description: "Auto-references Medicare LCD/NCD and commercial payer requirements.",
+  },
+  {
+    title: "Export to Any EHR",
+    description: "Word, PDF, or copy-paste directly into your payer portal.",
+  },
+]
 
 export default function Hero() {
   const [signInOpen, setSignInOpen] = useState(false)
 
-  useEffect(() => {
-    gsap.registerPlugin(ScrollToPlugin)
-  }, [])
-
-  const handleSmoothScroll = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault()
-    gsap.to(window, {
-      duration: 1.5,
-      scrollTo: { y: "#features", offsetY: 80 },
-      ease: "power3.inOut",
-    })
-  }
-
   return (
-    <header className="relative min-h-screen flex flex-col">
-      {/* Sticky Header */}
-      <nav className="sticky top-0 z-50 border-b border-sage-medium/50 glass-card">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <LumaLogo className="w-10 h-10" />
-            <span className="text-2xl font-serif font-bold text-dark-bg">Luma</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => setSignInOpen(true)}>
-              Log In
-            </Button>
-            <Link href="/signup">
-              <Button size="lg">Get Started</Button>
-            </Link>
+    <header className="relative flex flex-col">
+      {/* Nav */}
+      <nav className="py-5 bg-transparent">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto flex h-16 items-center justify-between">
+            <div className="flex items-center gap-2">
+              <LumaLogo className="w-10 h-10" />
+              <span className="text-2xl font-semibold text-dark-bg tracking-tight">Luma</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <Button variant="outline" onClick={() => setSignInOpen(true)}>
+                Log In
+              </Button>
+              <Link href="/signup">
+                <Button>Get Started</Button>
+              </Link>
+            </div>
           </div>
         </div>
       </nav>
 
-      {/* Hero Content */}
-      <section className="flex-1 relative bg-gradient-to-b from-light-gray to-white overflow-hidden">
-        <MedicalGrid intensity="light" animated={false} />
-
-        <div className="container mx-auto px-4 py-20 md:py-32 relative">
+      {/* Hero */}
+      <section className="relative bg-gradient-to-br from-[#F4F4EE] to-[#EDEDE7]">
+        <div className="container mx-auto px-4 py-20 md:py-28">
           <div className="max-w-5xl mx-auto">
-            {/* Floating HIPAA Badge */}
-            <div className="mb-8 animate-fade-in-down">
-              <Badge variant="glass" className="text-sm px-4 py-2 font-mono text-gray-600">
-                <ShieldCheck className="w-4 h-4 mr-2 text-mint" />
-                HIPAA Compliant from Day One
-              </Badge>
-            </div>
-
-            {/* Headline with Staggered Animation */}
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif font-bold leading-tight text-dark-bg mb-8 text-shadow-soft">
-              <span className="block animate-fade-in-up opacity-0 [animation-fill-mode:forwards]">
-                Automate Documentation.
-              </span>
-              <span className="block animate-fade-in-up opacity-0 [animation-fill-mode:forwards] animation-delay-200">
-                Keep Patients On{" "}
-                <span className="text-mint relative">
-                  Life-Saving Therapies.
-                  <svg
-                    className="absolute -bottom-2 left-0 w-full h-3 text-mint opacity-30"
-                    viewBox="0 0 300 12"
-                    preserveAspectRatio="none"
-                  >
-                    <path
-                      d="M0 6 Q75 2, 150 6 T300 6"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    />
-                  </svg>
-                </span>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif leading-[1.1] text-dark-bg mb-8">
+              <span className="block font-normal">Automate Documentation.</span>
+              <span className="block font-normal">
+                Keep Patients On Life-Saving Therapies.
               </span>
             </h1>
 
-            {/* Subheadline */}
-            <p className="text-xl md:text-2xl text-gray-700 mb-12 max-w-3xl leading-relaxed animate-fade-in-up opacity-0 [animation-fill-mode:forwards] animation-delay-400">
+            <p className="text-base md:text-lg text-muted-foreground mb-10 max-w-2xl leading-relaxed">
               Generate compliant medical necessity documentation in seconds. So you can secure approvals faster and ensure your patients get the treatments they need. Audit-proof, HIPAA-compliant, and built for care.
             </p>
 
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-16 animate-fade-in-up opacity-0 [animation-fill-mode:forwards] animation-delay-500">
-              <Link href="/signup">
-                <Button size="lg" className="w-full sm:w-auto text-lg px-10 py-6 h-auto">
+            <div className="flex items-center gap-6 mb-12">
+              <Link href="/signup" className="group">
+                <Button size="lg" className="text-lg px-10 py-6 h-auto gap-3 hover:bg-mint/95 [&_svg]:!size-auto">
                   Start Free Trial
+                  <span className="inline-block overflow-hidden w-8 h-8 ml-1">
+                    <ArrowRight className="w-8 h-8 arrow-loop" strokeWidth={1.5} />
+                  </span>
                 </Button>
               </Link>
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full sm:w-auto text-lg px-10 py-6 h-auto"
-                onClick={handleSmoothScroll}
-              >
-                Learn More
-              </Button>
+              <p className="text-sm text-muted-foreground font-mono tracking-wide">
+                7-day free trial · SOC 2 Type II · Cancel anytime
+              </p>
             </div>
 
-            {/* Trust Indicators */}
-            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600 font-mono animate-fade-in-up opacity-0 [animation-fill-mode:forwards] animation-delay-600">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-mint" />
-                <span>14-day free trial</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-mint" />
-                <span>SOC 2 Type II certified</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-mint" />
-                <span>Cancel anytime</span>
-              </div>
+            {/* Pillar Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {pillars.map((pillar, index) => (
+                <div
+                  key={index}
+                  className="bg-white border border-border rounded-lg p-6"
+                >
+                  <h3 className="text-base font-semibold text-dark-bg mb-2">
+                    {pillar.title}
+                  </h3>
+                  <p className="text-sm text-foreground/70 leading-relaxed">
+                    {pillar.description}
+                  </p>
+                </div>
+              ))}
             </div>
-          </div>
-        </div>
-
-        {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-pulse">
-          <div className="flex flex-col items-center gap-2 text-gray-400">
-            <span className="text-xs uppercase tracking-wider">Scroll</span>
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 14l-7 7m0 0l-7-7m7 7V3"
-              />
-            </svg>
           </div>
         </div>
       </section>
 
-      {/* Sign In Dialog */}
       <SignInDialog open={signInOpen} onOpenChange={setSignInOpen} />
     </header>
   )

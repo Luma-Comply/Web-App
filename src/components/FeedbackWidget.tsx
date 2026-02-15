@@ -145,7 +145,8 @@ export function FeedbackWidget({ user: propUser }: FeedbackWidgetProps) {
                 <Button
                     variant="default"
                     size="icon"
-                    className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full shadow-lg bg-coral hover:bg-coral/90 text-white"
+                    className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full shadow-lg text-white hover:opacity-90"
+                    style={{ backgroundColor: "#182040" }}
                 >
                     <MessageSquare className="h-6 w-6" />
                 </Button>

@@ -1,5 +1,6 @@
 "use client"
 
+import ProfileLoading from "./loading"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -198,11 +199,7 @@ export default function ProfilePage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-pulse text-gray-600">Loading...</div>
-      </div>
-    )
+    return <ProfileLoading />
   }
 
   return (
@@ -227,7 +224,6 @@ export default function ProfilePage() {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="John"
-                  className="bg-white border-sage-medium/30"
                 />
               </div>
               <div className="space-y-2">
@@ -239,7 +235,6 @@ export default function ProfilePage() {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Doe"
-                  className="bg-white border-sage-medium/30"
                 />
               </div>
             </div>
@@ -257,7 +252,7 @@ export default function ProfilePage() {
                     type="text"
                     value={practiceName}
                     onChange={(e) => setPracticeName(e.target.value)}
-                    className="pl-10 border-sage-medium/30 bg-white"
+                    className="pl-10"
                     placeholder="Your Practice Name"
                   />
                 </div>
@@ -276,7 +271,7 @@ export default function ProfilePage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 bg-white border-sage-medium/30"
+                  className="pl-10"
                 />
               </div>
             </div>
@@ -323,7 +318,7 @@ export default function ProfilePage() {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="bg-white border-sage-medium/30 pr-10"
+                  className="pr-10"
                 />
                 <button
                   type="button"
@@ -351,7 +346,7 @@ export default function ProfilePage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="bg-white border-sage-medium/30 pr-10"
+                  className="pr-10"
                 />
                 <button
                   type="button"
@@ -380,7 +375,7 @@ export default function ProfilePage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`bg-white border-sage-medium/30 pr-10 ${confirmPassword && !passwordsMatch ? "border-coral focus-visible:ring-coral" : ""
+                  className={`pr-10 ${confirmPassword && !passwordsMatch ? "border-coral focus-visible:ring-coral" : ""
                     }`}
                 />
                 <button

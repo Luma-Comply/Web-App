@@ -27,7 +27,14 @@ import { LCDValidationPanel } from "@/components/dashboard/LCDValidationPanel"
 import { ChecklistItemEditModal } from "@/components/dashboard/ChecklistItemEditModal"
 import { ChatInterface, ChatInterfaceRef } from "@/components/chat/ChatInterface"
 import { GeneratingSteps } from "@/components/GeneratingSteps"
-import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X, Plus, RefreshCw, Send, Save, ChevronDown, MessageSquare, FileText, Image, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X, Plus, RefreshCw, Send, Save, ChevronDown, MessageSquare, FileText, Image, AlertTriangle, User, Users, CreditCard, LogOut } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { LCDValidationResult, ChecklistEdit, ChecklistEditsData, ChecklistItemWithEdits } from "@/lib/lcd-validation"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -120,6 +127,11 @@ export default function CaseDetailPage() {
     disease_activity: "",
   })
 
+  // User/org state for nav
+  const [userEmail, setUserEmail] = useState("")
+  const [practiceName, setPracticeName] = useState("")
+  const [isTeamOwner, setIsTeamOwner] = useState(true)
+
   // Carousel State
   const [tidbitIndex, setTidbitIndex] = useState(0)
 
@@ -153,6 +165,34 @@ export default function CaseDetailPage() {
   useEffect(() => {
     loadCase()
   }, [params.id])
+
+  useEffect(() => {
+    async function loadUserNav() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      setUserEmail(session.user.email || "")
+      const { data: userData } = await supabase
+        .from("users")
+        .select("practice_name, team_owner_id, is_team_owner")
+        .eq("id", session.user.id)
+        .single()
+      if (userData) {
+        const ownerStatus = userData.is_team_owner || !userData.team_owner_id
+        setIsTeamOwner(ownerStatus)
+        if (userData.team_owner_id) {
+          const { data: ownerData } = await supabase
+            .from("users")
+            .select("practice_name")
+            .eq("id", userData.team_owner_id)
+            .single()
+          setPracticeName(ownerData?.practice_name || "")
+        } else {
+          setPracticeName(userData.practice_name || "")
+        }
+      }
+    }
+    loadUserNav()
+  }, [])
 
   // Common words and medical terms to exclude from name extraction
   const excludedWords = new Set([
@@ -355,6 +395,11 @@ export default function CaseDetailPage() {
   // Note: Auto-extraction is now display-only (see render logic below)
   // We no longer auto-save extracted names to the database to prevent overwriting user input
 
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    router.push("/")
+  }
+
   async function loadCase() {
     try {
       const { data, error } = await supabase
@@ -527,7 +572,7 @@ export default function CaseDetailPage() {
       patient_age: caseData.patient_age?.toString() || "",
       patient_state: caseData.patient_state || "",
       payer_name: caseData.payer_name || "",
-      claim_amount: caseData.claim_amount?.toString() || "",
+      claim_amount: caseData.claim_amount && caseData.claim_amount > 0 ? caseData.claim_amount.toLocaleString('en-US') : "",
       disease_activity: caseData.disease_activity || "",
     })
     setEditModalOpen(true)
@@ -610,12 +655,14 @@ export default function CaseDetailPage() {
         }
       }
 
-      // Only update claim_amount if it's provided and valid
+      // Update claim_amount — set to value if provided, null if cleared
       if (editFormData.claim_amount && editFormData.claim_amount.trim()) {
         const claimAmount = parseFloat(editFormData.claim_amount.replace(/[^0-9.]/g, ''))
-        if (!isNaN(claimAmount) && claimAmount > 0) {
+        if (!isNaN(claimAmount)) {
           updateData.claim_amount = claimAmount
         }
+      } else {
+        updateData.claim_amount = null
       }
 
       // Check authentication
@@ -963,18 +1010,65 @@ export default function CaseDetailPage() {
     <div className="min-h-screen bg-gradient-to-b from-light-gray to-white">
       {/* Header */}
       <header className="border-b border-sage-medium/50 glass-card sticky top-0 z-40">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="mx-auto px-4 max-w-6xl h-16 flex items-center justify-between">
+          <Link href="/dashboard">
+            <Button variant="ghost" size="sm" className="hover:bg-gray-100">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
           <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            </Link>
-          </div>
-          <div className="flex items-center gap-2">
-            <LumaLogo className="w-8 h-8" />
-            <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
+            <Button
+              onClick={() => router.push("/cases/new")}
+              size="sm"
+              className="relative overflow-hidden bg-dark-bg hover:bg-dark-bg/90 text-white transition-all duration-300 hover:scale-105 before:content-[''] before:absolute before:top-0 before:left-[-100%] before:w-full before:h-full before:bg-white/20 before:transition-all before:duration-300 hover:before:left-[100%] active:scale-100"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Case
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex items-center gap-2 hover:bg-gray-100">
+                  <span className="text-sm text-gray-600 hidden md:block max-w-[200px] truncate">{practiceName || userEmail}</span>
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-white border border-sage-medium/30">
+                <DropdownMenuItem
+                  onClick={() => router.push('/settings/profile')}
+                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </DropdownMenuItem>
+                {isTeamOwner && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => router.push('/settings/team')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Team
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => router.push('/settings/billing')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Billing
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="focus:bg-coral/10 focus:text-coral cursor-pointer"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -1110,7 +1204,7 @@ export default function CaseDetailPage() {
                   </p>
                 </div>
 
-                {caseData.claim_amount && (
+                {caseData.claim_amount != null && caseData.claim_amount > 0 && (
                   <div className="col-span-2">
                     <p className="text-gray-500 mb-1">Claim Amount</p>
                     <p className="text-dark-bg">
@@ -1440,16 +1534,28 @@ export default function CaseDetailPage() {
 
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="claim-amount">Claim Amount</Label>
-                <Input
-                  id="claim-amount"
-                  type="text"
-                  placeholder="$50,000.00"
-                  value={editFormData.claim_amount ? `$${parseFloat(editFormData.claim_amount.replace(/[^0-9.]/g, '') || '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
-                  onChange={(e) => {
-                    const rawValue = e.target.value.replace(/[^0-9.]/g, '')
-                    setEditFormData({ ...editFormData, claim_amount: rawValue })
-                  }}
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                  <Input
+                    id="claim-amount"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="50,000.00"
+                    className="pl-7"
+                    value={editFormData.claim_amount}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9.]/g, '')
+                      // Prevent multiple decimal points
+                      const parts = raw.split('.')
+                      const sanitized = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : raw
+                      // Format integer part with commas, preserve decimal part as-is
+                      const [intPart, decPart] = sanitized.split('.')
+                      const formatted = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+                      const display = decPart !== undefined ? `${formatted}.${decPart}` : formatted
+                      setEditFormData({ ...editFormData, claim_amount: display })
+                    }}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2 col-span-2">

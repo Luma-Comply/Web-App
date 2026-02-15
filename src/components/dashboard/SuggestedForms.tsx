@@ -183,7 +183,7 @@ export function SuggestedForms({ caseId, lastGenerated }: SuggestedFormsProps) {
             {/* Grid - 1 col mobile, 2 cols tablet, 3 cols on larger tablets/desktop */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {forms.map((form) => (
-                    <Card key={form.id} className="p-3 sm:p-4 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
+                    <Card key={form.id} className="p-3 sm:p-4 !bg-white rounded-xl border border-sage-medium/30 shadow-sm hover:shadow-md transition-shadow">
                         <div className="space-y-1.5">
                             <div className="flex items-start sm:items-center gap-2 flex-wrap">
                                 <h4 className="font-medium text-dark-bg text-sm leading-snug">{form.title}</h4>
