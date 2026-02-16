@@ -61,7 +61,7 @@ export async function sendInvitationEmail({
 
     <div style="border-top: 1px solid #e2e8f0; margin-top: 32px; padding-top: 16px;">
       <p style="color: #94a3b8; font-size: 12px; margin: 0;">
-        © ${new Date().getFullYear()} Luma Health. All rights reserved.
+        © ${new Date().getFullYear()} Luma. All rights reserved.
       </p>
     </div>
   </div>
