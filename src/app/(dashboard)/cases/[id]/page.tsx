@@ -1246,12 +1246,9 @@ export default function CaseDetailPage() {
                         if (!doc.storagePath) return
                         const { data } = await supabase.storage
                           .from('case-documents')
-                          .createSignedUrl(doc.storagePath, 60)
+                          .createSignedUrl(doc.storagePath, 60, { download: doc.filename })
                         if (data?.signedUrl) {
-                          const a = document.createElement('a')
-                          a.href = data.signedUrl
-                          a.download = doc.filename
-                          a.click()
+                          window.open(data.signedUrl, '_blank')
                         }
                       }}
                     >
@@ -1825,12 +1822,9 @@ export default function CaseDetailPage() {
                             if (!doc.storagePath) return
                             const { data } = await supabase.storage
                               .from('case-documents')
-                              .createSignedUrl(doc.storagePath, 60)
+                              .createSignedUrl(doc.storagePath, 60, { download: doc.filename })
                             if (data?.signedUrl) {
-                              const a = document.createElement('a')
-                              a.href = data.signedUrl
-                              a.download = doc.filename
-                              a.click()
+                              window.open(data.signedUrl, '_blank')
                             }
                           }}
                         >
