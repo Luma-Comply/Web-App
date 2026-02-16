@@ -48,19 +48,7 @@ sentry.properties
 
 # Internal docs (keep locally, never commit)
 .kiro/
-*_PLAN.md
-*_REPORT.md
-*_COMPLETE.md
-*_SUMMARY.md
-IMPLEMENTATION_SUMMARY.md
-CHECKOUT_FIX.md
-TROUBLESHOOTING_LOG.md
-SECURITY_AUDIT.md
-*_DEBUG*.md
-*_GUIDE.md
-*_CHECKLIST.md
-*_SETUP*.md
-*_INSTRUCTIONS.md
+docs/
 
 # One-off scripts and fixes
 scripts/
