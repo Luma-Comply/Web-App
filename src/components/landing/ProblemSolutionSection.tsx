@@ -74,7 +74,7 @@ export default function ProblemSolutionSection() {
           </p>
 
           {/* Tab Selector */}
-          <div className="inline-flex gap-1 mb-12">
+          <div className="grid grid-cols-2 sm:inline-flex gap-1 mb-12 w-full sm:w-auto">
             {tabs.map((tab) => (
               <motion.button
                 key={tab.id}

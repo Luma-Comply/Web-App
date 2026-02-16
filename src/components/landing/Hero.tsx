@@ -63,7 +63,7 @@ export default function Hero() {
               Generate compliant medical necessity documentation in seconds. So you can secure approvals faster and ensure your patients get the treatments they need. Audit-proof, HIPAA-compliant, and built for care.
             </p>
 
-            <div className="flex items-center gap-6 mb-12">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mb-12">
               <Link href="/signup" className="group">
                 <Button size="lg" className="text-lg px-10 py-6 h-auto gap-3 hover:bg-mint/95 [&_svg]:!size-auto">
                   Start Free Trial
