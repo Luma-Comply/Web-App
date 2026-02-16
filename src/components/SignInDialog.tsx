@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useFormStatus } from "react-dom"
 import Link from "next/link"
 import { login } from "@/app/auth/actions"
 import {
@@ -13,7 +14,28 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
+
+function SubmitButton() {
+  const { pending } = useFormStatus()
+  return (
+    <Button
+      type="submit"
+      formAction={login}
+      disabled={pending}
+      className="w-full h-11 text-base bg-mint hover:bg-mint/90"
+    >
+      {pending ? (
+        <>
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          Signing in...
+        </>
+      ) : (
+        "Sign in"
+      )}
+    </Button>
+  )
+}
 
 interface SignInDialogProps {
   open: boolean
@@ -96,12 +118,7 @@ export default function SignInDialog({ open, onOpenChange }: SignInDialogProps) 
             </div>
 
             {/* Sign In Button - innermost radius 12px */}
-            <Button
-              formAction={login}
-              className="w-full h-11 text-base bg-mint hover:bg-mint/90"
-            >
-              Sign in
-            </Button>
+            <SubmitButton />
           </form>
 
           {/* Divider */}

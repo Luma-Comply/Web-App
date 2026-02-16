@@ -1,14 +1,36 @@
 "use client"
 
 import { useState, Suspense } from "react"
+import { useFormStatus } from "react-dom"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { login } from "@/app/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Shield, Lock, Eye, EyeOff, AlertCircle } from "lucide-react"
+import { Shield, Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
 import { LumaLogo } from "@/components/LumaLogo"
+
+function SubmitButton() {
+  const { pending } = useFormStatus()
+  return (
+    <Button
+      type="submit"
+      formAction={login}
+      disabled={pending}
+      className="w-full h-11 text-base"
+    >
+      {pending ? (
+        <>
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          Signing in...
+        </>
+      ) : (
+        "Sign in"
+      )}
+    </Button>
+  )
+}
 
 function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
@@ -133,12 +155,7 @@ function LoginForm() {
                     </div>
                   </div>
 
-                  <Button
-                    formAction={login}
-                    className="w-full h-11 text-base"
-                  >
-                    Sign in
-                  </Button>
+                  <SubmitButton />
                 </form>
 
                 <div className="mt-8 pt-6 border-t border-gray-200 text-center">
