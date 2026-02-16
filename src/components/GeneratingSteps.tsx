@@ -75,7 +75,7 @@ function AnimatedCheck({ isComplete }: { isComplete: boolean }) {
         className="absolute inset-0 rounded-full"
         initial={{ backgroundColor: 'rgb(229 231 235)' }}
         animate={{
-          backgroundColor: isComplete ? 'rgb(126 161 141)' : 'rgb(229 231 235)',
+          backgroundColor: isComplete ? 'rgb(22 82 197)' : 'rgb(229 231 235)',
         }}
         transition={{ duration: 0.3 }}
       />
@@ -99,7 +99,7 @@ function PulsingDot() {
   return (
     <div className="w-6 h-6 flex items-center justify-center">
       <motion.div
-        className="w-3 h-3 rounded-full bg-mint"
+        className="w-3 h-3 rounded-full bg-[#1652C5]"
         animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
         transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
       />
@@ -296,7 +296,7 @@ export function GeneratingSteps({ caseId, docType, onComplete, onError }: Genera
   const totalSteps = steps.length
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-start justify-center pt-20">
+    <div className="min-h-screen bg-light-gray flex items-start justify-center pt-20">
       <div className="text-center px-4 max-w-md mx-auto">
         <div className="relative w-16 h-16 mx-auto mb-6">
           <LumaLogo className="w-16 h-16" variant="loading" />
@@ -347,7 +347,7 @@ export function GeneratingSteps({ caseId, docType, onComplete, onError }: Genera
                     <motion.span
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="text-xs text-mint font-medium"
+                      className="text-xs text-[#1652C5] font-medium"
                     >
                       Done
                     </motion.span>
@@ -365,7 +365,7 @@ export function GeneratingSteps({ caseId, docType, onComplete, onError }: Genera
             <div className="mt-6 pt-4 border-t border-gray-100">
               <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                 <motion.div
-                  className="h-full bg-gradient-to-r from-mint to-sage-light rounded-full"
+                  className="h-full bg-[#1652C5] rounded-full"
                   initial={{ width: '0%' }}
                   animate={{ width: `${(completedCount / totalSteps) * 100}%` }}
                   transition={{ duration: 0.5, ease: 'easeOut' }}

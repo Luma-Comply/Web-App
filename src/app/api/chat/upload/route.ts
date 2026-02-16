@@ -205,6 +205,20 @@ export async function POST(request: NextRequest) {
     const summary = await generateSummary(extractedText, file.name)
     console.log(`[Upload API] Generated summary: ${summary.substring(0, 100)}...`)
 
+    // Store file in Supabase Storage
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const storagePath = `${session.user.id}/${caseId}/${Date.now()}-${safeName}`
+    const { error: storageError } = await supabase.storage
+      .from('case-documents')
+      .upload(storagePath, buffer, { contentType: file.type, upsert: false })
+
+    if (storageError) {
+      console.error('[Upload API] Storage upload failed:', storageError)
+      // Non-blocking — still save metadata even if storage fails
+    } else {
+      console.log(`[Upload API] File stored at: ${storagePath}`)
+    }
+
     // Save as system message with metadata
     const { error: saveError } = await supabase.from("case_messages").insert({
       case_id: caseId,
@@ -217,6 +231,7 @@ export async function POST(request: NextRequest) {
         fileType: fileExtension,
         extractedText: extractedText.slice(0, 50000), // Limit stored text
         summary,
+        storagePath: storageError ? null : storagePath,
       },
     })
 

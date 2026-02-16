@@ -88,7 +88,7 @@ export default function CaseDetailPage() {
   const [generationKey, setGenerationKey] = useState(0) // Forces GeneratingSteps remount on regeneration
   const [isChatExpanded, setIsChatExpanded] = useState(false) // Opens when user clicks "Chat with Luma" card
   const [isChatCopied, setIsChatCopied] = useState(false)
-  const [uploadedDocs, setUploadedDocs] = useState<{ filename: string; fileType: string }[]>([])
+  const [uploadedDocs, setUploadedDocs] = useState<{ filename: string; fileType: string; storagePath: string | null }[]>([])
   const [showDocsDropdown, setShowDocsDropdown] = useState(false)
   const [showRisksDropdown, setShowRisksDropdown] = useState(false)
   const [copiedRiskIndex, setCopiedRiskIndex] = useState<string | null>(null)
@@ -498,6 +498,7 @@ export default function CaseDetailPage() {
           return {
             filename: metadata.filename || "Document",
             fileType: metadata.fileType || "file",
+            storagePath: metadata.storagePath || null,
           }
         })
       setUploadedDocs(docs)
@@ -1237,18 +1238,33 @@ export default function CaseDetailPage() {
                 <h3 className="font-semibold text-dark-bg mb-3">Uploaded Documents</h3>
                 <div className="space-y-2">
                   {uploadedDocs.map((doc, index) => (
-                    <div
+                    <button
                       key={index}
-                      className="flex items-center gap-3 p-2 rounded-lg bg-sage-light/20"
-                      title={doc.filename}
+                      className="flex items-center gap-3 p-2 rounded-lg bg-sage-light/20 hover:bg-sage-light/30 transition-colors w-full text-left group"
+                      title={doc.storagePath ? `Download ${doc.filename}` : doc.filename}
+                      onClick={async () => {
+                        if (!doc.storagePath) return
+                        const { data } = await supabase.storage
+                          .from('case-documents')
+                          .createSignedUrl(doc.storagePath, 60)
+                        if (data?.signedUrl) {
+                          const a = document.createElement('a')
+                          a.href = data.signedUrl
+                          a.download = doc.filename
+                          a.click()
+                        }
+                      }}
                     >
                       {["png", "jpg", "jpeg"].includes(doc.fileType) ? (
                         <Image className="h-4 w-4 text-gray-500 flex-shrink-0" />
                       ) : (
                         <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
                       )}
-                      <span className="text-sm text-gray-700 truncate">{doc.filename}</span>
-                    </div>
+                      <span className="text-sm text-gray-700 truncate flex-1">{doc.filename}</span>
+                      {doc.storagePath && (
+                        <Download className="h-3.5 w-3.5 text-gray-400 group-hover:text-dark-bg transition-colors flex-shrink-0" />
+                      )}
+                    </button>
                   ))}
                 </div>
               </Card>
@@ -1801,18 +1817,33 @@ export default function CaseDetailPage() {
                         Uploaded Files
                       </div>
                       {uploadedDocs.map((doc, index) => (
-                        <div
+                        <button
                           key={index}
-                          className="px-3 py-2 flex items-center gap-2 hover:bg-gray-50"
-                          title={doc.filename}
+                          className="px-3 py-2 flex items-center gap-2 hover:bg-gray-50 w-full text-left group"
+                          title={doc.storagePath ? `Download ${doc.filename}` : doc.filename}
+                          onClick={async () => {
+                            if (!doc.storagePath) return
+                            const { data } = await supabase.storage
+                              .from('case-documents')
+                              .createSignedUrl(doc.storagePath, 60)
+                            if (data?.signedUrl) {
+                              const a = document.createElement('a')
+                              a.href = data.signedUrl
+                              a.download = doc.filename
+                              a.click()
+                            }
+                          }}
                         >
                           {["png", "jpg", "jpeg"].includes(doc.fileType) ? (
                             <Image className="h-4 w-4 text-gray-400 flex-shrink-0" />
                           ) : (
                             <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
                           )}
-                          <span className="text-sm text-gray-700 truncate">{doc.filename}</span>
-                        </div>
+                          <span className="text-sm text-gray-700 truncate flex-1">{doc.filename}</span>
+                          {doc.storagePath && (
+                            <Download className="h-3.5 w-3.5 text-gray-400 group-hover:text-dark-bg transition-colors flex-shrink-0" />
+                          )}
+                        </button>
                       ))}
                     </motion.div>
                   )}
