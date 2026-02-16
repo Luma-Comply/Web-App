@@ -544,7 +544,7 @@ Note: These recommendations are based on AI analysis of current payer policies. 
 function getDocTypeLabel(docType: string): string {
   switch (docType) {
     case "biologics_pa": return "Biologics Prior Authorization"
-    case "medical_necessity": return "Medical Necessity Letter"
+    case "medical_necessity": return "Prior Authorization Letter"
     case "appeal": return "Appeal Documentation"
     default: return "Medical Documentation"
   }

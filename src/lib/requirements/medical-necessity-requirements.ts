@@ -1,5 +1,5 @@
 /**
- * Medical Necessity Letter Requirements
+ * Prior Authorization Letter Requirements
  * Generic requirements for medical necessity documentation across payers
  *
  * These requirements are based on common payer criteria for demonstrating

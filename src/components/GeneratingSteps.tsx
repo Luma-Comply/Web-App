@@ -43,7 +43,7 @@ const medicalNecessitySteps: Step[] = [
   { id: 'loading_case', label: 'Loading case data' },
   { id: 'researching', label: 'Researching payer policies' },
   { id: 'validating', label: 'Checking documentation completeness' },
-  { id: 'generating', label: 'Generating medical necessity letter' },
+  { id: 'generating', label: 'Generating prior authorization letter' },
   { id: 'saving', label: 'Finalizing your letter' },
 ]
 

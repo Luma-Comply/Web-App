@@ -1082,7 +1082,7 @@ export default function CaseDetailPage() {
               <div>
                 <p className="text-sm font-medium text-dark-bg/70 mb-1 uppercase tracking-wide">
                   {caseData.doc_type === "biologics_pa" && "Biologics Prior Authorization"}
-                  {caseData.doc_type === "medical_necessity" && "Medical Necessity Letter"}
+                  {caseData.doc_type === "medical_necessity" && "Prior Authorization Letter"}
                   {caseData.doc_type === "appeal" && "Appeal Letter"}
                   {!["biologics_pa", "medical_necessity", "appeal"].includes(caseData.doc_type) && "Case Documentation"}
                 </p>

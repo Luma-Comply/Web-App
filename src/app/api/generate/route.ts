@@ -909,7 +909,7 @@ function getDocTypeLabel(docType: string): string {
     case "biologics_pa":
       return "Biologics Prior Authorization"
     case "medical_necessity":
-      return "Medical Necessity Letter"
+      return "Prior Authorization Letter"
     case "appeal":
       return "Appeal Documentation"
     default:

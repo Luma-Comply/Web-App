@@ -1,5 +1,5 @@
 /**
- * Medical Necessity Letter Validation
+ * Prior Authorization Letter Validation
  * Validates clinical notes against medical necessity documentation requirements
  * Returns audit risk assessment and actionable recommendations
  */

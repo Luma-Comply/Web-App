@@ -495,7 +495,7 @@ export default function NewCasePage() {
             >
               <option value="" disabled>Select Document Type</option>
               <option value="biologics_pa">Biologics Prior Authorization</option>
-              <option value="medical_necessity">Medical Necessity Letter</option>
+              <option value="medical_necessity">Prior Authorization Letter</option>
               <option value="appeal">Appeal Letter</option>
             </select>
 
