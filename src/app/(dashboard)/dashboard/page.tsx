@@ -400,7 +400,11 @@ export default function DashboardPage() {
               onClick={async () => {
                 const response = await fetch("/api/stripe/create-portal", { method: "POST" })
                 const data = await response.json()
-                if (data.url) window.location.href = data.url
+                if (data.url) {
+                  window.location.href = data.url
+                } else {
+                  window.location.href = "/checkout"
+                }
               }}
               className="ml-auto flex items-center gap-2 bg-mint/10 border border-mint/30 rounded-lg px-4 py-2 text-sm font-semibold text-dark-bg hover:bg-mint/20 transition-colors cursor-pointer"
             >
