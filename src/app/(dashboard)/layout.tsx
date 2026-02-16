@@ -27,7 +27,8 @@ export default async function DashboardLayout({
 
   const status = userData?.subscription_status || "canceled"
   const trialEndsAt = userData?.trial_ends_at
-  const hasHadSubscription = !!userData?.stripe_subscription_id
+  const trialExpired = status === "trialing" && trialEndsAt && new Date(trialEndsAt) <= new Date()
+  const hasHadSubscription = !!userData?.stripe_subscription_id || trialExpired
 
   // Determine if user has valid access
   const isActive = status === "active"

@@ -36,14 +36,15 @@ export default function CheckoutPage() {
         return
       }
 
-      // Check if returning user (has had a prior subscription)
+      // Check if returning user (has had a prior subscription or expired trial)
       const { data: userData } = await supabase
         .from("users")
-        .select("stripe_subscription_id")
+        .select("stripe_subscription_id, subscription_status, trial_ends_at")
         .eq("id", user.id)
         .single()
 
-      if (userData?.stripe_subscription_id) {
+      const trialExpired = userData?.subscription_status === "trialing" && userData?.trial_ends_at && new Date(userData.trial_ends_at) <= new Date()
+      if (userData?.stripe_subscription_id || trialExpired) {
         setIsReturningUser(true)
       }
 

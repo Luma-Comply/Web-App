@@ -107,8 +107,9 @@ export async function POST(req: NextRequest) {
         .eq("id", authUser.id);
     }
 
-    // Determine if user has had a prior subscription (no second free trial)
-    const isReturningUser = !!user.stripe_subscription_id;
+    // Determine if user has had a prior subscription or expired trial (no second free trial)
+    const trialExpired = user.subscription_status === "trialing" && user.trial_ends_at && new Date(user.trial_ends_at) <= new Date();
+    const isReturningUser = !!user.stripe_subscription_id || trialExpired;
 
     // Create Checkout Session
     const checkoutSession = await stripe.checkout.sessions.create({
