@@ -316,7 +316,15 @@ export default function TeamPage() {
         {availableSeats <= 0 && isTeamOwner && (
           <div className="mb-6 p-4 bg-coral/10 border border-coral/30 rounded-lg">
             <p className="text-sm text-coral">
-              You've reached your team limit. <Button variant="link" className="text-coral underline p-0 h-auto" onClick={() => router.push("/settings/billing")}>Upgrade your plan</Button> to add more members.
+              You've reached your team limit. <Button variant="link" className="text-coral underline p-0 h-auto" onClick={async () => {
+                const res = await fetch("/api/stripe/create-portal", { method: "POST" })
+                const data = await res.json()
+                if (data.url) {
+                  window.location.href = data.url
+                } else {
+                  router.push("/settings/billing")
+                }
+              }}>Upgrade your plan</Button> to add more members.
             </p>
           </div>
         )}
