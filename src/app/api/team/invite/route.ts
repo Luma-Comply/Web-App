@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     const invitationLink = `${process.env.NEXT_PUBLIC_APP_URL}/team/accept?token=${invitationToken}`
     const practiceName = userData.practice_name || session.user.email || "A team"
 
-    await sendInvitationEmail({
+    const emailResult = await sendInvitationEmail({
       to: email,
       inviterEmail: session.user.email || "unknown",
       practiceName,
@@ -140,8 +140,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Invitation sent successfully",
-      invitation_link: invitationLink, // Remove this in production
+      message: emailResult.success
+        ? "Invitation sent successfully"
+        : "Invitation created but email delivery failed. Please try resending.",
+      invitation_link: invitationLink,
+      email_failed: !emailResult.success,
     })
   } catch (error) {
     console.error("Error in invite endpoint:", error)
