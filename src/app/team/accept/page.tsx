@@ -53,7 +53,7 @@ function AcceptInvitationContent() {
       // Fetch invitation details
       const { data: invitation, error: inviteError } = await supabase
         .from("team_invitations")
-        .select("invitee_email, team_owner_id, status, expires_at")
+        .select("invitee_email, team_owner_id, status, expires_at, practice_name")
         .eq("invitation_token", token)
         .single()
 
@@ -76,15 +76,8 @@ function AcceptInvitationContent() {
         return
       }
 
-      // Get team owner info including practice name
-      const { data: ownerData } = await supabase
-        .from("users")
-        .select("email, practice_name")
-        .eq("id", invitation.team_owner_id)
-        .single()
-
       setInvitationData({
-        practiceName: ownerData?.practice_name || ownerData?.email || "Unknown",
+        practiceName: invitation.practice_name || "Your team",
         inviteeEmail: invitation.invitee_email,
         teamOwnerId: invitation.team_owner_id,
         token: token,

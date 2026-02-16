@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
         invitee_email: email,
         invitation_token: invitationToken,
         status: "pending",
+        practice_name: userData.practice_name || null,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
       })
       .select()
