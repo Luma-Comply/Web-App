@@ -334,27 +334,30 @@ async function handleSubscriptionDeleted(
 
   // First, verify the user exists in our database
   let userExists = false;
+  let currentSubscriptionId: string | null = null;
 
   if (userId) {
     const { data: userById } = await supabase
       .from("users")
-      .select("id")
+      .select("id, stripe_subscription_id")
       .eq("id", userId)
       .single();
     userExists = !!userById;
+    currentSubscriptionId = userById?.stripe_subscription_id || null;
   }
 
   // If user not found by ID, try by customer ID
   if (!userExists) {
     const { data: userByCustomer } = await supabase
       .from("users")
-      .select("id")
+      .select("id, stripe_subscription_id")
       .eq("stripe_customer_id", customerId)
       .single();
 
     if (userByCustomer) {
       userId = userByCustomer.id;
       userExists = true;
+      currentSubscriptionId = userByCustomer.stripe_subscription_id || null;
     }
   }
 
@@ -365,6 +368,15 @@ async function handleSubscriptionDeleted(
       customerId,
       metadataUserId: subscription.metadata.supabase_user_id,
     });
+    return;
+  }
+
+  // Guard: If the user's current subscription is different from the one being deleted,
+  // they have re-subscribed with a new subscription. Do NOT overwrite the active status.
+  if (currentSubscriptionId && currentSubscriptionId !== subscription.id) {
+    console.log(
+      `Skipping deletion for old subscription ${subscription.id} — user ${userId} already has newer subscription ${currentSubscriptionId}`
+    );
     return;
   }
 
