@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { UserPlus, Trash2, Mail, Crown, User as UserIcon } from "lucide-react"
+import { UserPlus, Trash2 } from "lucide-react"
 
 interface TeamMember {
   id: string
@@ -343,14 +343,7 @@ export default function TeamPage() {
                 teamMembers.map((member) => (
                   <TableRow key={member.id}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        {member.is_team_owner ? (
-                          <Crown className="w-4 h-4 text-amber-500" />
-                        ) : (
-                          <UserIcon className="w-4 h-4 text-gray-400" />
-                        )}
-                        <span className="font-medium">{member.email}</span>
-                      </div>
+                      <span className="font-medium">{member.email}</span>
                     </TableCell>
                     <TableCell>
                       <span
@@ -409,10 +402,7 @@ export default function TeamPage() {
                 {invitations.map((invitation) => (
                   <TableRow key={invitation.id}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        <span>{invitation.invitee_email}</span>
-                      </div>
+                      <span>{invitation.invitee_email}</span>
                     </TableCell>
                     <TableCell className="text-sm text-gray-600">
                       {new Date(invitation.created_at).toLocaleDateString()}
