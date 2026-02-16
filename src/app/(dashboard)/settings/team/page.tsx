@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { UserPlus, Trash2, Loader2 } from "lucide-react"
+import { UserPlus, Trash2, Loader2, ChevronDown } from "lucide-react"
 
 interface TeamMember {
   id: string
@@ -65,8 +65,9 @@ export default function TeamPage() {
   const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null)
 
   // Add seats state
-  const [seatQuantity, setSeatQuantity] = useState(1)
+  const [seatQuantity, setSeatQuantity] = useState(3)
   const [addingSeats, setAddingSeats] = useState(false)
+  const [seatsExpanded, setSeatsExpanded] = useState(false)
 
   useEffect(() => {
     loadTeamData()
@@ -331,64 +332,119 @@ export default function TeamPage() {
         </div>
 
         {availableSeats <= 0 && isTeamOwner && (
-          <div className="mb-6 p-4 bg-coral/10 border border-coral/30 rounded-lg">
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-sm text-coral">
-                You've reached your team limit. Add more seats to invite more members.
-              </p>
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="flex items-center gap-2">
-                  <select
-                    value={seatQuantity}
-                    onChange={(e) => setSeatQuantity(Number(e.target.value))}
-                    className="h-9 rounded-md border border-coral/30 bg-white px-2 text-sm text-dark-bg focus:outline-none focus:ring-2 focus:ring-coral/50"
-                    aria-label="Number of seats to add"
-                  >
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <option key={n} value={n}>
-                        {n} {n === 1 ? "seat" : "seats"}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-xs text-gray-600 whitespace-nowrap">
-                    ${seatQuantity * 15}/mo
-                  </span>
+          <div className="mb-6 border border-border rounded-lg overflow-hidden">
+            {/* Collapsed bar */}
+            <button
+              type="button"
+              onClick={() => setSeatsExpanded(!seatsExpanded)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-foreground/[0.04] transition-colors"
+              aria-expanded={seatsExpanded}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                <span className="text-sm text-foreground/60">
+                  <strong className="text-foreground font-semibold">All seats in use.</strong>{" "}
+                  Need more room?
+                </span>
+              </div>
+              <span className="flex items-center gap-1 text-sm font-medium text-mint">
+                Add seats
+                <ChevronDown
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    seatsExpanded ? "rotate-180" : ""
+                  }`}
+                />
+              </span>
+            </button>
+
+            {/* Expandable panel */}
+            <div
+              className={`grid transition-all duration-300 ease-in-out ${
+                seatsExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div className="border-t border-border px-4 py-4">
+                  <div className="flex items-start gap-6">
+                    {/* Left: copy + selector */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground mb-1">
+                        Add team seats
+                      </p>
+                      <p className="text-xs text-foreground/50 leading-relaxed mb-3">
+                        Each seat is <strong className="text-foreground font-semibold">$15/month</strong>,
+                        billed to the card on file. New seats are available
+                        immediately and can be removed anytime from Billing.
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <label
+                          htmlFor="seat-select"
+                          className="text-xs font-medium text-foreground/50 whitespace-nowrap"
+                        >
+                          How many?
+                        </label>
+                        <select
+                          id="seat-select"
+                          value={seatQuantity}
+                          onChange={(e) => setSeatQuantity(Number(e.target.value))}
+                          className="h-9 rounded-md border border-input bg-white px-3 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 appearance-none bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2710%27%20height%3D%276%27%20viewBox%3D%270%200%2010%206%27%20fill%3D%27none%27%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%3E%3Cpath%20d%3D%27M1%201L5%205L9%201%27%20stroke%3D%27%231a274980%27%20stroke-width%3D%271.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E')] bg-no-repeat bg-[center_right_0.75rem] cursor-pointer"
+                          aria-label="Number of seats to add"
+                        >
+                          {[1, 2, 3, 5, 10].map((n) => (
+                            <option key={n} value={n}>
+                              {n} {n === 1 ? "seat" : "seats"}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Right: price summary + CTA */}
+                    <div className="shrink-0 bg-foreground/[0.04] rounded-lg px-5 py-4 text-center min-w-[140px]">
+                      <p className="text-2xl font-semibold text-foreground leading-none font-serif">
+                        ${seatQuantity * 15}
+                      </p>
+                      <p className="text-[11px] text-foreground/50 mt-0.5 mb-3">
+                        per month
+                      </p>
+                      <Button
+                        size="sm"
+                        disabled={addingSeats}
+                        onClick={async () => {
+                          setAddingSeats(true)
+                          try {
+                            const res = await fetch("/api/stripe/add-seats", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ quantity: seatQuantity }),
+                            })
+                            const data = await res.json()
+                            if (!res.ok) throw new Error(data.error)
+                            if (data.url) window.location.href = data.url
+                          } catch (error: any) {
+                            toast({
+                              title: "Error",
+                              description: error.message || "Failed to start checkout",
+                              variant: "destructive",
+                            })
+                          } finally {
+                            setAddingSeats(false)
+                          }
+                        }}
+                        className="w-full bg-dark-bg text-white hover:bg-dark-bg/90"
+                      >
+                        {addingSeats ? (
+                          <>
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            Loading...
+                          </>
+                        ) : (
+                          "Add Seats"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <Button
-                  size="sm"
-                  disabled={addingSeats}
-                  onClick={async () => {
-                    setAddingSeats(true)
-                    try {
-                      const res = await fetch("/api/stripe/add-seats", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ quantity: seatQuantity }),
-                      })
-                      const data = await res.json()
-                      if (!res.ok) throw new Error(data.error)
-                      if (data.url) window.location.href = data.url
-                    } catch (error: any) {
-                      toast({
-                        title: "Error",
-                        description: error.message || "Failed to start checkout",
-                        variant: "destructive",
-                      })
-                    } finally {
-                      setAddingSeats(false)
-                    }
-                  }}
-                  className="bg-dark-bg text-white hover:bg-dark-bg/90"
-                >
-                  {addingSeats ? (
-                    <>
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    "Add Seats"
-                  )}
-                </Button>
               </div>
             </div>
           </div>
