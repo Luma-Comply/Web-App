@@ -15,7 +15,7 @@ export async function sendInvitationEmail({
   practiceName,
   invitationLink,
 }: SendInvitationEmailParams) {
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Luma <noreply@useluma.io>'
+  const fromEmail = 'Luma <noreply@useluma.io>'
 
   if (!process.env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY is not set. Email invitation skipped.')
@@ -71,11 +71,11 @@ export async function sendInvitationEmail({
     })
 
     if (error) {
-      console.error('Error sending invitation email:', error)
+      console.error('Resend invitation error:', JSON.stringify(error))
       return { success: false, error }
     }
 
-    console.log(`Invitation email sent to ${to}`)
+    console.log('Resend invitation success:', JSON.stringify(data))
     return { success: true, data }
   } catch (error) {
     console.error('Exception sending invitation email:', error)

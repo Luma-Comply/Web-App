@@ -184,8 +184,9 @@ export default function TeamPage() {
       }
 
       toast({
-        title: "Success",
-        description: `Invitation sent to ${inviteEmail}`,
+        title: data.email_failed ? "Warning" : "Success",
+        description: data.message || `Invitation sent to ${inviteEmail}`,
+        variant: data.email_failed ? "destructive" : "default",
       })
 
       setInviteEmail("")
