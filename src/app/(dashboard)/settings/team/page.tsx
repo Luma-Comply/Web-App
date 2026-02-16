@@ -2,7 +2,7 @@
 
 import TeamLoading from "./loading"
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { UserPlus, Trash2 } from "lucide-react"
+import { UserPlus, Trash2, Loader2 } from "lucide-react"
 
 interface TeamMember {
   id: string
@@ -44,6 +44,7 @@ interface TeamInvitation {
 
 export default function TeamPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const { toast } = useToast()
 
@@ -63,9 +64,25 @@ export default function TeamPage() {
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null)
 
+  // Add seats state
+  const [seatQuantity, setSeatQuantity] = useState(1)
+  const [addingSeats, setAddingSeats] = useState(false)
+
   useEffect(() => {
     loadTeamData()
   }, [])
+
+  // Show success toast when returning from Stripe checkout
+  useEffect(() => {
+    if (searchParams.get("seats_added") === "true") {
+      toast({
+        title: "Seats added successfully!",
+        description: "You can now invite more team members.",
+      })
+      // Clean up URL param
+      router.replace("/settings/team", { scroll: false })
+    }
+  }, [searchParams])
 
   async function loadTeamData() {
     try {
@@ -315,17 +332,65 @@ export default function TeamPage() {
 
         {availableSeats <= 0 && isTeamOwner && (
           <div className="mb-6 p-4 bg-coral/10 border border-coral/30 rounded-lg">
-            <p className="text-sm text-coral">
-              You've reached your team limit. <Button variant="link" className="text-coral underline p-0 h-auto" onClick={async () => {
-                const res = await fetch("/api/stripe/create-portal", { method: "POST" })
-                const data = await res.json()
-                if (data.url) {
-                  window.location.href = data.url
-                } else {
-                  router.push("/settings/billing")
-                }
-              }}>Upgrade your plan</Button> to add more members.
-            </p>
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-coral">
+                You've reached your team limit. Add more seats to invite more members.
+              </p>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={seatQuantity}
+                    onChange={(e) => setSeatQuantity(Number(e.target.value))}
+                    className="h-9 rounded-md border border-coral/30 bg-white px-2 text-sm text-dark-bg focus:outline-none focus:ring-2 focus:ring-coral/50"
+                    aria-label="Number of seats to add"
+                  >
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <option key={n} value={n}>
+                        {n} {n === 1 ? "seat" : "seats"}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-gray-600 whitespace-nowrap">
+                    ${seatQuantity * 15}/mo
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  disabled={addingSeats}
+                  onClick={async () => {
+                    setAddingSeats(true)
+                    try {
+                      const res = await fetch("/api/stripe/add-seats", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ quantity: seatQuantity }),
+                      })
+                      const data = await res.json()
+                      if (!res.ok) throw new Error(data.error)
+                      if (data.url) window.location.href = data.url
+                    } catch (error: any) {
+                      toast({
+                        title: "Error",
+                        description: error.message || "Failed to start checkout",
+                        variant: "destructive",
+                      })
+                    } finally {
+                      setAddingSeats(false)
+                    }
+                  }}
+                  className="bg-dark-bg text-white hover:bg-dark-bg/90"
+                >
+                  {addingSeats ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    "Add Seats"
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 

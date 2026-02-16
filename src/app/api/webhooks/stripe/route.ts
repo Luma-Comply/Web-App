@@ -254,8 +254,43 @@ async function handleSubscriptionUpdate(
     updateData.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
   }
 
-  // Always ensure we have a default seat count if not present
-  updateData.seats_count = 3;
+  // Calculate seats_count from all active subscriptions
+  // Base plan includes 3 seats, extra seat subscriptions add more
+  const extraSeatPriceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_EXTRA_SEAT;
+  let extraSeats = 0;
+
+  if (extraSeatPriceId) {
+    // Check items on this subscription
+    if (subscription.items?.data) {
+      for (const item of subscription.items.data) {
+        if (item.price?.id === extraSeatPriceId) {
+          extraSeats += item.quantity || 0;
+        }
+      }
+    }
+
+    // Also check other active subscriptions (extra seats may be separate)
+    if (extraSeats === 0) {
+      try {
+        const subscriptions = await stripe.subscriptions.list({
+          customer: customerId,
+          status: "active",
+        });
+        for (const sub of subscriptions.data) {
+          for (const item of sub.items.data) {
+            if (item.price?.id === extraSeatPriceId) {
+              extraSeats += item.quantity || 0;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to list subscriptions for seat count:", e);
+      }
+    }
+  }
+
+  updateData.seats_count = 3 + extraSeats;
+  console.log(`Seats: 3 base + ${extraSeats} extra = ${3 + extraSeats}`);
 
   const { error } = await supabase
     .from("users")
