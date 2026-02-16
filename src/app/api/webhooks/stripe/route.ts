@@ -7,6 +7,35 @@ export const maxDuration = 25;
 
 type SupabaseClientType = SupabaseClient<any, "public", any>;
 
+/**
+ * Extract billing period from a subscription.
+ * As of Stripe API 2025-03-31.basil, current_period_start/end moved from
+ * the subscription level to individual subscription items.
+ */
+function getBillingPeriod(subscription: any): {
+  start: string | null;
+  end: string | null;
+} {
+  // Try item-level fields first (new API versions)
+  const firstItem = subscription.items?.data?.[0];
+  if (firstItem?.current_period_start && firstItem?.current_period_end) {
+    return {
+      start: new Date(firstItem.current_period_start * 1000).toISOString(),
+      end: new Date(firstItem.current_period_end * 1000).toISOString(),
+    };
+  }
+
+  // Fall back to subscription-level fields (old API versions)
+  if (subscription.current_period_start && subscription.current_period_end) {
+    return {
+      start: new Date(subscription.current_period_start * 1000).toISOString(),
+      end: new Date(subscription.current_period_end * 1000).toISOString(),
+    };
+  }
+
+  return { start: null, end: null };
+}
+
 // Validate environment variables at startup
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -173,15 +202,17 @@ async function handleCheckoutCompleted(
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const sub = subscription as any;
   const status = subscription.status;
+  const billingPeriod = getBillingPeriod(subscription);
 
   const updateData: Record<string, any> = {
     stripe_customer_id: customerId,
     stripe_subscription_id: subscriptionId,
     subscription_status: status,
-    billing_period_start: new Date(sub.current_period_start * 1000).toISOString(),
-    billing_period_end: new Date(sub.current_period_end * 1000).toISOString(),
     cancel_at_period_end: subscription.cancel_at_period_end,
   };
+
+  if (billingPeriod.start) updateData.billing_period_start = billingPeriod.start;
+  if (billingPeriod.end) updateData.billing_period_end = billingPeriod.end;
 
   // Clear trial date if active (no trial)
   if (status === "active") {
@@ -256,19 +287,18 @@ async function handleSubscriptionUpdate(
   }
 
   const status = subscription.status;
-  // Type cast to any to access period fields
   const sub = subscription as any;
-  const currentPeriodEnd = new Date(sub.current_period_end * 1000);
-  const currentPeriodStart = new Date(sub.current_period_start * 1000);
+  const billingPeriod = getBillingPeriod(subscription);
 
   const updateData: Record<string, any> = {
     stripe_customer_id: customerId,
     stripe_subscription_id: subscription.id,
     subscription_status: status,
-    billing_period_start: currentPeriodStart.toISOString(),
-    billing_period_end: currentPeriodEnd.toISOString(),
     cancel_at_period_end: subscription.cancel_at_period_end,
   };
+
+  if (billingPeriod.start) updateData.billing_period_start = billingPeriod.start;
+  if (billingPeriod.end) updateData.billing_period_end = billingPeriod.end;
 
   // If transitioning FROM trial TO active, clear trial date
   if (status === "active" && sub.trial_end) {
@@ -439,17 +469,18 @@ async function handlePaymentSucceeded(
     return;
   }
 
-  // Type cast to access period fields
-  const sub = subscription as any;
+  const billingPeriod = getBillingPeriod(subscription);
 
   // Update subscription status on successful payment using actual Stripe status
+  const paymentUpdateData: Record<string, any> = {
+    subscription_status: subscription.status,
+  };
+  if (billingPeriod.start) paymentUpdateData.billing_period_start = billingPeriod.start;
+  if (billingPeriod.end) paymentUpdateData.billing_period_end = billingPeriod.end;
+
   const { error } = await supabase
     .from("users")
-    .update({
-      subscription_status: subscription.status,
-      billing_period_start: new Date(sub.current_period_start * 1000).toISOString(),
-      billing_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-    })
+    .update(paymentUpdateData)
     .eq("id", userId);
 
   if (error) {

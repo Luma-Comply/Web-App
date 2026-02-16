@@ -56,24 +56,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const sub = subscription as any;
     const adminClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // Billing period moved from subscription-level to item-level in Stripe API 2025-03-31+
+    const firstItem = (subscription as any).items?.data?.[0];
+    const periodStart = firstItem?.current_period_start ?? (subscription as any).current_period_start;
+    const periodEnd = firstItem?.current_period_end ?? (subscription as any).current_period_end;
+
     const updateData: Record<string, any> = {
       stripe_customer_id: session.customer as string,
       stripe_subscription_id: subscriptionId,
       subscription_status: subscription.status,
-      billing_period_start: new Date(
-        sub.current_period_start * 1000
-      ).toISOString(),
-      billing_period_end: new Date(
-        sub.current_period_end * 1000
-      ).toISOString(),
       cancel_at_period_end: subscription.cancel_at_period_end,
     };
+
+    if (periodStart) updateData.billing_period_start = new Date(periodStart * 1000).toISOString();
+    if (periodEnd) updateData.billing_period_end = new Date(periodEnd * 1000).toISOString();
 
     if (subscription.status === "active") {
       updateData.trial_ends_at = null;
