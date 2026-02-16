@@ -3,6 +3,8 @@ import Stripe from "stripe";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { stripe } from "@/lib/stripe";
 
+export const maxDuration = 25;
+
 type SupabaseClientType = SupabaseClient<any, "public", any>;
 
 // Validate environment variables at startup
@@ -87,6 +89,8 @@ export async function POST(req: NextRequest) {
 
   console.log(`Processing webhook: ${event.type}`, { eventId: event.id });
 
+  const startTime = performance.now();
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
@@ -124,15 +128,17 @@ export async function POST(req: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
+    const elapsed = Math.round(performance.now() - startTime);
+    console.log(`[Webhook] ${event.type} processed in ${elapsed}ms (${event.id})`);
+
     return NextResponse.json({ received: true });
   } catch (error: unknown) {
+    const elapsed = Math.round(performance.now() - startTime);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error("Webhook handler error:", {
+    console.error(`[Webhook] ${event.type} FAILED after ${elapsed}ms (${event.id}):`, {
       message: errorMessage,
       stack: errorStack,
-      eventType: event.type,
-      eventId: event.id,
     });
     return NextResponse.json(
       { error: "Webhook handler failed" },
@@ -289,24 +295,9 @@ async function handleSubscriptionUpdate(
       }
     }
 
-    // Also check other active subscriptions (extra seats may be separate)
-    if (extraSeats === 0) {
-      try {
-        const subscriptions = await stripe.subscriptions.list({
-          customer: customerId,
-          status: "active",
-        });
-        for (const sub of subscriptions.data) {
-          for (const item of sub.items.data) {
-            if (item.price?.id === extraSeatPriceId) {
-              extraSeats += item.quantity || 0;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("Failed to list subscriptions for seat count:", e);
-      }
-    }
+    // Extra seats from separate subscriptions would need a stripe.subscriptions.list() call,
+    // but that adds ~500ms+ latency. Seat add-ons are on the same subscription item, so
+    // subscription.items.data above already covers it.
   }
 
   updateData.seats_count = 3 + extraSeats;

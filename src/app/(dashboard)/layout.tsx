@@ -1,7 +1,9 @@
+import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { FeedbackWidget } from "@/components/FeedbackWidget"
 import { SubscriptionGate } from "@/components/dashboard/SubscriptionGate"
+import { LumaLogo } from "@/components/LumaLogo"
 
 export default async function DashboardLayout({
   children,
@@ -39,10 +41,20 @@ export default async function DashboardLayout({
   const hasAccess = isActive || isTrialing
 
   if (!hasAccess) {
-    // SubscriptionGate handles the session_id fallback client-side:
-    // if session_id is in the URL, it verifies the checkout session
-    // with Stripe and syncs the DB before reloading.
-    return <SubscriptionGate hasHadSubscription={hasHadSubscription} />
+    // SubscriptionGate uses useSearchParams() which requires Suspense in App Router.
+    // Without Suspense, searchParams returns null during SSR and the session_id
+    // fallback never triggers.
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-gradient-to-b from-light-gray to-white flex items-center justify-center px-4">
+            <LumaLogo className="w-16 h-16" variant="loading" />
+          </div>
+        }
+      >
+        <SubscriptionGate hasHadSubscription={hasHadSubscription} />
+      </Suspense>
+    )
   }
 
   return (
