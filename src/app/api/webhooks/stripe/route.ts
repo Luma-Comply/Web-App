@@ -191,12 +191,24 @@ async function handleCheckoutCompleted(
     return;
   }
 
+  // Check if this is an extra_seats checkout (defensive guard for legacy sessions)
+  const isExtraSeats = session.metadata?.type === "extra_seats";
+
   console.log("Processing checkout.session.completed", {
     userId,
     customerId,
     subscriptionId,
     sessionId: session.id,
+    type: isExtraSeats ? "extra_seats" : "membership",
   });
+
+  // Extra seat purchases now modify the existing subscription directly
+  // (via stripe.subscriptions.update in add-seats API), so no checkout session
+  // should arrive for them. If one does (legacy), skip overwriting subscription ID.
+  if (isExtraSeats) {
+    console.log("Skipping checkout handler for extra_seats session — seats handled via subscription update");
+    return;
+  }
 
   // Fetch subscription from Stripe to get accurate status and billing period
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -310,24 +322,18 @@ async function handleSubscriptionUpdate(
     updateData.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
   }
 
-  // Calculate seats_count from all active subscriptions
-  // Base plan includes 3 seats, extra seat subscriptions add more
+  // Calculate seats_count from subscription line items.
+  // Base plan includes 3 seats. Extra seats are added as a separate line item
+  // on the SAME subscription (via stripe.subscriptions.update in add-seats API).
   const extraSeatPriceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_EXTRA_SEAT;
   let extraSeats = 0;
 
-  if (extraSeatPriceId) {
-    // Check items on this subscription
-    if (subscription.items?.data) {
-      for (const item of subscription.items.data) {
-        if (item.price?.id === extraSeatPriceId) {
-          extraSeats += item.quantity || 0;
-        }
+  if (extraSeatPriceId && subscription.items?.data) {
+    for (const item of subscription.items.data) {
+      if (item.price?.id === extraSeatPriceId) {
+        extraSeats += item.quantity || 0;
       }
     }
-
-    // Extra seats from separate subscriptions would need a stripe.subscriptions.list() call,
-    // but that adds ~500ms+ latency. Seat add-ons are on the same subscription item, so
-    // subscription.items.data above already covers it.
   }
 
   updateData.seats_count = 3 + extraSeats;

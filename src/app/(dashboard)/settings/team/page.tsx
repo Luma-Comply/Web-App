@@ -68,20 +68,21 @@ export default function TeamPage() {
   const [seatQuantity, setSeatQuantity] = useState(3)
   const [addingSeats, setAddingSeats] = useState(false)
   const [seatsExpanded, setSeatsExpanded] = useState(false)
+  const [confirmSeatsDialogOpen, setConfirmSeatsDialogOpen] = useState(false)
 
   useEffect(() => {
     loadTeamData()
   }, [])
 
-  // Show success toast when returning from Stripe checkout
+  // Handle legacy Stripe checkout return (seats_added=true in URL)
   useEffect(() => {
     if (searchParams.get("seats_added") === "true") {
       toast({
         title: "Seats added successfully!",
         description: "You can now invite more team members.",
       })
-      // Clean up URL param
       router.replace("/settings/team", { scroll: false })
+      loadTeamData()
     }
   }, [searchParams])
 
@@ -410,37 +411,10 @@ export default function TeamPage() {
                       <Button
                         size="sm"
                         disabled={addingSeats}
-                        onClick={async () => {
-                          setAddingSeats(true)
-                          try {
-                            const res = await fetch("/api/stripe/add-seats", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ quantity: seatQuantity }),
-                            })
-                            const data = await res.json()
-                            if (!res.ok) throw new Error(data.error)
-                            if (data.url) window.location.href = data.url
-                          } catch (error: any) {
-                            toast({
-                              title: "Error",
-                              description: error.message || "Failed to start checkout",
-                              variant: "destructive",
-                            })
-                          } finally {
-                            setAddingSeats(false)
-                          }
-                        }}
+                        onClick={() => setConfirmSeatsDialogOpen(true)}
                         className="w-full bg-dark-bg text-white hover:bg-dark-bg/90"
                       >
-                        {addingSeats ? (
-                          <>
-                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                            Loading...
-                          </>
-                        ) : (
-                          "Add Seats"
-                        )}
+                        Add Seats
                       </Button>
                     </div>
                   </div>
@@ -639,6 +613,73 @@ export default function TeamPage() {
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Remove Member
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Add Seats Dialog */}
+      <Dialog open={confirmSeatsDialogOpen} onOpenChange={setConfirmSeatsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Confirm seat purchase</DialogTitle>
+            <DialogDescription>
+              {seatQuantity} additional {seatQuantity === 1 ? "seat" : "seats"} at $15/month {seatQuantity > 1 ? `($${seatQuantity * 15}/mo total)` : ""} will be added to your subscription and billed to the card on file. This change takes effect immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmSeatsDialogOpen(false)}
+              disabled={addingSeats}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={addingSeats}
+              onClick={async () => {
+                setAddingSeats(true)
+                try {
+                  const res = await fetch("/api/stripe/add-seats", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ quantity: seatQuantity }),
+                  })
+                  const data = await res.json()
+                  if (!res.ok) throw new Error(data.error)
+
+                  // Update state immediately with API response
+                  setSeatsCount(data.total_seats)
+                  setConfirmSeatsDialogOpen(false)
+                  setSeatsExpanded(false)
+
+                  toast({
+                    title: "Seats added successfully!",
+                    description: `${data.seats_added} ${data.seats_added === 1 ? "seat" : "seats"} added. You now have ${data.total_seats} total seats.`,
+                  })
+
+                  // Re-fetch to ensure DB is fully in sync
+                  loadTeamData()
+                } catch (error: any) {
+                  toast({
+                    title: "Error",
+                    description: error.message || "Failed to add seats",
+                    variant: "destructive",
+                  })
+                } finally {
+                  setAddingSeats(false)
+                }
+              }}
+              className="bg-dark-bg text-white hover:bg-dark-bg/90"
+            >
+              {addingSeats ? (
+                <>
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                `Add ${seatQuantity} ${seatQuantity === 1 ? "seat" : "seats"} — $${seatQuantity * 15}/mo`
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
