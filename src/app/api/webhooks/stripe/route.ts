@@ -163,13 +163,33 @@ async function handleCheckoutCompleted(
     sessionId: session.id,
   });
 
-  // Update user with customer ID - subscription details will be handled by subscription webhooks
+  // Fetch subscription from Stripe to get accurate status and billing period
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const sub = subscription as any;
+  const status = subscription.status;
+
+  const updateData: Record<string, any> = {
+    stripe_customer_id: customerId,
+    stripe_subscription_id: subscriptionId,
+    subscription_status: status,
+    billing_period_start: new Date(sub.current_period_start * 1000).toISOString(),
+    billing_period_end: new Date(sub.current_period_end * 1000).toISOString(),
+    cancel_at_period_end: subscription.cancel_at_period_end,
+  };
+
+  // Clear trial date if active (no trial)
+  if (status === "active") {
+    updateData.trial_ends_at = null;
+  }
+
+  // Set trial date if trialing
+  if (status === "trialing" && sub.trial_end) {
+    updateData.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
+  }
+
   const { error } = await supabase
     .from("users")
-    .update({
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscriptionId,
-    })
+    .update(updateData)
     .eq("id", userId);
 
   if (error) {
@@ -177,7 +197,7 @@ async function handleCheckoutCompleted(
     throw error;
   }
 
-  console.log(`Checkout completed for user ${userId}`);
+  console.log(`Checkout completed for user ${userId}, status: ${status}`);
 }
 
 async function handleSubscriptionUpdate(
@@ -419,11 +439,11 @@ async function handlePaymentSucceeded(
   // Type cast to access period fields
   const sub = subscription as any;
 
-  // Update subscription status on successful payment
+  // Update subscription status on successful payment using actual Stripe status
   const { error } = await supabase
     .from("users")
     .update({
-      subscription_status: "active",
+      subscription_status: subscription.status,
       billing_period_start: new Date(sub.current_period_start * 1000).toISOString(),
       billing_period_end: new Date(sub.current_period_end * 1000).toISOString(),
     })
