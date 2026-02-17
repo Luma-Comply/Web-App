@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 export async function login(formData: FormData) {
     const supabase = await createClient()
@@ -67,6 +68,38 @@ export async function signup(formData: FormData) {
         redirect('/signup?error=Please%20fill%20in%20all%20fields')
     }
 
+    // Pre-signup check: detect existing accounts before hitting Supabase Auth.
+    // RLS on public.users requires auth.uid(), so we need a service role client.
+    const adminClient = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    const { data: existingUser } = await adminClient
+        .from('users')
+        .select('is_team_owner, team_owner_id')
+        .eq('email', email)
+        .maybeSingle()
+
+    if (existingUser) {
+        if (!existingUser.is_team_owner && existingUser.team_owner_id) {
+            // Email belongs to a team member — they must be removed first
+            redirect(
+                '/signup?error=' +
+                encodeURIComponent(
+                    'This email is associated with a team account. To create your own account, ask your team owner to remove you first, then sign up again.'
+                )
+            )
+        }
+        // Email belongs to an existing owner
+        redirect(
+            '/signup?error=' +
+            encodeURIComponent(
+                'An account with this email already exists. Please sign in instead.'
+            )
+        )
+    }
+
     const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -78,9 +111,13 @@ export async function signup(formData: FormData) {
         },
     })
 
+    if (error) {
+        redirect('/signup?error=' + encodeURIComponent(error.message))
+    }
+
     // If signup succeeded, update the user profile with practice_name and mark as team owner
     // Use upsert to handle the case where the trigger hasn't created the record yet
-    if (data?.user && !error) {
+    if (data?.user) {
         await supabase
             .from('users')
             .upsert({
@@ -93,13 +130,8 @@ export async function signup(formData: FormData) {
             })
     }
 
-    // Even if there's an error (like user already exists), still show confirm email page
-    // The user might need to check their email or resend confirmation
     revalidatePath('/', 'layout')
-
-    // Always redirect to confirmation page - user needs to verify email first
-    // If signup failed, they'll see the error on the confirm page or can resend
-    redirect(`/signup/confirm-email?email=${encodeURIComponent(email)}${error ? `&error=${encodeURIComponent(error.message)}` : ''}`)
+    redirect(`/signup/confirm-email?email=${encodeURIComponent(email)}`)
 }
 
 export async function forgotPassword(formData: FormData) {

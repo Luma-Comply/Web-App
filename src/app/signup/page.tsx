@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { useFormStatus } from "react-dom"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { signup } from "@/app/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Check, Zap, Shield, Loader2, Eye, EyeOff } from "lucide-react"
+import { Check, Zap, Shield, Loader2, Eye, EyeOff, AlertCircle } from "lucide-react"
 import { LumaLogo } from "@/components/LumaLogo"
 import SignInDialog from "@/components/SignInDialog"
 
@@ -40,6 +41,16 @@ function SubmitButton() {
 }
 
 export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupPageContent />
+    </Suspense>
+  )
+}
+
+function SignupPageContent() {
+  const searchParams = useSearchParams()
+  const errorMessage = searchParams.get("error")
   const [signInOpen, setSignInOpen] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   return (
@@ -100,6 +111,13 @@ export default function SignupPage() {
                     Start your free 7-day trial
                   </p>
                 </div>
+
+                {errorMessage && (
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-coral/10 border border-coral/20 mb-6" role="alert">
+                    <AlertCircle className="w-5 h-5 text-coral flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-dark-bg">{errorMessage}</p>
+                  </div>
+                )}
 
                 <form action={signup} className="space-y-5">
                   <div>
