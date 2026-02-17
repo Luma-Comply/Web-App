@@ -68,9 +68,11 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        "elevation-sm": "0 2px 4px rgba(0,0,0,.04), 0 4px 8px rgba(0,0,0,.06)",
-        "elevation-md": "0 2px 8px rgba(0,0,0,.08), 0 8px 16px rgba(0,0,0,.08)",
-        "elevation-lg": "0 4px 12px rgba(0,0,0,.08), 0 12px 24px rgba(0,0,0,.10)",
+        "elevation-border": "0 0 0 1px rgba(0,0,0,.06), 0 1px 2px -1px rgba(0,0,0,.06), 0 2px 4px rgba(0,0,0,.04)",
+        "elevation-sm": "0 1px 2px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.04)",
+        "elevation-md": "0 2px 4px rgba(0,0,0,.04), 0 4px 8px rgba(0,0,0,.06)",
+        "elevation-lg": "0 4px 8px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.08)",
+        "elevation-xl": "0 8px 16px rgba(0,0,0,.06), 0 20px 40px rgba(0,0,0,.1)",
       },
       fontFamily: {
         serif: ["var(--font-serif)", "Georgia", "serif"],
