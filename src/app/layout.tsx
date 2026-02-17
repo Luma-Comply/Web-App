@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     siteName: "Luma",
     images: [
       {
-        url: "/og-image.png",
+        url: "/opengraph-preview.jpg",
         width: 1200,
         height: 630,
         alt: "Luma - Medical Necessity Documentation Platform",
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Luma - Medical Necessity Documentation",
     description: "Keep your patients on life-saving therapies. Secure approvals faster with HIPAA-compliant AI documentation.",
-    images: ["/og-image.png"],
+    images: ["/opengraph-preview.jpg"],
     creator: "@useluma",
   },
   icons: {

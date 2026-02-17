@@ -4,8 +4,8 @@
   "description": "HIPAA-compliant AI-powered medical necessity documentation for biologics",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F5F5F0",
-  "theme_color": "#ABC5B6",
+  "background_color": "#F4F4EE",
+  "theme_color": "#1A2749",
   "icons": [
     {
       "src": "/icon-192.png",
