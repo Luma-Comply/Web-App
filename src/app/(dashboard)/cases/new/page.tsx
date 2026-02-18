@@ -599,7 +599,7 @@ export default function NewCasePage() {
           {/* ============================================== */}
           <Card className="p-6 glass-card border border-sage-medium/30">
             <h2 className="text-xl font-sans font-semibold text-dark-bg mb-4">1. Document Type</h2>
-            <Label htmlFor="doc_type">What document do you need generated?</Label>
+            <Label htmlFor="doc_type">What document do you need generated? <span className="text-coral">*</span></Label>
             <select
               id="doc_type"
               name="doc_type"
@@ -939,63 +939,9 @@ export default function NewCasePage() {
           <Card className="p-6 glass-card border border-sage-medium/30 overflow-visible">
             <h2 className="text-xl font-sans font-semibold text-dark-bg mb-4">2. Patient & Claim Info</h2>
             <div className="grid md:grid-cols-2 gap-4">
-              {/* Patient Name */}
-              <div>
-                <Label htmlFor="patient_first_name">First Name</Label>
-                <Input
-                  id="patient_first_name"
-                  name="patient_first_name"
-                  value={formData.patient_first_name}
-                  onChange={handleChange}
-                  placeholder="John"
-                  className="mt-2"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="patient_last_name">Last Name</Label>
-                <Input
-                  id="patient_last_name"
-                  name="patient_last_name"
-                  value={formData.patient_last_name}
-                  onChange={handleChange}
-                  placeholder="Doe"
-                  className="mt-2"
-                  required
-                />
-              </div>
-
-              {/* Age & State */}
-              <div>
-                <Label htmlFor="patient_age">Age</Label>
-                <Input
-                  id="patient_age"
-                  name="patient_age"
-                  type="number"
-                  value={formData.patient_age}
-                  onChange={handleChange}
-                  placeholder="45"
-                  className="mt-2"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="patient_state">State</Label>
-                <Input
-                  id="patient_state"
-                  name="patient_state"
-                  value={formData.patient_state}
-                  onChange={handleChange}
-                  placeholder="TX"
-                  maxLength={2}
-                  className="mt-2"
-                  required
-                />
-              </div>
-
               {/* Insurance Payer - CRITICAL for AI */}
-              <div className="md:col-span-2">
-                <Label htmlFor="payer_name">Insurance Payer (Required for Research)</Label>
+              <div>
+                <Label htmlFor="payer_name">Insurance Payer <span className="text-coral">*</span></Label>
                 <Autocomplete
                   id="payer_name"
                   name="payer_name"
@@ -1015,12 +961,12 @@ export default function NewCasePage() {
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  The AI will research the specific policy for this payer. Start typing to see suggestions.
+                  Start typing to see suggestions.
                 </p>
               </div>
 
               {/* Claim Amount */}
-              <div className="md:col-span-2">
+              <div>
                 <Label htmlFor="claim_amount">Estimated Claim Amount</Label>
                 <div className="relative mt-2">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
@@ -1037,6 +983,61 @@ export default function NewCasePage() {
                   />
                 </div>
               </div>
+
+              {/* Patient Name */}
+              <div>
+                <Label htmlFor="patient_first_name">First Name <span className="text-coral">*</span></Label>
+                <Input
+                  id="patient_first_name"
+                  name="patient_first_name"
+                  value={formData.patient_first_name}
+                  onChange={handleChange}
+                  placeholder="John"
+                  className="mt-2"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="patient_last_name">Last Name <span className="text-coral">*</span></Label>
+                <Input
+                  id="patient_last_name"
+                  name="patient_last_name"
+                  value={formData.patient_last_name}
+                  onChange={handleChange}
+                  placeholder="Doe"
+                  className="mt-2"
+                  required
+                />
+              </div>
+
+              {/* Age & State */}
+              <div>
+                <Label htmlFor="patient_age">Age <span className="text-coral">*</span></Label>
+                <Input
+                  id="patient_age"
+                  name="patient_age"
+                  type="number"
+                  value={formData.patient_age}
+                  onChange={handleChange}
+                  placeholder="45"
+                  className="mt-2"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="patient_state">State <span className="text-coral">*</span></Label>
+                <Input
+                  id="patient_state"
+                  name="patient_state"
+                  value={formData.patient_state}
+                  onChange={handleChange}
+                  placeholder="TX"
+                  maxLength={2}
+                  className="mt-2"
+                  required
+                />
+              </div>
+
             </div>
           </Card>
           )}
