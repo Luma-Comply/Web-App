@@ -176,9 +176,15 @@ function SignupPageContent() {
                         )}
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Must be at least 8 characters
-                    </p>
+                    <div className="text-xs text-gray-500 mt-2 space-y-0.5">
+                      <p>Password requirements:</p>
+                      <ul className="list-disc list-inside ml-1 space-y-0.5">
+                        <li>At least 8 characters</li>
+                        <li>At least one uppercase letter (A-Z)</li>
+                        <li>At least one number (0-9)</li>
+                        <li>At least one special character (!@#$...)</li>
+                      </ul>
+                    </div>
                   </div>
 
                   <SubmitButton />
