@@ -1169,7 +1169,7 @@ export default function CaseDetailPage() {
             {/* Chat with Luma bar */}
             <motion.button
               onClick={() => setIsChatExpanded(true)}
-              className="w-full flex items-center gap-3 px-5 py-3 rounded-xl cursor-pointer border-0 outline-none"
+              className="relative w-full flex items-center gap-3 px-5 py-3 rounded-xl cursor-pointer border-0 outline-none overflow-hidden"
               style={{
                 background: 'linear-gradient(90deg, #24315D 0%, #161F35 100%)',
               }}
@@ -1178,10 +1178,30 @@ export default function CaseDetailPage() {
               transition={{ type: 'spring', stiffness: 400, damping: 25 }}
               aria-label="Open chat with Luma AI assistant"
             >
-              <div className="w-8 h-8 rounded-full bg-[#1652C5]/20 flex items-center justify-center flex-shrink-0">
+              {/* Hero video — right half, left edge fades to transparent via CSS mask */}
+              <div
+                className="absolute right-0 top-0 w-1/2 h-full pointer-events-none overflow-hidden"
+                style={{
+                  WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 50%)',
+                  maskImage: 'linear-gradient(90deg, transparent 0%, black 50%)',
+                }}
+              >
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 h-full w-full object-cover opacity-20"
+                  style={{ mixBlendMode: 'screen' }}
+                  poster="/hero.webp"
+                >
+                  <source src="/hero.mp4" type="video/mp4" />
+                </video>
+              </div>
+              <div className="relative z-10 w-8 h-8 rounded-full bg-[#1652C5]/20 flex items-center justify-center flex-shrink-0">
                 <MessageSquare className="w-4 h-4 text-[#1652C5]" />
               </div>
-              <div className="text-left">
+              <div className="relative z-10 text-left">
                 <span className="text-white text-sm font-medium block leading-tight">Chat with Luma</span>
                 <span className="text-white/50 text-xs leading-tight">Ask questions or discuss compliance gaps</span>
               </div>
@@ -1217,21 +1237,19 @@ export default function CaseDetailPage() {
                   {/* Generated Documentation */}
                   <Card className="bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
                     <div className="p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-sans font-semibold text-dark-bg">
+                      <div
+                        className="flex items-center justify-between cursor-pointer hover:bg-sage-light/10 -m-6 p-6 rounded-xl transition-colors"
+                        onClick={() => setIsDocCollapsed(!isDocCollapsed)}
+                      >
+                        <h2 className="text-lg font-sans font-semibold text-dark-bg">
                           Generated Documentation
                         </h2>
-                        <button
-                          onClick={() => setIsDocCollapsed(!isDocCollapsed)}
-                          className="p-2 hover:bg-sage-light/20 rounded-lg transition-colors"
+                        <motion.div
+                          animate={{ rotate: isDocCollapsed ? 0 : 180 }}
+                          transition={{ duration: 0.2 }}
                         >
-                          <motion.div
-                            animate={{ rotate: isDocCollapsed ? 0 : 180 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            <ChevronDown className="w-5 h-5 text-gray-500" />
-                          </motion.div>
-                        </button>
+                          <ChevronDown className="w-5 h-5 text-gray-400" />
+                        </motion.div>
                       </div>
 
                       <AnimatePresence initial={false}>
