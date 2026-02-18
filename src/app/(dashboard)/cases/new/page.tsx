@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { LumaLogo } from "@/components/LumaLogo"
 import { searchPayers } from "@/lib/payers"
 import { getActiveWiserSkinSubStates, isWiserActiveForSkinSubs, getMACInfo } from "@/lib/mac-jurisdictions"
+import { icd10ToWoundType } from "@/lib/lcd-requirements"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -329,7 +330,7 @@ export default function NewCasePage() {
   }
 
   // Progressive disclosure: check if each step is complete
-  const isStep1Complete = !!(formData.doc_type && selectedIcd10Codes.length > 0)
+  const isStep1Complete = !!formData.doc_type
   const isStep2Complete = !!(
     formData.patient_first_name &&
     formData.patient_last_name &&
@@ -347,12 +348,6 @@ export default function NewCasePage() {
     // Basic validation
     if (!formData.doc_type) {
       setError("Please select a document type.")
-      return
-    }
-
-    // ICD-10 code required for all document types
-    if (selectedIcd10Codes.length === 0) {
-      setError("Please search and select at least one diagnosis code (ICD-10).")
       return
     }
 
@@ -623,7 +618,7 @@ export default function NewCasePage() {
             {formData.doc_type && (
               <div className="mt-4" ref={icd10ContainerRef}>
                 <div className="flex items-center gap-1.5">
-                  <Label htmlFor="icd10_search" className="mb-0">Diagnosis Codes (ICD-10)</Label>
+                  <Label htmlFor="icd10_search" className="mb-0">Diagnosis Codes (ICD-10) <span className="text-gray-400 font-normal">— Optional</span></Label>
                   <div
                     className="relative"
                     onMouseEnter={() => setIcd10Tooltip(true)}
@@ -657,6 +652,7 @@ export default function NewCasePage() {
                     </AnimatePresence>
                   </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-1">Adding diagnosis codes significantly improves research accuracy for your payer.</p>
 
                 {/* Selected codes as animated badges */}
                 <AnimatePresence mode="popLayout">
@@ -909,8 +905,8 @@ export default function NewCasePage() {
               </DialogContent>
             </Dialog>
 
-            {/* WISeR Pilot State Info */}
-            {formData.doc_type === "biologics_pa" && (
+            {/* WISeR Pilot State Info — only show for wound care biologics */}
+            {formData.doc_type === "biologics_pa" && selectedIcd10Codes.some(c => icd10ToWoundType(c.code) !== undefined) && (
               <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
