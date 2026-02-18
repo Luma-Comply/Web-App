@@ -10,6 +10,7 @@ import { WoundType } from "@/lib/lcd-requirements"
 import { getMACInfo, isWiserActiveForSkinSubs } from "@/lib/mac-jurisdictions"
 import { validateMedicalNecessity, MedicalNecessityValidationResult } from "@/lib/validation/medical-necessity-validation"
 import { validateAppeal, AppealValidationResult } from "@/lib/validation/appeal-validation"
+import { computeAgeTags, formatAgeTagsForPrompt, reinsertPatientName, PATIENT_PLACEHOLDER } from "@/lib/phi-utils"
 
 // Unified validation result type for all doc types
 type ValidationResult = LCDValidationResult | MedicalNecessityValidationResult | AppealValidationResult
@@ -120,7 +121,7 @@ Find for LCD ${lcdNumber} (${macInfo?.macName || "this MAC"}): LCD effective dat
           } else {
             researchQuery = `Research ${docTypeLabel} criteria for ${caseData.payer_name} in ${caseData.patient_state}:
 Medication: ${caseData.requested_medication}
-Patient: ${caseData.patient_age}yo
+Patient: ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}
 Clinical context: ${clinicalNotes.substring(0, 1000)}
 
 Find: coverage criteria, step therapy requirements, medical necessity requirements.`
@@ -332,13 +333,15 @@ Medication: ${caseData.requested_medication}`
 
       const systemContext = validationResult
         ? `You are an AI for ${isBiologicsPA ? 'CTP prior authorization' : isMedicalNecessity ? 'medical necessity letter' : 'appeal letter'} documentation. Generate professional medical documentation.
-Validation: Risk ${validationResult.auditRisk.overallScore}, ${validationResult.summary.foundCount}/${validationResult.summary.totalRequirements} requirements met.`
-        : `You are an AI for medical documentation. Generate professional, persuasive prior authorization letters.`
+Validation: Risk ${validationResult.auditRisk.overallScore}, ${validationResult.summary.foundCount}/${validationResult.summary.totalRequirements} requirements met.
+CRITICAL: Use ${PATIENT_PLACEHOLDER} as the patient name throughout. Do NOT invent or extract any patient names, dates of birth, or specific identifiers. Use generalized timeframes.`
+        : `You are an AI for medical documentation. Generate professional, persuasive prior authorization letters.
+CRITICAL: Use ${PATIENT_PLACEHOLDER} as the patient name throughout. Do NOT invent or extract any patient names, dates of birth, or specific identifiers. Use generalized timeframes.`
 
       const fullPrompt = `${systemContext}
 
 Generate ${getDocTypeLabel(caseData.doc_type)} for:
-Patient: ${caseData.patient_first_name} ${caseData.patient_last_name}, ${caseData.patient_age}yo, ${caseData.patient_state}
+Patient: ${PATIENT_PLACEHOLDER}, ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}, ${caseData.patient_state}
 Payer: ${caseData.payer_name}
 Medication: ${caseData.requested_medication}
 
@@ -358,6 +361,9 @@ Generate a professional, persuasive prior authorization letter. Do not use markd
 
       const docResult = await docModel.generateContent(fullPrompt)
       let documentation = docResult.response.text() || ""
+
+      // Re-insert patient name (replace [PATIENT] with actual name)
+      documentation = reinsertPatientName(documentation, caseData.patient_first_name, caseData.patient_last_name)
 
       documentation = documentation
         .replace(/\*\*/g, '')

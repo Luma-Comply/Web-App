@@ -25,7 +25,7 @@ const faqs = [
   {
     question: "Do you store PHI?",
     answer:
-      "No. Luma is designed to generate documentation without storing PHI. We collect only limited patient context: first name, age or age range, state, payer name, diagnosis codes, and clinical details needed for AI generation.",
+      "No. Luma is designed to generate documentation without storing PHI. We collect only limited patient context: age or age range, state, payer name, diagnosis codes, and clinical details needed for AI generation.",
   },
   {
     question: "What should we avoid entering into Luma?",

@@ -13,6 +13,7 @@ import { WoundType } from "@/lib/lcd-requirements"
 import { getMACInfo, buildStateSpecificContext, isWiserActiveForSkinSubs } from "@/lib/mac-jurisdictions"
 import { validateMedicalNecessity, MedicalNecessityValidationResult } from "@/lib/validation/medical-necessity-validation"
 import { validateAppeal, AppealValidationResult } from "@/lib/validation/appeal-validation"
+import { computeAgeTags, formatAgeTagsForPrompt, reinsertPatientName, PATIENT_PLACEHOLDER } from "@/lib/phi-utils"
 
 // Unified validation result type for all doc types
 type ValidationResult = LCDValidationResult | MedicalNecessityValidationResult | AppealValidationResult
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
           caseData.diagnosis_codes?.join(", ")
         ].filter(Boolean).join("\n\n")
 
-        console.log(`Researching payer: ${caseData.payer_name} for ${caseData.requested_medication} - Document Type: ${docTypeLabel} - State: ${caseData.patient_state} - Age: ${caseData.patient_age}`)
+        console.log(`Researching payer: ${caseData.payer_name} for ${caseData.requested_medication} - Document Type: ${docTypeLabel} - State: ${caseData.patient_state}`)
 
         // Use CTP-specific query for Biologics PA
         let researchQuery: string
@@ -113,7 +114,7 @@ PATIENT CASE:
 - MAC: ${macInfo?.macName || "Unknown"} (${macInfo?.jurisdiction || "Unknown"})
 - LCD: ${lcdNumber}
 - Payer: ${caseData.payer_name} (${caseData.payer_type})
-- Patient Age: ${caseData.patient_age}
+- ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}
 - WISeR Pilot State: ${isWiserState ? "YES - PA Required" : "NO"}
 
 CLINICAL CONTEXT (abbreviated):
@@ -138,9 +139,8 @@ RETURN FORMAT (include all if found):
           researchQuery = `Research and find the specific ${docTypeLabel} criteria and requirements for the following case:
 
 PATIENT INFORMATION:
-- Age: ${caseData.patient_age} years old
+- ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}
 - State: ${caseData.patient_state}
-- Patient Name: ${caseData.patient_first_name} ${caseData.patient_last_name}
 - Gender: ${caseData.patient_gender || 'Not specified'}
 
 DOCUMENT TYPE:
@@ -165,7 +165,7 @@ CRITICAL: Research ${caseData.payer_name}'s policy specifically for ${caseData.p
 2. Required diagnosis codes for this medication
 3. Step therapy requirements (prior treatment failures needed)
 4. Disease severity criteria
-5. Age-specific considerations (patient is ${caseData.patient_age} years old)
+5. Age-group-specific considerations (${computeAgeTags(caseData.patient_age).age_group} patient${computeAgeTags(caseData.patient_age).is_medicare_eligible ? ', Medicare eligible' : ''})
 6. Medical necessity requirements for ${docTypeLabel}
 7. Any state-specific prior authorization requirements
 
@@ -613,16 +613,17 @@ Documentation Status:
 
 THEN generate the Prior Authorization letter following these rules:
 - Professional, persuasive, medical-legal tone
-- Clean format WITHOUT placeholders or markdown
-- Extract patient name from Clinical Notes (source of truth)
+- Clean format WITHOUT placeholders or markdown (except ${PATIENT_PLACEHOLDER} for the patient name)
+- Use ${PATIENT_PLACEHOLDER} as the patient name throughout the letter. Do NOT invent or extract any patient names.
+- Do NOT invent any patient identifiers, dates of birth, or specific dates. Use generalized timeframes.
 - Include ALL wounds/conditions mentioned
 - Reference SOC failure documentation explicitly
 - Include ABI results if present
 - Note wound measurements with dates
 
 CRITICAL - PATIENT INFORMATION:
-- Use patient name from Clinical Notes, not form input
-- Extract ALL relevant details: wounds, measurements, lab values, ABI, vascular studies
+- Use ${PATIENT_PLACEHOLDER} as the patient name. Do NOT extract or invent any names.
+- Extract ALL relevant clinical details: wounds, measurements, lab values, ABI, vascular studies
 - Verify staging and dates from notes`
     } else {
       // Standard prompt for non-CTP cases
@@ -646,10 +647,10 @@ CRITICAL - PATIENT INFORMATION:
     - Use actual dates, addresses, and information from the clinical notes when available.
     - If information is not available, simply omit it rather than using placeholders.
 
-    CRITICAL - PATIENT INFORMATION ACCURACY:
-    - ALWAYS extract the ACTUAL patient name from the Clinical Notes. The name in the Clinical Notes is the source of truth, not the form input.
-    - If the Clinical Notes contain a different patient name than the form input, USE THE NAME FROM THE CLINICAL NOTES.
-    - Extract ALL relevant patient details from notes: age, gender, location, comorbidities, diagnosis codes, lab values, test results (ABI, vascular studies, nutritional assessments).
+    CRITICAL - PATIENT INFORMATION:
+    - Use ${PATIENT_PLACEHOLDER} as the patient name throughout the letter. Do NOT extract or invent any patient names from the Clinical Notes or elsewhere.
+    - Do NOT invent any patient identifiers, dates of birth, or specific dates. Use generalized timeframes (e.g., "approximately 10 months" not "January 15, 2025").
+    - Extract ALL relevant clinical details from notes: comorbidities, diagnosis codes, lab values, test results (ABI, vascular studies, nutritional assessments).
     - Include ALL wounds/conditions mentioned in the notes, not just one.
     - Verify wound staging, measurements, and dates directly from the clinical notes.
     - Extract practice/clinic names from the notes - use the CURRENT practice name if mentioned, not closed practices.
@@ -669,7 +670,7 @@ CRITICAL - PATIENT INFORMATION:
     const userPrompt = `GENERATE DOCUMENTATION FOR:
 
     CASE CONTEXT (Form Input - Use as reference, but Clinical Notes are source of truth):
-    - Patient Form Input: ${caseData.patient_first_name} ${caseData.patient_last_name}, ${caseData.patient_age}yo ${caseData.patient_gender || ''} from ${caseData.patient_state}
+    - Patient: ${PATIENT_PLACEHOLDER}, ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}, ${caseData.patient_gender || ''} from ${caseData.patient_state}
     - Payer: ${caseData.payer_name} (${caseData.payer_type})
     - Medication: ${caseData.requested_medication} ${caseData.medication_dose}
     - Document Type: ${getDocTypeLabel(caseData.doc_type)}
@@ -685,8 +686,8 @@ CRITICAL - PATIENT INFORMATION:
     ${caseData.lab_values}
     
     CRITICAL INSTRUCTIONS - EXTRACT FROM CLINICAL NOTES:
-    1. PATIENT NAME: Search the Clinical Notes for the ACTUAL patient name. If you find a different name than the form input, USE THE NAME FROM THE NOTES. The clinical notes are the authoritative source.
-    
+    1. PATIENT NAME: Use ${PATIENT_PLACEHOLDER} as the patient name throughout. Do NOT extract or invent any patient names. Do NOT use any names found in clinical notes.
+
     2. PRACTICE/CLINIC NAME: Extract the CURRENT practice or clinic name from the notes. If notes mention a practice closure or transfer, use the CURRENT/ACTIVE practice name.
     
     3. ALL WOUNDS/CONDITIONS: Include ALL wounds, conditions, or diagnoses mentioned in the notes, not just one. Provide details for each (staging, measurements, location, dates).
@@ -709,7 +710,7 @@ CRITICAL - PATIENT INFORMATION:
        - If NO provider information with phone number is found anywhere in the notes, end the letter WITHOUT adding any provider contact information.
        - Only use provider info that includes a phone number.
     
-    6. ACCURACY: Double-check all names, dates, measurements, and staging against what is explicitly stated in the Clinical Notes. Do not assume or infer - use only what is documented.
+    6. ACCURACY: Double-check all measurements and staging against what is explicitly stated in the Clinical Notes. Do not assume or infer - use only what is documented. Do NOT invent dates, identifiers, or patient names.
     
     Please write the ${getDocTypeLabel(caseData.doc_type)} now, ensuring all patient information, wound details, and provider information is extracted directly from the Clinical Notes.`
 
@@ -726,6 +727,9 @@ CRITICAL - PATIENT INFORMATION:
     const docResult = await docModel.generateContent(userPrompt)
 
     let documentation = docResult.response.text() || ""
+
+    // Re-insert patient name (replace [PATIENT] with actual name)
+    documentation = reinsertPatientName(documentation, caseData.patient_first_name, caseData.patient_last_name)
 
     // Clean up placeholders and special characters
     documentation = documentation

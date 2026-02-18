@@ -57,10 +57,6 @@ export function ComplianceSection() {
               <ul className="space-y-3 text-foreground/80">
                 <li className="flex items-start gap-3">
                   <span className="text-mint mt-0.5 font-medium">✓</span>
-                  <span>First name only</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-mint mt-0.5 font-medium">✓</span>
                   <span>Age or age range</span>
                 </li>
                 <li className="flex items-start gap-3">
@@ -107,7 +103,7 @@ export function ComplianceBlock() {
         HIPAA Compliant by Design
       </h3>
       <p className="text-sm text-foreground/80 mb-3">
-        Luma collects only limited patient context (first name, age, state, diagnosis) and does not store PHI such as date of birth, MRN, full address, or insurance member IDs.
+        Luma collects only limited patient context (age, state, diagnosis) and does not store PHI such as date of birth, MRN, full address, or insurance member IDs.
       </p>
       <p className="text-xs text-muted-foreground">
         <strong>BAA:</strong> Generally not required for this workflow. Enterprise arrangements available.

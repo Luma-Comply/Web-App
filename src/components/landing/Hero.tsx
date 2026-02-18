@@ -11,7 +11,7 @@ import SignInDialog from "@/components/SignInDialog"
 const pillars = [
   {
     title: "No PHI Required",
-    description: "Only patient name and clinical data. No BAA needed with AI providers.",
+    description: "De-identified clinical data only. No PHI sent to AI providers.",
   },
   {
     title: "Payer-Specific Criteria",

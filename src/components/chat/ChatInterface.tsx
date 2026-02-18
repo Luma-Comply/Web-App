@@ -35,6 +35,7 @@ export interface ChatInterfaceRef {
 }
 
 export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(function ChatInterface({ caseId, caseData, onGenerate }, ref) {
+  const patientName = `${caseData?.patient_first_name || ''} ${caseData?.patient_last_name || ''}`.trim() || undefined
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isStreaming, setIsStreaming] = useState(false)
@@ -238,7 +239,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
           </div>
         ) : (
           messages.map(message => (
-            <ChatMessage key={message.id} message={message} />
+            <ChatMessage key={message.id} message={message} patientName={patientName} />
           ))
         )}
         {isUploading && (
@@ -273,6 +274,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
               created_at: new Date().toISOString(),
             }}
             isStreaming
+            patientName={patientName}
           />
         )}
         <div ref={messagesEndRef} />

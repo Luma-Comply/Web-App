@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { computeAgeTags, formatAgeTagsForPrompt, PATIENT_PLACEHOLDER } from "@/lib/phi-utils"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
@@ -138,8 +139,8 @@ ${suggestedForms.map(form => `- ${form.title} (${form.confidence} confidence): $
     // Build case context for the AI
     const caseContext = `
 CURRENT CASE INFORMATION (You already have this data - DO NOT ask for it again):
-- Patient Name: ${caseData.patient_first_name} ${caseData.patient_last_name}
-- Patient Age: ${caseData.patient_age} years old
+- Patient: ${PATIENT_PLACEHOLDER}
+- ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}
 - Patient State: ${caseData.patient_state}
 - Patient Gender: ${caseData.patient_gender || "Not specified"}
 - Diagnosis/Condition: ${caseData.disease_activity || "Not yet specified"}

@@ -23,6 +23,7 @@ interface Message {
 interface ChatMessageProps {
   message: Message;
   isStreaming?: boolean;
+  patientName?: string;
 }
 
 function parseContent(content: string): React.ReactNode[] {
@@ -191,10 +192,15 @@ function parseContent(content: string): React.ReactNode[] {
   return elements;
 }
 
-export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
+export function ChatMessage({ message, isStreaming, patientName }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const attachments = message.metadata?.attachments;
+
+  // Replace [PATIENT] placeholder with actual patient name for display
+  const displayContent = patientName
+    ? message.content.replace(/\[PATIENT\]/gi, patientName)
+    : message.content;
 
   if (isSystem) return null;
 
@@ -219,7 +225,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         )}
       >
         <div className="break-words">
-          {parseContent(message.content)}
+          {parseContent(displayContent)}
           {isStreaming && (
             <motion.span
               className="inline-block w-2 h-5 ml-1 bg-mint rounded-sm align-middle"

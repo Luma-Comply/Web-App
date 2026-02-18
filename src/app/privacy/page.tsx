@@ -68,7 +68,6 @@ export default function PrivacyPage() {
                 Luma is designed to operate without Protected Health Information (PHI). We collect only the minimum clinical context needed for documentation generation:
               </p>
               <ul className="list-disc pl-6 text-gray-700 mb-6 space-y-2">
-                <li>Patient first name only</li>
                 <li>Age or age range (not date of birth)</li>
                 <li>State of residence (no full address)</li>
                 <li>Payer/insurance company name</li>
@@ -115,8 +114,8 @@ export default function PrivacyPage() {
               </p>
               <ul className="list-disc pl-6 text-gray-700 mb-6 space-y-2">
                 <li>Zero data retention policies for API requests</li>
-                <li>SOC 2 Type II certification</li>
-                <li>Signed Business Associate Agreements (BAAs)</li>
+                <li>SOC 2 Type II certified infrastructure</li>
+                <li>No PHI is sent to AI providers — all patient identifiers are stripped before any outbound API call</li>
                 <li>Compliance with HIPAA security and privacy requirements</li>
               </ul>
               <p className="text-gray-700">
@@ -172,7 +171,7 @@ export default function PrivacyPage() {
             <section className="mb-12">
               <h2 className="text-2xl font-sans font-semibold text-dark-bg mb-4">HIPAA Compliance</h2>
               <p className="text-gray-700 mb-4">
-                Luma is designed to operate without collecting Protected Health Information (PHI) as defined by HIPAA. By using the Safe Harbor de-identification method, the limited patient context we collect (first name + clinical data) does not constitute PHI.
+                Luma is designed to operate without collecting Protected Health Information (PHI) as defined by HIPAA. By using the Safe Harbor de-identification method, the limited patient context we collect (clinical data) does not constitute PHI.
               </p>
               <p className="text-gray-700 mb-4">
                 <strong>Business Associate Agreement (BAA):</strong> Because PHI is not collected or processed in our standard workflow, a BAA is generally not required. For organizations with internal policies requiring a BAA regardless of PHI handling, we offer enterprise arrangements.

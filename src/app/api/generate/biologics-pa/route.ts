@@ -1,6 +1,7 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
+import { computeAgeTags, formatAgeTagsForPrompt, reinsertPatientName, PATIENT_PLACEHOLDER } from '@/lib/phi-utils';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -50,9 +51,10 @@ export async function POST(req: NextRequest) {
       Using these current requirements: ${researchContent}
 
       Generate medical necessity documentation for:
-      Patient: ${formData.patientFirstName || 'Unknown'} ${formData.patientLastName || 'Unknown'}
-      Age: ${formData.patientAge || 'Unknown'}
+      Patient: ${PATIENT_PLACEHOLDER}
+      ${formData.patientAge ? formatAgeTagsForPrompt(computeAgeTags(Number(formData.patientAge))) : 'Age Group: unknown'}
       Diagnosis: ${formData.diagnosisCodes}
+      CRITICAL: Use ${PATIENT_PLACEHOLDER} as the patient name throughout. Do NOT invent any patient names or identifiers.
       Prior treatments: ${formData.priorTreatments || 'None provided'}
       Labs: ${formData.labValues || 'None provided'}
       Requesting: ${formData.requestedMedication}
@@ -68,8 +70,16 @@ export async function POST(req: NextRequest) {
 
         const result = await model.generateContent(generationPrompt);
 
+        // Re-insert patient name (replace [PATIENT] with actual name)
+        let documentation = result.response.text() || "";
+        documentation = reinsertPatientName(
+            documentation,
+            formData.patientFirstName || '',
+            formData.patientLastName || ''
+        );
+
         return NextResponse.json({
-            documentation: result.response.text(),
+            documentation,
             sources: citations
         });
 
