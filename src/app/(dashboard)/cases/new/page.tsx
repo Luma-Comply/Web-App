@@ -48,6 +48,7 @@ import {
   Users,
   CreditCard,
   LogOut,
+  HelpCircle,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 
@@ -187,6 +188,7 @@ export default function NewCasePage() {
   const [icd10DetailCode, setIcd10DetailCode] = useState<{ code: string; description: string } | null>(null)
   const [icd10RelatedCodes, setIcd10RelatedCodes] = useState<Array<{ code: string; description: string }>>([])
   const [icd10RelatedLoading, setIcd10RelatedLoading] = useState(false)
+  const [icd10Tooltip, setIcd10Tooltip] = useState(false)
 
   // ICD-10 search state
   const [icd10Query, setIcd10Query] = useState("")
@@ -620,7 +622,41 @@ export default function NewCasePage() {
             {/* ICD-10 Diagnosis Codes - Required for all doc types */}
             {formData.doc_type && (
               <div className="mt-4" ref={icd10ContainerRef}>
-                <Label htmlFor="icd10_search">Diagnosis Codes (ICD-10)</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="icd10_search" className="mb-0">Diagnosis Codes (ICD-10)</Label>
+                  <div
+                    className="relative"
+                    onMouseEnter={() => setIcd10Tooltip(true)}
+                    onMouseLeave={() => setIcd10Tooltip(false)}
+                    onFocus={() => setIcd10Tooltip(true)}
+                    onBlur={() => setIcd10Tooltip(false)}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="What are ICD-10 codes?"
+                  >
+                    <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help transition-colors duration-150 hover:text-foreground" />
+                    <AnimatePresence>
+                      {icd10Tooltip && (
+                        <motion.div
+                          role="tooltip"
+                          initial={{ opacity: 0, y: 4, scale: 0.96, filter: "blur(4px)" }}
+                          animate={{
+                            opacity: 1, y: 0, scale: 1, filter: "blur(0px)",
+                            transition: { type: "spring", stiffness: 500, damping: 30 }
+                          }}
+                          exit={{
+                            opacity: 0, y: 2, filter: "blur(4px)",
+                            transition: { duration: 0.1 }
+                          }}
+                          className="absolute left-0 bottom-full mb-2.5 px-3 py-2 bg-dark-bg text-white text-xs rounded-lg w-56 leading-relaxed pointer-events-none z-50 shadow-lg"
+                        >
+                          ICD-10 codes are standardized diagnosis codes required by payers to validate medical necessity for prior authorizations.
+                          <div className="absolute left-[5px] top-full w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-dark-bg" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
 
                 {/* Selected codes as animated badges */}
                 <AnimatePresence mode="popLayout">
