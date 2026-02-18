@@ -112,7 +112,7 @@ For appeal_deadline_met:
 Return your response as valid JSON only.`
 
   const validationModel = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: systemPrompt,
     generationConfig: {
       temperature: 0.1,

@@ -261,7 +261,7 @@ Payer: ${caseData.payer_name}
 Medication: ${caseData.requested_medication}`
 
         const formModel = genAI.getGenerativeModel({
-          model: "gemini-2.0-flash",
+          model: "gemini-2.5-flash",
           generationConfig: {
             temperature: 0.2,
             responseMimeType: "application/json"
@@ -371,7 +371,7 @@ CLINICAL NOTES: ${caseData.disease_activity || ''} ${caseData.prior_treatments |
 Generate a professional, persuasive prior authorization letter. Do not use markdown formatting like ** or #. Use plain text only. If provider checklist updates are provided above, incorporate that information into the letter.`
 
       const docModel = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 3000,

@@ -95,7 +95,7 @@ For wound/clinical photos, describe:
 Be specific and clinical. This information will be used for Medicare LCD L35041 compliance documentation.`
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: systemPrompt,
   })
 
@@ -116,7 +116,7 @@ async function generateSummary(text: string, filename: string): Promise<string> 
   const truncatedText = text.slice(0, 8000) // Limit context for summary
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: "You are a medical document analyst. Provide a brief summary (2-3 sentences) of the uploaded document, focusing on clinically relevant information for prior authorization purposes.",
     generationConfig: {
       maxOutputTokens: 200,

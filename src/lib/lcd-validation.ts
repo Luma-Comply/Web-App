@@ -184,7 +184,7 @@ IMPORTANT: This is for Medicare Part B CTP claims. SOC failure documentation is 
 Return your response as valid JSON only.`
 
   const validationModel = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: systemPrompt,
     generationConfig: {
       temperature: 0.1,
@@ -251,7 +251,7 @@ async function detectWoundType(
   clinicalNotes: string
 ): Promise<WoundType> {
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: `Analyze the clinical notes and determine the wound type. Return ONLY one of: DFU, VLU, PRESSURE_ULCER
 
 DFU = Diabetic Foot Ulcer (patient has diabetes, wound on foot)

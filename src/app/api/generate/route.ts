@@ -453,7 +453,7 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
       `
 
       const formModel = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         generationConfig: {
           temperature: 0.2,
           responseMimeType: "application/json"
@@ -734,7 +734,7 @@ CRITICAL - PATIENT INFORMATION:
 
     // Generate documentation with Gemini
     const docModel = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       systemInstruction: systemPrompt,
       generationConfig: {
         temperature: 0.7,
