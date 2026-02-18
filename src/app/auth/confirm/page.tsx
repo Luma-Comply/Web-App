@@ -41,12 +41,17 @@ function AuthConfirmContent() {
 
         console.log("OTP verification success:", data)
 
+        // Notify admin of new signup (fire and forget)
+        if (type === 'signup') {
+          fetch('/api/notify-signup', { method: 'POST' }).catch(() => {})
+        }
+
         setStatus("success")
         setMessage("Your email has been successfully verified!")
 
-        // Redirect to profile page after 2 seconds
+        // Redirect to checkout for new signups, profile for others
         setTimeout(() => {
-          router.push("/settings/profile")
+          router.push(type === 'signup' ? "/checkout" : "/settings/profile")
         }, 2000)
       } else {
         // No token in URL, just check if user has a session
