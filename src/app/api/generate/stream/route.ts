@@ -6,7 +6,7 @@ import {
   LCDValidationResult,
   ChecklistEditsData,
 } from "@/lib/lcd-validation"
-import { WoundType } from "@/lib/lcd-requirements"
+import { WoundType, icd10ToWoundType } from "@/lib/lcd-requirements"
 import { getMACInfo, isWiserActiveForSkinSubs } from "@/lib/mac-jurisdictions"
 import { validateMedicalNecessity, MedicalNecessityValidationResult } from "@/lib/validation/medical-necessity-validation"
 import { validateAppeal, AppealValidationResult } from "@/lib/validation/appeal-validation"
@@ -87,6 +87,18 @@ export async function POST(request: NextRequest) {
 
       let researchContext = "No specific payer guidelines found."
 
+      // Format all ICD-10 codes for prompts (supports multi-code)
+      const formatIcd10ForPrompt = (): string => {
+        const codes = caseData.metadata?.icd10_codes as Array<{ code: string; description: string }> | undefined
+        if (codes && codes.length > 0) {
+          return codes.map((c: { code: string; description: string }) => `${c.code} — ${c.description}`).join("; ")
+        }
+        if (caseData.metadata?.icd10_code) {
+          return `${caseData.metadata.icd10_code} — ${caseData.metadata.icd10_description || caseData.metadata.icd10_code}`
+        }
+        return caseData.diagnosis_codes?.join(", ") || "See clinical notes"
+      }
+
       if (pp_apiKey && caseData.payer_name && caseData.payer_name !== "Unknown") {
         try {
           const docTypeLabel = getDocTypeLabel(caseData.doc_type)
@@ -113,6 +125,7 @@ STATE-SPECIFIC MAC INFO:
 ${isWiserState ? `- WISeR Pilot: YES - PA processed by ${macInfo?.aiVendor}` : "- WISeR Pilot: NO"}
 
 PATIENT CASE:
+- ICD-10: ${formatIcd10ForPrompt()}
 - CTP Product: ${caseData.requested_medication}
 - Payer: ${caseData.payer_name}
 CLINICAL CONTEXT: ${clinicalNotes.substring(0, 1500)}
@@ -120,6 +133,7 @@ CLINICAL CONTEXT: ${clinicalNotes.substring(0, 1500)}
 Find for LCD ${lcdNumber} (${macInfo?.macName || "this MAC"}): LCD effective date, product coverage on THIS MAC's list, application limits, SOC failure criteria, ABI thresholds, debridement requirements, common denial reasons.`
           } else {
             researchQuery = `Research ${docTypeLabel} criteria for ${caseData.payer_name} in ${caseData.patient_state}:
+Diagnosis: ${formatIcd10ForPrompt()}
 Medication: ${caseData.requested_medication}
 Patient: ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}
 Clinical context: ${clinicalNotes.substring(0, 1000)}
@@ -187,7 +201,11 @@ Find: coverage criteria, step therapy requirements, medical necessity requiremen
 
       if (isBiologicsPA) {
         try {
-          const woundTypeFromMeta = caseData.metadata?.wound_type as WoundType | undefined
+          const primaryCode = (caseData.metadata?.icd10_codes as Array<{ code: string }> | undefined)?.[0]?.code
+            || (caseData.metadata?.icd10_code as string | undefined)
+          const woundTypeFromMeta = primaryCode
+            ? icd10ToWoundType(primaryCode)
+            : (caseData.metadata?.wound_type as WoundType | undefined)
 
           validationResult = await validateAgainstLCD(
             clinicalNotesForValidation,
@@ -341,6 +359,7 @@ CRITICAL: Use ${PATIENT_PLACEHOLDER} as the patient name throughout. Do NOT inve
       const fullPrompt = `${systemContext}
 
 Generate ${getDocTypeLabel(caseData.doc_type)} for:
+Diagnosis: ${formatIcd10ForPrompt()}
 Patient: ${PATIENT_PLACEHOLDER}, ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}, ${caseData.patient_state}
 Payer: ${caseData.payer_name}
 Medication: ${caseData.requested_medication}

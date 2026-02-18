@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -18,6 +18,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
+import { motion, AnimatePresence } from "framer-motion"
 import { LumaLogo } from "@/components/LumaLogo"
 import { searchPayers } from "@/lib/payers"
 import { getActiveWiserSkinSubStates, isWiserActiveForSkinSubs, getMACInfo } from "@/lib/mac-jurisdictions"
@@ -176,9 +178,129 @@ export default function NewCasePage() {
     patient_state: "",
     claim_amount: "",
     payer_name: "",
-    wound_type: "", // Required for biologics_pa
-    custom_wound_type: "", // Used when wound_type is "OTHER"
   })
+
+  // ICD-10 multi-code state
+  const [selectedIcd10Codes, setSelectedIcd10Codes] = useState<
+    Array<{ code: string; description: string }>
+  >([])
+  const [icd10DetailCode, setIcd10DetailCode] = useState<{ code: string; description: string } | null>(null)
+  const [icd10RelatedCodes, setIcd10RelatedCodes] = useState<Array<{ code: string; description: string }>>([])
+  const [icd10RelatedLoading, setIcd10RelatedLoading] = useState(false)
+
+  // ICD-10 search state
+  const [icd10Query, setIcd10Query] = useState("")
+  const [icd10Results, setIcd10Results] = useState<Array<{ code: string; description: string }>>([])
+  const [icd10Loading, setIcd10Loading] = useState(false)
+  const [icd10Open, setIcd10Open] = useState(false)
+  const [icd10ActiveIndex, setIcd10ActiveIndex] = useState(0)
+  const icd10ContainerRef = useRef<HTMLDivElement>(null)
+  const icd10TimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Debounced ICD-10 search against NLM API
+  useEffect(() => {
+    if (icd10Query.length < 2) {
+      setIcd10Results([])
+      setIcd10Open(false)
+      return
+    }
+
+    if (icd10TimerRef.current) clearTimeout(icd10TimerRef.current)
+
+    icd10TimerRef.current = setTimeout(async () => {
+      setIcd10Loading(true)
+      try {
+        const res = await fetch(
+          `https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search?sf=code,name&terms=${encodeURIComponent(icd10Query)}&maxList=15`
+        )
+        const data = await res.json()
+        // NLM response: [total_count, [codes], null, [[code, description], ...]]
+        const pairs: Array<{ code: string; description: string }> = (data[3] || []).map(
+          (pair: [string, string]) => ({ code: pair[0], description: pair[1] })
+        )
+        setIcd10Results(pairs)
+        setIcd10Open(pairs.length > 0)
+        setIcd10ActiveIndex(0)
+      } catch {
+        setIcd10Results([])
+      } finally {
+        setIcd10Loading(false)
+      }
+    }, 300)
+
+    return () => {
+      if (icd10TimerRef.current) clearTimeout(icd10TimerRef.current)
+    }
+  }, [icd10Query])
+
+  // Close ICD-10 dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (icd10ContainerRef.current && !icd10ContainerRef.current.contains(event.target as Node)) {
+        setIcd10Open(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // Fetch related ICD-10 codes when detail modal opens
+  useEffect(() => {
+    if (!icd10DetailCode) {
+      setIcd10RelatedCodes([])
+      return
+    }
+    const prefix = icd10DetailCode.code.split('.')[0]
+    if (!prefix) return
+
+    setIcd10RelatedLoading(true)
+    fetch(`https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search?sf=code,name&terms=${encodeURIComponent(prefix)}&maxList=8`)
+      .then(res => res.json())
+      .then(data => {
+        const pairs: Array<{ code: string; description: string }> = (data[3] || [])
+          .map((pair: [string, string]) => ({ code: pair[0], description: pair[1] }))
+          .filter((p: { code: string }) => p.code !== icd10DetailCode.code)
+        setIcd10RelatedCodes(pairs)
+      })
+      .catch(() => setIcd10RelatedCodes([]))
+      .finally(() => setIcd10RelatedLoading(false))
+  }, [icd10DetailCode])
+
+  const getIcd10Chapter = (code: string): string => {
+    const letter = code.charAt(0).toUpperCase()
+    const chapters: Record<string, string> = {
+      A: "Infectious & Parasitic Diseases", B: "Infectious & Parasitic Diseases",
+      C: "Neoplasms", D: "Blood & Immune Disorders",
+      E: "Endocrine, Nutritional & Metabolic Diseases",
+      F: "Mental & Behavioral Disorders",
+      G: "Nervous System Diseases", H: "Eye & Ear Disorders",
+      I: "Circulatory System Diseases",
+      J: "Respiratory System Diseases",
+      K: "Digestive System Diseases",
+      L: "Skin & Subcutaneous Tissue Diseases",
+      M: "Musculoskeletal & Connective Tissue Diseases",
+      N: "Genitourinary System Diseases",
+      O: "Pregnancy & Childbirth",
+      P: "Perinatal Conditions", Q: "Congenital Malformations",
+      R: "Symptoms & Abnormal Findings",
+      S: "Injury & External Causes", T: "Injury & External Causes",
+      V: "External Causes of Morbidity", W: "External Causes of Morbidity",
+      X: "External Causes of Morbidity", Y: "External Causes of Morbidity",
+      Z: "Factors Influencing Health Status",
+    }
+    return chapters[letter] || "Unknown Category"
+  }
+
+  const addIcd10Code = (code: string, description: string) => {
+    if (selectedIcd10Codes.some(c => c.code === code)) return
+    setSelectedIcd10Codes(prev => [...prev, { code, description }])
+    setIcd10Query("")
+    setIcd10Open(false)
+  }
+
+  const removeIcd10Code = (code: string) => {
+    setSelectedIcd10Codes(prev => prev.filter(c => c.code !== code))
+  }
 
   // Basic change handler for flat inputs
   const handleChange = (
@@ -205,9 +327,7 @@ export default function NewCasePage() {
   }
 
   // Progressive disclosure: check if each step is complete
-  const isStep1Complete = formData.doc_type === "biologics_pa"
-    ? !!(formData.doc_type && formData.wound_type && (formData.wound_type !== "OTHER" || formData.custom_wound_type.trim()))
-    : !!formData.doc_type
+  const isStep1Complete = !!(formData.doc_type && selectedIcd10Codes.length > 0)
   const isStep2Complete = !!(
     formData.patient_first_name &&
     formData.patient_last_name &&
@@ -228,15 +348,9 @@ export default function NewCasePage() {
       return
     }
 
-    // Wound type required for biologics PA
-    if (formData.doc_type === "biologics_pa" && !formData.wound_type) {
-      setError("Please select a wound type for Biologics Prior Authorization.")
-      return
-    }
-
-    // Custom wound type required when "Other" is selected
-    if (formData.wound_type === "OTHER" && !formData.custom_wound_type.trim()) {
-      setError("Please enter the wound type.")
+    // ICD-10 code required for all document types
+    if (selectedIcd10Codes.length === 0) {
+      setError("Please search and select at least one diagnosis code (ICD-10).")
       return
     }
 
@@ -328,7 +442,9 @@ export default function NewCasePage() {
         disease_activity: pastedText,
 
         // 3. Placeholders (AI will ignore these or use defaults)
-        diagnosis_codes: ["See Notes"],
+        diagnosis_codes: selectedIcd10Codes.length > 0
+          ? selectedIcd10Codes.map(c => c.code)
+          : ["See Notes"],
         lab_values: "See Clinical Notes",
         prior_treatments: "See Clinical Notes",
         requested_medication: "See Notes",
@@ -344,9 +460,11 @@ export default function NewCasePage() {
               ? "upload_only"
               : "paste_only",
           original_pasted_text: pastedText,
-          // Wound type for LCD validation (biologics PA only)
-          wound_type: formData.wound_type || undefined,
-          custom_wound_type: formData.wound_type === "OTHER" ? formData.custom_wound_type.trim() : undefined,
+          // ICD-10 codes for diagnosis
+          icd10_codes: selectedIcd10Codes.length > 0 ? selectedIcd10Codes : undefined,
+          // Backward-compat: primary (first) code
+          icd10_code: selectedIcd10Codes[0]?.code || undefined,
+          icd10_description: selectedIcd10Codes[0]?.description || undefined,
           // AUDIT TRAIL - Terms Agreement
           terms_accepted: true,
           terms_accepted_at: new Date().toISOString(),
@@ -499,41 +617,261 @@ export default function NewCasePage() {
               <option value="appeal">Appeal Letter</option>
             </select>
 
-            {/* Wound Type - Required for Biologics PA */}
-            {formData.doc_type === "biologics_pa" && (
-              <div className="mt-4">
-                <Label htmlFor="wound_type">Wound Type</Label>
-                <select
-                  id="wound_type"
-                  name="wound_type"
-                  value={formData.wound_type}
-                  onChange={handleChange}
-                  className="w-full mt-2 h-11 px-4 rounded-md border border-input bg-white focus:border-ring focus:ring-2 focus:ring-ring focus:ring-offset-0 outline-none"
-                  required
-                >
-                  <option value="" disabled>Select Wound Type</option>
-                  <option value="DFU">Diabetic Foot Ulcer (DFU)</option>
-                  <option value="VLU">Venous Leg Ulcer (VLU)</option>
-                  <option value="PRESSURE_ULCER">Pressure Ulcer / Pressure Injury</option>
-                  <option value="ARTERIAL_ULCER">Arterial Ulcer</option>
-                  <option value="SURGICAL_WOUND">Surgical Wound (Non-healing)</option>
-                  <option value="TRAUMATIC_WOUND">Traumatic Wound</option>
-                  <option value="BURN">Burn Wound</option>
-                  <option value="OTHER">Other</option>
-                </select>
-                {formData.wound_type === "OTHER" && (
-                  <Input
-                    id="custom_wound_type"
-                    name="custom_wound_type"
-                    value={formData.custom_wound_type}
-                    onChange={handleChange}
-                    placeholder="Enter wound type"
-                    className="mt-2"
-                    required
+            {/* ICD-10 Diagnosis Codes - Required for all doc types */}
+            {formData.doc_type && (
+              <div className="mt-4" ref={icd10ContainerRef}>
+                <Label htmlFor="icd10_search">Diagnosis Codes (ICD-10)</Label>
+
+                {/* Selected codes as animated badges */}
+                <AnimatePresence mode="popLayout">
+                  {selectedIcd10Codes.length > 0 && (
+                    <motion.div
+                      className="flex flex-wrap gap-2 mt-2"
+                      role="list"
+                      aria-label="Selected diagnosis codes"
+                      layout
+                    >
+                      {selectedIcd10Codes.map((item, index) => (
+                        <motion.span
+                          key={item.code}
+                          role="listitem"
+                          layout
+                          initial={{ opacity: 0, scale: 0.8, filter: "blur(4px)" }}
+                          animate={{
+                            opacity: 1,
+                            scale: 1,
+                            filter: "blur(0px)",
+                            transition: {
+                              type: "spring",
+                              stiffness: 500,
+                              damping: 30,
+                              delay: index * 0.04,
+                            }
+                          }}
+                          exit={{
+                            opacity: 0,
+                            scale: 0.8,
+                            filter: "blur(4px)",
+                            transition: {
+                              duration: 0.15,
+                            }
+                          }}
+                          className="group inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full bg-mint/8 border border-mint/20 text-sm cursor-pointer hover:bg-mint/12 hover:border-mint/30 transition-colors duration-150"
+                          onClick={() => setIcd10DetailCode(item)}
+                        >
+                          <span className="font-mono font-semibold text-mint text-xs">{item.code}</span>
+                          <span className="text-foreground/60 text-xs truncate max-w-[260px]">
+                            — {item.description}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeIcd10Code(item.code)
+                            }}
+                            className="ml-0.5 p-1 rounded-full text-foreground/30 hover:bg-coral/10 hover:text-coral transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-coral/50"
+                            aria-label={`Remove ${item.code}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </motion.span>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Search input — always visible, always in search mode */}
+                <div className="relative mt-2">
+                  <input
+                    id="icd10_search"
+                    type="text"
+                    value={icd10Query}
+                    onChange={(e) => {
+                      setIcd10Query(e.target.value)
+                      setIcd10ActiveIndex(0)
+                    }}
+                    onKeyDown={(e) => {
+                      if (!icd10Open || icd10Results.length === 0) return
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault()
+                        setIcd10ActiveIndex(prev => Math.min(prev + 1, icd10Results.length - 1))
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault()
+                        setIcd10ActiveIndex(prev => Math.max(prev - 1, 0))
+                      } else if (e.key === "Enter") {
+                        e.preventDefault()
+                        const selected = icd10Results[icd10ActiveIndex]
+                        if (selected && !selectedIcd10Codes.some(c => c.code === selected.code)) {
+                          addIcd10Code(selected.code, selected.description)
+                        }
+                      } else if (e.key === "Escape") {
+                        setIcd10Open(false)
+                      }
+                    }}
+                    placeholder={selectedIcd10Codes.length > 0
+                      ? "Add another code..."
+                      : "Search by code or description (e.g. L97.419 or diabetic foot ulcer)"
+                    }
+                    className={cn(
+                      "w-full h-11 px-4 rounded-md border bg-white focus:border-ring focus:ring-2 focus:ring-ring focus:ring-offset-0 outline-none text-sm transition-colors duration-200",
+                      selectedIcd10Codes.length > 0 ? "border-mint/50" : "border-input"
+                    )}
+                    autoComplete="off"
+                    role="combobox"
+                    aria-expanded={icd10Open}
+                    aria-autocomplete="list"
+                    aria-controls="icd10-listbox"
+                    aria-activedescendant={icd10Open ? `icd10-option-${icd10ActiveIndex}` : undefined}
                   />
-                )}
+                  {icd10Loading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                    </div>
+                  )}
+
+                  {/* Dropdown results */}
+                  <AnimatePresence>
+                    {icd10Open && icd10Results.length > 0 && (
+                      <motion.ul
+                        id="icd10-listbox"
+                        role="listbox"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0, transition: { duration: 0.15 } }}
+                        exit={{ opacity: 0, y: -4, transition: { duration: 0.1 } }}
+                        className="absolute z-[100] w-full mt-1 bg-white border border-sage-medium/30 rounded-lg shadow-lg max-h-60 overflow-auto"
+                      >
+                        {icd10Results.map((result, idx) => {
+                          const isAlreadySelected = selectedIcd10Codes.some(c => c.code === result.code)
+                          return (
+                            <li
+                              key={result.code}
+                              id={`icd10-option-${idx}`}
+                              role="option"
+                              aria-selected={idx === icd10ActiveIndex}
+                              aria-disabled={isAlreadySelected}
+                              className={cn(
+                                "px-4 py-2.5 text-sm border-b border-sage-light/20 last:border-0 transition-colors duration-100",
+                                isAlreadySelected
+                                  ? "opacity-40 cursor-default bg-gray-50"
+                                  : idx === icd10ActiveIndex
+                                    ? "bg-mint/10 cursor-pointer"
+                                    : "hover:bg-gray-50 cursor-pointer"
+                              )}
+                              onMouseEnter={() => setIcd10ActiveIndex(idx)}
+                              onClick={() => {
+                                if (!isAlreadySelected) {
+                                  addIcd10Code(result.code, result.description)
+                                }
+                              }}
+                            >
+                              <span className="font-mono font-medium text-dark-bg">{result.code}</span>
+                              <span className="text-gray-500 ml-2">—</span>
+                              <span className="text-gray-700 ml-2">{result.description}</span>
+                              {isAlreadySelected && (
+                                <span className="ml-2 text-mint text-xs font-medium">(added)</span>
+                              )}
+                            </li>
+                          )
+                        })}
+                      </motion.ul>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             )}
+
+            {/* ICD-10 Code Detail Modal */}
+            <Dialog open={!!icd10DetailCode} onOpenChange={(open) => !open && setIcd10DetailCode(null)}>
+              <DialogContent className="sm:max-w-md bg-white border-0 shadow-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-3">
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-mint/10 border border-mint/20">
+                      <span className="font-mono font-semibold text-mint text-sm">{icd10DetailCode?.code}</span>
+                    </span>
+                  </DialogTitle>
+                  <DialogDescription className="sr-only">
+                    Details for ICD-10 code {icd10DetailCode?.code}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-5 pt-1">
+                  {/* Description */}
+                  <div>
+                    <p className="text-xs font-medium text-foreground/40 uppercase tracking-wider mb-1.5">Description</p>
+                    <p className="text-foreground text-sm leading-relaxed">{icd10DetailCode?.description}</p>
+                  </div>
+
+                  {/* Chapter classification */}
+                  <div>
+                    <p className="text-xs font-medium text-foreground/40 uppercase tracking-wider mb-1.5">Classification</p>
+                    <p className="text-foreground/70 text-sm">
+                      <span className="font-mono font-medium text-foreground/50">{icd10DetailCode?.code?.split('.')[0]}</span>
+                      <span className="mx-1.5">·</span>
+                      {icd10DetailCode?.code ? getIcd10Chapter(icd10DetailCode.code) : ''}
+                    </p>
+                  </div>
+
+                  {/* Related codes */}
+                  <div>
+                    <p className="text-xs font-medium text-foreground/40 uppercase tracking-wider mb-2">Related Codes</p>
+                    {icd10RelatedLoading ? (
+                      <div className="flex items-center gap-2 py-2">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-foreground/30" />
+                        <span className="text-xs text-foreground/40">Loading...</span>
+                      </div>
+                    ) : icd10RelatedCodes.length > 0 ? (
+                      <div className="space-y-1">
+                        {icd10RelatedCodes.slice(0, 5).map((related) => {
+                          const alreadyAdded = selectedIcd10Codes.some(c => c.code === related.code)
+                          return (
+                            <button
+                              key={related.code}
+                              type="button"
+                              disabled={alreadyAdded}
+                              onClick={() => {
+                                addIcd10Code(related.code, related.description)
+                              }}
+                              className={cn(
+                                "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors duration-100",
+                                alreadyAdded
+                                  ? "opacity-40 cursor-default bg-gray-50"
+                                  : "hover:bg-mint/5 cursor-pointer"
+                              )}
+                            >
+                              <span className="font-mono font-medium text-foreground/60 text-xs">{related.code}</span>
+                              <span className="text-foreground/50 ml-2 text-xs">— {related.description}</span>
+                              {alreadyAdded && <span className="ml-1.5 text-mint text-xs font-medium">(added)</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-foreground/30 py-1">No related codes found</p>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (icd10DetailCode) removeIcd10Code(icd10DetailCode.code)
+                        setIcd10DetailCode(null)
+                      }}
+                      className="flex-1 px-4 py-2.5 rounded-lg border border-coral/20 text-coral text-sm font-medium hover:bg-coral/5 transition-colors duration-150"
+                    >
+                      Remove Code
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIcd10DetailCode(null)}
+                      className="flex-1 px-4 py-2.5 rounded-lg bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors duration-150"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* WISeR Pilot State Info */}
             {formData.doc_type === "biologics_pa" && (

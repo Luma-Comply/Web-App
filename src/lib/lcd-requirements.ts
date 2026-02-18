@@ -25,6 +25,33 @@ export type WoundType =
   | "BURN"
   | "OTHER"
 
+/**
+ * Map ICD-10 code to WoundType for LCD requirement filtering.
+ * Uses code prefix matching. Returns undefined if no match (triggers auto-detect).
+ */
+export function icd10ToWoundType(code: string): WoundType | undefined {
+  const upper = code.toUpperCase()
+  // DFU: E08-E13.62x (diabetic foot ulcer codes)
+  if (/^E1[0-3]\.62/.test(upper) || /^E0[89]\.62/.test(upper)) return "DFU"
+  // DFU: L97.4xx (heel/midfoot ulcers), L97.5xx (other foot ulcers)
+  if (/^L97\.[45]/.test(upper)) return "DFU"
+  // VLU: I83.0/2 (varicose veins with ulcer), I87.0x (postthrombotic syndrome)
+  if (/^I83\.[02]/.test(upper) || /^I87\.0/.test(upper)) return "VLU"
+  // Pressure ulcer: L89.xxx
+  if (/^L89\./.test(upper)) return "PRESSURE_ULCER"
+  // Arterial ulcer: I70.2xx (atherosclerosis with ulceration), I73.x
+  if (/^I70\.2/.test(upper) || /^I73\./.test(upper)) return "ARTERIAL_ULCER"
+  // Surgical wound: T81.3x (disruption of wound)
+  if (/^T81\.3/.test(upper)) return "SURGICAL_WOUND"
+  // Burns: T20-T32
+  if (/^T(2[0-9]|3[0-2])/.test(upper)) return "BURN"
+  // Traumatic wound: S/T codes not matching above
+  if (/^[ST]\d/.test(upper)) return "TRAUMATIC_WOUND"
+  // Other chronic ulcers: L97.xxx (not caught above), L98.4xx
+  if (/^L97\./.test(upper) || /^L98\.4/.test(upper)) return "OTHER"
+  return undefined
+}
+
 export interface LCDRequirement {
   id: string
   label: string

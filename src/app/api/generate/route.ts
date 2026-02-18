@@ -9,7 +9,7 @@ import {
   PerplexityFindings,
 } from "@/lib/lcd-validation"
 import { ResearchFindings } from "@/lib/validation/validation-types"
-import { WoundType } from "@/lib/lcd-requirements"
+import { WoundType, icd10ToWoundType } from "@/lib/lcd-requirements"
 import { getMACInfo, buildStateSpecificContext, isWiserActiveForSkinSubs } from "@/lib/mac-jurisdictions"
 import { validateMedicalNecessity, MedicalNecessityValidationResult } from "@/lib/validation/medical-necessity-validation"
 import { validateAppeal, AppealValidationResult } from "@/lib/validation/appeal-validation"
@@ -63,6 +63,18 @@ export async function POST(request: NextRequest) {
     // --- STEP 1: RESEARCH WITH PERPLEXITY ---
     let researchContext = "No specific payer guidelines found."
 
+    // Format all ICD-10 codes for prompts (supports multi-code)
+    const formatIcd10ForPrompt = (): string => {
+      const codes = caseData.metadata?.icd10_codes as Array<{ code: string; description: string }> | undefined
+      if (codes && codes.length > 0) {
+        return codes.map((c: { code: string; description: string }) => `${c.code} — ${c.description}`).join("; ")
+      }
+      if (caseData.metadata?.icd10_code) {
+        return `${caseData.metadata.icd10_code} — ${caseData.metadata.icd10_description || caseData.metadata.icd10_code}`
+      }
+      return caseData.diagnosis_codes?.join(", ") || "See clinical notes"
+    }
+
     if (pp_apiKey && caseData.payer_name && caseData.payer_name !== "Unknown") {
       try {
         const docTypeLabel = getDocTypeLabel(caseData.doc_type)
@@ -108,6 +120,7 @@ CRITICAL AUDIT QUESTIONS (Answer all for LCD ${lcdNumber}):
 10. What specific debridement and vascular testing requirements does ${macInfo?.macName || "this MAC"} require?
 
 PATIENT CASE:
+- ICD-10: ${formatIcd10ForPrompt()}
 - CTP Product: ${caseData.requested_medication}
 - Dose/Size: ${caseData.medication_dose || "Not specified"}
 - State: ${caseData.patient_state}
@@ -154,8 +167,8 @@ MEDICATION REQUEST:
 - Medication: ${caseData.requested_medication}
 - Dose: ${caseData.medication_dose || 'Not specified'}
 
-DIAGNOSIS CODES:
-${caseData.diagnosis_codes?.join(", ") || "See clinical notes"}
+DIAGNOSIS:
+${formatIcd10ForPrompt()}
 
 CLINICAL NOTES:
 ${clinicalNotes || "No clinical notes provided"}
@@ -235,8 +248,12 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
       try {
         console.log("Running LCD L35041 validation for CTP/wound care...")
 
-        // Get wound type from metadata if available, otherwise auto-detect
-        const woundTypeFromMeta = caseData.metadata?.wound_type as WoundType | undefined
+        // Get wound type: resolve from primary ICD-10 code, fall back to legacy wound_type, then auto-detect
+        const primaryCode = (caseData.metadata?.icd10_codes as Array<{ code: string }> | undefined)?.[0]?.code
+          || (caseData.metadata?.icd10_code as string | undefined)
+        const woundTypeFromMeta = primaryCode
+          ? icd10ToWoundType(primaryCode)
+          : (caseData.metadata?.wound_type as WoundType | undefined)
 
         validationResult = await validateAgainstLCD(
           clinicalNotesForValidation,
@@ -670,10 +687,11 @@ CRITICAL - PATIENT INFORMATION:
     const userPrompt = `GENERATE DOCUMENTATION FOR:
 
     CASE CONTEXT (Form Input - Use as reference, but Clinical Notes are source of truth):
+    - Document Type: ${getDocTypeLabel(caseData.doc_type)}
+    - Diagnosis: ${formatIcd10ForPrompt()}
     - Patient: ${PATIENT_PLACEHOLDER}, ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}, ${caseData.patient_gender || ''} from ${caseData.patient_state}
     - Payer: ${caseData.payer_name} (${caseData.payer_type})
     - Medication: ${caseData.requested_medication} ${caseData.medication_dose}
-    - Document Type: ${getDocTypeLabel(caseData.doc_type)}
 
     RESEARCHED PAYER GUIDELINES (Use this to align the letter):
     ${researchContext}

@@ -1,14 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { motion, AnimatePresence } from "framer-motion"
 
 export interface AutocompleteProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "onSelect"> {
   suggestions?: string[]
   onValueChange?: (value: string) => void
-  onSelect?: (value: string) => void // Called only when a suggestion is selected
+  onSelect?: (value: string) => void
   onSearch?: (query: string) => string[]
   maxSuggestions?: number
 }
@@ -30,16 +30,15 @@ export const Autocomplete = React.forwardRef<HTMLInputElement, AutocompleteProps
     const [filteredSuggestions, setFilteredSuggestions] = React.useState<string[]>([])
     const [showSuggestions, setShowSuggestions] = React.useState(false)
     const [activeSuggestionIndex, setActiveSuggestionIndex] = React.useState(0)
+    const [hasSelected, setHasSelected] = React.useState(false)
     const containerRef = React.useRef<HTMLDivElement>(null)
 
-    // Handle click outside to close suggestions
     React.useEffect(() => {
       function handleClickOutside(event: MouseEvent) {
         if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
           setShowSuggestions(false)
         }
       }
-
       document.addEventListener("mousedown", handleClickOutside)
       return () => document.removeEventListener("mousedown", handleClickOutside)
     }, [])
@@ -48,6 +47,7 @@ export const Autocomplete = React.forwardRef<HTMLInputElement, AutocompleteProps
       const value = e.target.value
       setInputValue(value)
       onValueChange?.(value)
+      if (hasSelected) setHasSelected(false)
 
       if (value.length > 0) {
         const filtered = onSearch
@@ -67,8 +67,9 @@ export const Autocomplete = React.forwardRef<HTMLInputElement, AutocompleteProps
     const handleSuggestionClick = (suggestion: string) => {
       setInputValue(suggestion)
       onValueChange?.(suggestion)
-      onSelect?.(suggestion) // Notify that a selection was made
+      onSelect?.(suggestion)
       setShowSuggestions(false)
+      setHasSelected(true)
     }
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -85,18 +86,13 @@ export const Autocomplete = React.forwardRef<HTMLInputElement, AutocompleteProps
       } else if (e.key === "Enter") {
         e.preventDefault()
         if (filteredSuggestions[activeSuggestionIndex]) {
-          const selected = filteredSuggestions[activeSuggestionIndex]
-          setInputValue(selected)
-          onValueChange?.(selected)
-          onSelect?.(selected) // Notify that a selection was made
-          setShowSuggestions(false)
+          handleSuggestionClick(filteredSuggestions[activeSuggestionIndex])
         }
       } else if (e.key === "Escape") {
         setShowSuggestions(false)
       }
     }
 
-    // Update internal state when external value changes
     React.useEffect(() => {
       if (props.value !== undefined) {
         setInputValue(props.value as string)
@@ -105,7 +101,7 @@ export const Autocomplete = React.forwardRef<HTMLInputElement, AutocompleteProps
 
     return (
       <div ref={containerRef} className="relative w-full">
-        <Input
+        <input
           ref={ref}
           {...props}
           value={inputValue}
@@ -116,27 +112,49 @@ export const Autocomplete = React.forwardRef<HTMLInputElement, AutocompleteProps
               setShowSuggestions(true)
             }
           }}
-          className={cn(className)}
+          className={cn(
+            "flex h-11 w-full rounded-md border bg-white px-4 text-sm outline-none transition-colors duration-200 focus:border-ring focus:ring-2 focus:ring-ring focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50",
+            hasSelected ? "border-mint/50" : "border-input",
+            className
+          )}
           autoComplete="off"
+          role="combobox"
+          aria-expanded={showSuggestions}
+          aria-autocomplete="list"
+          aria-controls="payer-listbox"
+          aria-activedescendant={showSuggestions ? `payer-option-${activeSuggestionIndex}` : undefined}
         />
-        {showSuggestions && filteredSuggestions.length > 0 && (
-          <ul className="absolute z-[100] w-full mt-1 bg-white border border-sage-medium/30 rounded-md shadow-lg max-h-60 overflow-auto">
-            {filteredSuggestions.map((suggestion, index) => (
-              <li
-                key={suggestion}
-                onClick={() => handleSuggestionClick(suggestion)}
-                className={cn(
-                  "px-4 py-2 cursor-pointer text-sm transition-colors",
-                  index === activeSuggestionIndex
-                    ? "bg-mint/10 text-dark-bg"
-                    : "hover:bg-sage-light/20 text-gray-700"
-                )}
-              >
-                {suggestion}
-              </li>
-            ))}
-          </ul>
-        )}
+        <AnimatePresence>
+          {showSuggestions && filteredSuggestions.length > 0 && (
+            <motion.ul
+              id="payer-listbox"
+              role="listbox"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.15 } }}
+              exit={{ opacity: 0, y: -4, transition: { duration: 0.1 } }}
+              className="absolute z-[100] w-full mt-1 bg-white border border-sage-medium/30 rounded-lg shadow-lg max-h-60 overflow-auto"
+            >
+              {filteredSuggestions.map((suggestion, index) => (
+                <li
+                  key={suggestion}
+                  id={`payer-option-${index}`}
+                  role="option"
+                  aria-selected={index === activeSuggestionIndex}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  onMouseEnter={() => setActiveSuggestionIndex(index)}
+                  className={cn(
+                    "px-4 py-2.5 cursor-pointer text-sm border-b border-sage-light/20 last:border-0 transition-colors duration-100",
+                    index === activeSuggestionIndex
+                      ? "bg-mint/10"
+                      : "hover:bg-gray-50"
+                  )}
+                >
+                  {suggestion}
+                </li>
+              ))}
+            </motion.ul>
+          )}
+        </AnimatePresence>
       </div>
     )
   }

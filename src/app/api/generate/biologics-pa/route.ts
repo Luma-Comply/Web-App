@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
         // STEP 1: Research with Perplexity
         const researchPrompt = `
       Find current ${formData.payerName} requirements for
-      ${formData.requestedMedication} for ${formData.diagnosisCodes}.
+      ${formData.requestedMedication} for ICD-10 ${formData.diagnosisCodes}.
       Include LCD/NCD requirements, step therapy, and documentation needed.
     `;
 
