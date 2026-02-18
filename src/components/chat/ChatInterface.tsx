@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react'
 import { ChatMessage } from './ChatMessage'
-import { ChatInput } from './ChatInput'
+import { ChatInput, type RiskItem, type CaseContext } from './ChatInput'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -28,13 +28,15 @@ interface ChatInterfaceProps {
   caseId: string
   caseData: any
   onGenerate: () => void
+  riskItems?: RiskItem[]
+  caseContext?: CaseContext
 }
 
 export interface ChatInterfaceRef {
   sendMessage: (content: string) => Promise<void>
 }
 
-export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(function ChatInterface({ caseId, caseData, onGenerate }, ref) {
+export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(function ChatInterface({ caseId, caseData, onGenerate, riskItems = [], caseContext }, ref) {
   const patientName = `${caseData?.patient_first_name || ''} ${caseData?.patient_last_name || ''}`.trim() || undefined
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -47,7 +49,6 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadingFileName, setUploadingFileName] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const supabase = createClient()
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -55,7 +56,8 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
 
   const loadMessages = useCallback(async () => {
     setIsLoading(true)
-    const { data, error } = await supabase
+    const client = createClient()
+    const { data, error } = await client
       .from('case_messages')
       .select('*')
       .eq('case_id', caseId)
@@ -67,7 +69,8 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
       setReadyToGenerate(hasReadySignal)
     }
     setIsLoading(false)
-  }, [caseId, supabase])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId])
 
   useEffect(() => {
     loadMessages()
@@ -90,6 +93,11 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
     setMessages(prev => [...prev, userMessage])
     setIsStreaming(true)
     setStreamingContent('')
+
+    // Trigger overlay glow effect on message send
+    if (typeof window !== 'undefined' && (window as any).__lumaChatGlow) {
+      ;(window as any).__lumaChatGlow()
+    }
 
     try {
       // If there are files, upload them first and collect results
@@ -226,77 +234,104 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
     onGenerate()
   }
 
+  const visibleMessages = messages.filter(m => m.role !== 'system')
+  const isEmpty = !isLoading && visibleMessages.length === 0
+
   return (
     <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full text-sage-light">
-            Loading messages...
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-sage-light">
-            Start a conversation to gather case information.
-          </div>
-        ) : (
-          messages.map(message => (
-            <ChatMessage key={message.id} message={message} patientName={patientName} />
-          ))
-        )}
-        {isUploading && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex gap-3 w-full justify-end"
-          >
-            <div className="max-w-[85%] rounded-2xl px-5 py-4 bg-dark-bg text-white rounded-br-md">
-              <div className="flex items-center gap-3 mb-2">
-                <FileText className="w-4 h-4 text-mint" />
-                <span className="text-sm font-medium truncate max-w-[200px]">{uploadingFileName}</span>
-              </div>
-              <div className="w-full bg-white/20 rounded-full h-1.5 overflow-hidden">
-                <motion.div
-                  className="h-full bg-mint rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${uploadProgress}%` }}
-                  transition={{ duration: 0.2 }}
-                />
-              </div>
-              <p className="text-xs text-white/60 mt-2">Uploading and analyzing document...</p>
+      {isEmpty ? (
+        /* ── Empty state: centered in viewport ── */
+        <div className="flex-1 flex items-center justify-center px-8">
+          <div className="w-full max-w-[720px] flex flex-col items-start">
+            <h2 className="text-[32px] font-medium text-[#e8eaf0] leading-tight mb-2">How can I help?</h2>
+            <p className="text-[#e8eaf0]/50 text-[15px] mb-8">All conversations and uploaded documents are saved and will be used to generate more accurate letters.</p>
+            <div className="w-full">
+              <ChatInput
+                onSend={sendMessage}
+                onFileUpload={handleFileUpload}
+                disabled={isStreaming}
+                placeholder="Ask anything...."
+                darkMode
+                riskItems={riskItems}
+                caseContext={caseContext}
+              />
             </div>
-          </motion.div>
-        )}
-        {isStreaming && streamingContent && (
-          <ChatMessage
-            message={{
-              id: 'streaming',
-              role: 'assistant',
-              content: streamingContent.replace('[READY_TO_GENERATE]', ''),
-              created_at: new Date().toISOString(),
-            }}
-            isStreaming
-            patientName={patientName}
-          />
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {readyToGenerate && (
-        <div className="px-4 pb-2">
-          <Button onClick={handleGenerate} className="w-full" variant="glow" size="lg">
-            <Sparkles className="h-5 w-5 mr-2" />
-            Generate Documentation
-          </Button>
+          </div>
         </div>
-      )}
+      ) : (
+        /* ── Conversation state: messages + input pinned to bottom ── */
+        <>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-[720px] w-full mx-auto">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full text-white/40">
+                Loading messages...
+              </div>
+            ) : (
+              visibleMessages.map(message => (
+                <ChatMessage key={message.id} message={message} patientName={patientName} darkMode />
+              ))
+            )}
+            {isUploading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex gap-3 w-full justify-end"
+              >
+                <div className="max-w-[85%] rounded-2xl px-5 py-4 bg-[#1A2B50] text-white rounded-br-md">
+                  <div className="flex items-center gap-3 mb-2">
+                    <FileText className="w-4 h-4 text-[#619DFF]" />
+                    <span className="text-sm font-medium truncate max-w-[200px]">{uploadingFileName}</span>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                    <motion.div
+                      className="h-full bg-[#619DFF] rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${uploadProgress}%` }}
+                      transition={{ duration: 0.2 }}
+                    />
+                  </div>
+                  <p className="text-xs text-white/60 mt-2">Uploading and analyzing document...</p>
+                </div>
+              </motion.div>
+            )}
+            {isStreaming && streamingContent && (
+              <ChatMessage
+                message={{
+                  id: 'streaming',
+                  role: 'assistant',
+                  content: streamingContent.replace('[READY_TO_GENERATE]', ''),
+                  created_at: new Date().toISOString(),
+                }}
+                isStreaming
+                patientName={patientName}
+                darkMode
+              />
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
-      <div className="p-4 border-t border-sage-light/30">
-        <ChatInput
-          onSend={sendMessage}
-          onFileUpload={handleFileUpload}
-          disabled={isStreaming}
-          placeholder="Describe the patient's condition..."
-        />
-      </div>
+          {readyToGenerate && (
+            <div className="px-4 pb-2">
+              <Button onClick={handleGenerate} className="w-full" variant="glow" size="lg">
+                <Sparkles className="h-5 w-5 mr-2" />
+                Generate Documentation
+              </Button>
+            </div>
+          )}
+
+          <div className="p-4 pb-8 max-w-[720px] w-full mx-auto">
+            <ChatInput
+              onSend={sendMessage}
+              onFileUpload={handleFileUpload}
+              disabled={isStreaming}
+              placeholder="Ask anything...."
+              darkMode
+              riskItems={riskItems}
+              caseContext={caseContext}
+            />
+          </div>
+        </>
+      )}
 
       <Dialog open={showHipaaWarning} onOpenChange={setShowHipaaWarning}>
         <DialogContent>

@@ -26,15 +26,10 @@ import { SuggestedForms } from "@/components/dashboard/SuggestedForms"
 import { LCDValidationPanel } from "@/components/dashboard/LCDValidationPanel"
 import { ChecklistItemEditModal } from "@/components/dashboard/ChecklistItemEditModal"
 import { ChatInterface, ChatInterfaceRef } from "@/components/chat/ChatInterface"
+import { ChatOverlay } from "@/components/chat/ChatOverlay"
+import type { CaseContext } from "@/components/chat/ChatInput"
 import { GeneratingSteps } from "@/components/GeneratingSteps"
-import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X, Plus, RefreshCw, Send, Save, ChevronDown, MessageSquare, FileText, Image, AlertTriangle, User, Users, CreditCard, LogOut } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, Pencil, X, RefreshCw, Save, ChevronDown, MessageSquare, FileText, Image, AlertTriangle } from "lucide-react"
 import type { LCDValidationResult, ChecklistEdit, ChecklistEditsData, ChecklistItemWithEdits } from "@/lib/lcd-validation"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -87,9 +82,7 @@ export default function CaseDetailPage() {
   const [regenerateAcknowledged, setRegenerateAcknowledged] = useState(false)
   const [generationKey, setGenerationKey] = useState(0) // Forces GeneratingSteps remount on regeneration
   const [isChatExpanded, setIsChatExpanded] = useState(false) // Opens when user clicks "Chat with Luma" card
-  const [isChatCopied, setIsChatCopied] = useState(false)
   const [uploadedDocs, setUploadedDocs] = useState<{ filename: string; fileType: string; storagePath: string | null }[]>([])
-  const [showDocsDropdown, setShowDocsDropdown] = useState(false)
   const [showRisksDropdown, setShowRisksDropdown] = useState(false)
   const [copiedRiskIndex, setCopiedRiskIndex] = useState<string | null>(null)
   const chatRef = useRef<ChatInterfaceRef>(null)
@@ -429,29 +422,6 @@ export default function CaseDetailPage() {
     }
   }
 
-  async function copyChatMessages() {
-    if (!caseData) return
-
-    const { data: messages } = await supabase
-      .from("case_messages")
-      .select("role, content")
-      .eq("case_id", caseData.id)
-      .order("created_at", { ascending: true })
-
-    if (messages && messages.length > 0) {
-      const assistantMessages = messages
-        .filter(m => m.role === "assistant")
-        .map(m => m.content.replace("[READY_TO_GENERATE]", "").trim())
-        .join("\n\n---\n\n")
-
-      if (assistantMessages) {
-        await navigator.clipboard.writeText(assistantMessages)
-        setIsChatCopied(true)
-        setTimeout(() => setIsChatCopied(false), 2000)
-      }
-    }
-  }
-
   async function copyRiskItem(text: string, index: string) {
     await navigator.clipboard.writeText(text)
     setCopiedRiskIndex(index)
@@ -476,6 +446,59 @@ export default function CaseDetailPage() {
   }
 
   const riskItems = getRiskItems()
+
+  // Build case context for chat presets — pulls real data from lcdValidation + caseData
+  const caseContext: CaseContext | undefined = (() => {
+    if (!lcdValidation && !caseData) return undefined
+    const ctx: CaseContext = {}
+
+    if (lcdValidation) {
+      ctx.checklist = lcdValidation.checklist?.map(cat => ({
+        category: cat.category,
+        items: cat.items.map(i => ({
+          label: i.label,
+          status: i.status,
+          suggestion: i.suggestion,
+          evidence: i.evidence,
+        })),
+        foundCount: cat.foundCount,
+        missingCount: cat.missingCount,
+      }))
+
+      ctx.recommendations = lcdValidation.recommendations?.map(r => ({
+        priority: r.priority,
+        action: r.action,
+        reason: r.reason,
+        suggestedLanguage: r.suggestedLanguage,
+      }))
+
+      if (lcdValidation.perplexityFindings) {
+        const pf = lcdValidation.perplexityFindings
+        ctx.researchFindings = {
+          lcdEffectiveDate: pf.lcdEffectiveDate,
+          productCoverageStatus: pf.productCoverageStatus,
+          recentLcdChanges: pf.recentLcdChanges,
+          currentAuditFocusAreas: pf.currentAuditFocusAreas,
+          oigWorkPlanItems: pf.oigWorkPlanItems,
+        }
+      }
+
+      ctx.riskLevel = lcdValidation.riskLevel
+      ctx.denialProbability = lcdValidation.denialProbability
+    }
+
+    if (caseData) {
+      ctx.caseSummary = {
+        patientName: `${caseData.patient_first_name || ''} ${caseData.patient_last_name || ''}`.trim() || undefined,
+        diagnosis: caseData.diagnosis_codes,
+        medication: caseData.requested_medication,
+        payer: caseData.payer_name,
+        priorTreatments: caseData.prior_treatments,
+      }
+    }
+
+    return ctx
+  })()
 
   async function loadUploadedDocs() {
     if (!caseData) return
@@ -533,32 +556,6 @@ export default function CaseDetailPage() {
         variant: "destructive",
         title: "Save Failed",
         description: "Failed to save changes. Please try again.",
-      })
-    }
-  }
-
-  async function markAsSubmitted() {
-    if (!caseData) return
-
-    try {
-      const { error } = await supabase
-        .from("cases")
-        .update({ status: "submitted" })
-        .eq("id", caseData.id)
-
-      if (error) throw error
-
-      setCaseData({ ...caseData, status: "submitted" })
-      toast({
-        title: "Case Submitted",
-        description: "This case has been marked as submitted.",
-      })
-    } catch (error) {
-      console.error("Error updating status:", error)
-      toast({
-        variant: "destructive",
-        title: "Update Failed",
-        description: "Failed to update case status. Please try again.",
       })
     }
   }
@@ -1018,185 +1015,84 @@ export default function CaseDetailPage() {
               Back to Dashboard
             </Button>
           </Link>
-          <div className="flex items-center gap-4">
-            <Button
-              onClick={() => router.push("/cases/new")}
-              size="sm"
-              className="relative overflow-hidden bg-dark-bg hover:bg-dark-bg/90 text-white transition-all duration-300 hover:scale-105 before:content-[''] before:absolute before:top-0 before:left-[-100%] before:w-full before:h-full before:bg-white/20 before:transition-all before:duration-300 hover:before:left-[100%] active:scale-100"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              New Case
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="flex items-center gap-2 hover:bg-gray-100">
-                  <span className="text-sm text-gray-600 hidden md:block max-w-[200px] truncate">{practiceName || userEmail}</span>
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
+          <div className="flex items-center gap-2">
+            {!isInChatMode && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (caseData?.generated_output) {
+                      setRegenerateModalOpen(true)
+                    } else {
+                      setGenerating(true)
+                    }
+                  }}
+                  disabled={generating}
+                  className="text-gray-600 hover:text-dark-bg border-gray-200"
+                >
+                  {generating ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : caseData?.generated_output ? (
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 mr-2" />
+                  )}
+                  {caseData?.generated_output ? "Regenerate" : "Generate"}
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-white border border-sage-medium/30">
-                <DropdownMenuItem
-                  onClick={() => router.push('/settings/profile')}
-                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
-                >
-                  <User className="mr-2 h-4 w-4" />
-                  Profile
-                </DropdownMenuItem>
-                {isTeamOwner && (
-                  <>
-                    <DropdownMenuItem
-                      onClick={() => router.push('/settings/team')}
-                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
-                    >
-                      <Users className="mr-2 h-4 w-4" />
-                      Team
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => router.push('/settings/billing')}
-                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
-                    >
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Billing
-                    </DropdownMenuItem>
-                  </>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleSignOut}
-                  className="focus:bg-coral/10 focus:text-coral cursor-pointer"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </>
+            )}
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {/* Case Title Section */}
-        {caseData && (
-          <div className="mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-dark-bg/70 mb-1 uppercase tracking-wide">
-                  {caseData.doc_type === "biologics_pa" && "Biologics Prior Authorization"}
-                  {caseData.doc_type === "medical_necessity" && "Prior Authorization Letter"}
-                  {caseData.doc_type === "appeal" && "Appeal Letter"}
-                  {!["biologics_pa", "medical_necessity", "appeal"].includes(caseData.doc_type) && "Case Documentation"}
-                </p>
-                <h1 className="text-3xl font-sans font-bold text-dark-bg">
-                  {displayFirstName} {displayLastName}
-                </h1>
-                {caseData.requested_medication &&
-                 !caseData.requested_medication.toLowerCase().includes("see notes") && (
-                  <p className="text-lg text-gray-600 mt-1">
-                    {caseData.requested_medication}
-                    {caseData.medication_dose &&
-                     !caseData.medication_dose.toLowerCase().includes("see notes") &&
-                     ` · ${caseData.medication_dose}`}
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-col items-end gap-3">
-                <div className="flex items-center gap-2">
-                  {/* Only show Regenerate button when not in chat mode */}
-                  {!isInChatMode && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          // Show confirmation modal if regenerating (already has output)
-                          if (caseData.generated_output) {
-                            setRegenerateModalOpen(true)
-                          } else {
-                            // Clear output and trigger streaming generation
-                            setGenerating(true)
-                          }
-                        }}
-                        disabled={generating}
-                        className="gap-2 border-dark-bg text-dark-bg hover:bg-dark-bg hover:text-white"
-                      >
-                        {generating ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-4 h-4" />
-                        )}
-                        Regenerate
-                      </Button>
-                    </>
-                  )}
-                  {caseData.status === "draft" && (
-                    <Button
-                      size="sm"
-                      onClick={markAsSubmitted}
-                      className="gap-2 bg-mint hover:bg-mint/90"
-                    >
-                      <Send className="w-4 h-4" />
-                      Mark Submitted
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
+      <div className="container mx-auto px-4 py-6 max-w-6xl">
         <div className="grid lg:grid-cols-3 gap-4 lg:gap-8">
           {/* Left Column - Case Details */}
           <div className="lg:col-span-1 space-y-6">
             <Card className="p-4 md:p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg md:text-xl font-sans font-semibold text-dark-bg">Case Details</h2>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="text-lg md:text-xl font-sans font-semibold text-dark-bg">Case Details</h2>
+                  <p className="text-xs font-medium text-mint-light uppercase tracking-wide mt-1">
+                    {caseData?.doc_type === "biologics_pa" && "Biologics Prior Authorization"}
+                    {caseData?.doc_type === "medical_necessity" && "Prior Authorization Letter"}
+                    {caseData?.doc_type === "appeal" && "Appeal Letter"}
+                    {caseData && !["biologics_pa", "medical_necessity", "appeal"].includes(caseData.doc_type) && "Case Documentation"}
+                  </p>
+                </div>
                 <button
                   onClick={openEditModal}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors px-3 py-1.5 h-7 text-xs text-gray-700 hover:text-gray-900 font-medium"
+                  className="rounded-full border border-gray-200 bg-white hover:bg-gray-50 transition-colors px-2.5 py-0.5 text-[11px] text-gray-500 hover:text-gray-700 font-medium"
                   title="Edit case details"
                 >
-                  <Pencil className="w-3 h-3" />
                   Edit
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-500 mb-1">First Name</p>
-                  <p className="font-semibold text-dark-bg">
-                    {displayFirstName}
-                    {showExtractedNameLabel && (
-                      <span className="text-xs text-gray-500 ml-2 font-normal">(from notes)</span>
-                    )}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-gray-500 mb-1">Last Name</p>
-                  <p className="font-semibold text-dark-bg">
-                    {displayLastName}
-                    {showExtractedNameLabel && (
-                      <span className="text-xs text-gray-500 ml-2 font-normal">(from notes)</span>
-                    )}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-gray-500 mb-1">Age</p>
-                  <p className="text-dark-bg">
-                    {caseData.patient_age}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-gray-500 mb-1">State</p>
-                  <p className="text-dark-bg">
-                    {caseData.patient_state}
-                  </p>
-                </div>
-
+              <div className="grid grid-cols-4 gap-4 text-sm">
                 <div className="col-span-2">
-                  <p className="text-gray-500 mb-1">Payer</p>
+                  <p className="text-xs font-medium text-dark-bg/50 uppercase tracking-wide mb-1">Full Name</p>
+                  <p className="font-semibold text-dark-bg">
+                    {displayFirstName} {displayLastName}
+                    {showExtractedNameLabel && (
+                      <span className="text-xs text-gray-500 ml-2 font-normal">(from notes)</span>
+                    )}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium text-dark-bg/50 uppercase tracking-wide mb-1">Age</p>
+                  <p className="text-dark-bg">{caseData.patient_age}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium text-dark-bg/50 uppercase tracking-wide mb-1">State</p>
+                  <p className="text-dark-bg">{caseData.patient_state}</p>
+                </div>
+
+                <div className={caseData.claim_amount != null && caseData.claim_amount > 0 ? "col-span-2" : "col-span-4"}>
+                  <p className="text-xs font-medium text-dark-bg/50 uppercase tracking-wide mb-1">Payer</p>
                   <p className="text-dark-bg">
                     {displayPayer}
                     {showExtractedPayerLabel && (
@@ -1207,96 +1103,93 @@ export default function CaseDetailPage() {
 
                 {caseData.claim_amount != null && caseData.claim_amount > 0 && (
                   <div className="col-span-2">
-                    <p className="text-gray-500 mb-1">Claim Amount</p>
+                    <p className="text-xs font-medium text-dark-bg/50 uppercase tracking-wide mb-1">Claim Amount</p>
                     <p className="text-dark-bg">
                       ${caseData.claim_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                 )}
               </div>
-            </Card>
 
-            <Card className="p-4 md:p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
-              <h3 className="font-semibold text-dark-bg mb-3">Clinical Details</h3>
-              <div className="space-y-3 text-sm">
-                {caseData.disease_activity && (
-                  <div>
-                    <p className="text-gray-500 mb-1">Clinical Notes</p>
-                    <p className="text-gray-700 text-xs">
-                      {caseData.disease_activity.length > 200
-                        ? `${caseData.disease_activity.substring(0, 200)}...`
-                        : caseData.disease_activity}
-                    </p>
+              {/* Clinical Details */}
+              {caseData.disease_activity && (
+                <>
+                  <div className="border-t border-gray-100 my-4" />
+                  <p className="text-xs font-medium text-dark-bg/50 uppercase tracking-wide mb-2">Clinical Details</p>
+                  <p className="text-gray-700 text-xs">
+                    {caseData.disease_activity.length > 200
+                      ? `${caseData.disease_activity.substring(0, 200)}...`
+                      : caseData.disease_activity}
+                  </p>
+                </>
+              )}
+
+              {/* Uploaded Documents */}
+              {uploadedDocs.length > 0 && (
+                <>
+                  <div className="border-t border-gray-100 my-4" />
+                  <p className="text-xs font-medium text-dark-bg/50 uppercase tracking-wide mb-2">Uploaded Documents</p>
+                  <div className="space-y-2">
+                    {uploadedDocs.map((doc, index) => (
+                      <button
+                        key={index}
+                        className="flex items-center gap-3 p-2 rounded-lg bg-sage-light/20 hover:bg-sage-light/30 transition-colors w-full text-left group"
+                        title={doc.storagePath ? `Download ${doc.filename}` : doc.filename}
+                        onClick={async () => {
+                          if (!doc.storagePath) return
+                          const { data } = await supabase.storage
+                            .from('case-documents')
+                            .createSignedUrl(doc.storagePath, 60, { download: doc.filename })
+                          if (data?.signedUrl) {
+                            window.open(data.signedUrl, '_blank')
+                          }
+                        }}
+                      >
+                        {["png", "jpg", "jpeg"].includes(doc.fileType) ? (
+                          <Image className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        ) : (
+                          <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        )}
+                        <span className="text-sm text-gray-700 truncate flex-1">{doc.filename}</span>
+                        {doc.storagePath && (
+                          <Download className="h-3.5 w-3.5 text-gray-400 group-hover:text-dark-bg transition-colors flex-shrink-0" />
+                        )}
+                      </button>
+                    ))}
                   </div>
-                )}
-              </div>
+                </>
+              )}
             </Card>
-
-            {/* Uploaded Documents */}
-            {uploadedDocs.length > 0 && (
-              <Card className="p-4 md:p-6 bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
-                <h3 className="font-semibold text-dark-bg mb-3">Uploaded Documents</h3>
-                <div className="space-y-2">
-                  {uploadedDocs.map((doc, index) => (
-                    <button
-                      key={index}
-                      className="flex items-center gap-3 p-2 rounded-lg bg-sage-light/20 hover:bg-sage-light/30 transition-colors w-full text-left group"
-                      title={doc.storagePath ? `Download ${doc.filename}` : doc.filename}
-                      onClick={async () => {
-                        if (!doc.storagePath) return
-                        const { data } = await supabase.storage
-                          .from('case-documents')
-                          .createSignedUrl(doc.storagePath, 60, { download: doc.filename })
-                        if (data?.signedUrl) {
-                          window.open(data.signedUrl, '_blank')
-                        }
-                      }}
-                    >
-                      {["png", "jpg", "jpeg"].includes(doc.fileType) ? (
-                        <Image className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      ) : (
-                        <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      )}
-                      <span className="text-sm text-gray-700 truncate flex-1">{doc.filename}</span>
-                      {doc.storagePath && (
-                        <Download className="h-3.5 w-3.5 text-gray-400 group-hover:text-dark-bg transition-colors flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </Card>
-            )}
 
             {/* Suggested Forms */}
           </div>
 
-          {/* Right Column - Chat Interface or Generated Documentation */}
+          {/* Right Column - Chat trigger + Documentation */}
           <div className="lg:col-span-2 space-y-4">
+            {/* Chat with Luma bar */}
+            <motion.button
+              onClick={() => setIsChatExpanded(true)}
+              className="w-full flex items-center gap-3 px-5 py-3 rounded-xl cursor-pointer border-0 outline-none"
+              style={{
+                background: 'linear-gradient(90deg, #24315D 0%, #161F35 100%)',
+              }}
+              whileHover={{ scale: 1.005 }}
+              whileTap={{ scale: 0.995 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              aria-label="Open chat with Luma AI assistant"
+            >
+              <div className="w-8 h-8 rounded-full bg-[#1652C5]/20 flex items-center justify-center flex-shrink-0">
+                <MessageSquare className="w-4 h-4 text-[#1652C5]" />
+              </div>
+              <div className="text-left">
+                <span className="text-white text-sm font-medium block leading-tight">Chat with Luma</span>
+                <span className="text-white/50 text-xs leading-tight">Ask questions or discuss compliance gaps</span>
+              </div>
+            </motion.button>
+
             <AnimatePresence mode="wait">
-              {/* Chat Interface - Full screen when in chat mode */}
               {isInChatMode ? (
-                <motion.div
-                  key="chat-interface"
-                  initial={{ opacity: 0, y: 20, filter: "blur(8px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -20, filter: "blur(8px)" }}
-                  transition={{
-                    type: "spring",
-                    duration: 0.5,
-                    bounce: 0.1,
-                  }}
-                >
-                  <Card className="bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] border-0 h-[600px]">
-                    <ChatInterface
-                      caseId={caseData.id}
-                      caseData={caseData}
-                      onGenerate={() => {
-                        // Trigger streaming generation via GeneratingSteps
-                        setGenerating(true)
-                      }}
-                    />
-                  </Card>
-                </motion.div>
+                <div />
               ) : (
                 <motion.div
                   key="documentation-view"
@@ -1310,26 +1203,6 @@ export default function CaseDetailPage() {
                   }}
                   className="space-y-4"
                 >
-                  {/* Chat with Luma - Opens modal for follow-up questions */}
-                  <button
-                    onClick={() => setIsChatExpanded(true)}
-                    className="w-full group"
-                  >
-                    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-dark-bg to-dark-bg/90 p-5 transition-all hover:shadow-lg hover:shadow-dark-bg/20 hover:scale-[1.01]">
-                      <div className="absolute inset-0 bg-gradient-to-br from-mint/10 via-transparent to-sage-light/10" />
-                      <div className="relative flex items-center gap-4">
-                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-mint/20 flex items-center justify-center">
-                          <MessageSquare className="w-5 h-5 text-mint" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <h2 className="text-lg font-semibold text-white">Chat with Luma</h2>
-                          <p className="text-sm text-white/60">Ask questions or discuss compliance gaps</p>
-                        </div>
-                        <ChevronDown className="w-5 h-5 text-white/40 -rotate-90 group-hover:translate-x-1 transition-transform" />
-                      </div>
-                    </div>
-                  </button>
-
                   {/* Documentation Validation Panel - Available for all doc types */}
                   {lcdValidation && (
                     <LCDValidationPanel
@@ -1745,147 +1618,27 @@ export default function CaseDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Chat Modal - For follow-up questions after generation */}
-      <Dialog open={isChatExpanded} onOpenChange={setIsChatExpanded}>
-        <DialogContent className="sm:max-w-4xl h-[80vh] max-h-[700px] p-0 gap-0 flex flex-col">
-          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
-            <DialogTitle className="text-lg">Chat with Luma</DialogTitle>
-            <DialogDescription className="pt-1">
-              All conversations and uploaded documents are saved and will be used to generate more accurate letters.
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Action Bar */}
-          <div className="px-6 pb-4 flex-shrink-0 flex items-center gap-3 flex-wrap">
-            <button
-              onClick={copyChatMessages}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-mint focus-visible:ring-offset-2"
-            >
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.div
-                  key={isChatCopied ? "check" : "copy"}
-                  initial={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
-                  transition={{
-                    type: "spring",
-                    duration: 0.3,
-                    bounce: 0,
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  {isChatCopied ? (
-                    <>
-                      <Check className="h-4 w-4 text-mint" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      <span>Copy Responses</span>
-                    </>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </button>
-
-            {/* Uploaded Documents - Click to expand */}
-            {uploadedDocs.length > 0 && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowDocsDropdown(!showDocsDropdown)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sage-light/40 hover:bg-sage-light/60 transition-colors text-xs font-medium text-gray-600"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  <span>{uploadedDocs.length} document{uploadedDocs.length !== 1 ? 's' : ''}</span>
-                  <ChevronDown className={`h-3 w-3 transition-transform ${showDocsDropdown ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {showDocsDropdown && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -4, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute top-full left-0 mt-1 z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-2 min-w-[200px] max-w-[280px]"
-                    >
-                      <div className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide">
-                        Uploaded Files
-                      </div>
-                      {uploadedDocs.map((doc, index) => (
-                        <button
-                          key={index}
-                          className="px-3 py-2 flex items-center gap-2 hover:bg-gray-50 w-full text-left group"
-                          title={doc.storagePath ? `Download ${doc.filename}` : doc.filename}
-                          onClick={async () => {
-                            if (!doc.storagePath) return
-                            const { data } = await supabase.storage
-                              .from('case-documents')
-                              .createSignedUrl(doc.storagePath, 60, { download: doc.filename })
-                            if (data?.signedUrl) {
-                              window.open(data.signedUrl, '_blank')
-                            }
-                          }}
-                        >
-                          {["png", "jpg", "jpeg"].includes(doc.fileType) ? (
-                            <Image className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          ) : (
-                            <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          )}
-                          <span className="text-sm text-gray-700 truncate flex-1">{doc.filename}</span>
-                          {doc.storagePath && (
-                            <Download className="h-3.5 w-3.5 text-gray-400 group-hover:text-dark-bg transition-colors flex-shrink-0" />
-                          )}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-
-          </div>
-
-          {/* Risk Items - Simple select with colored dots */}
-          {riskItems.length > 0 && (
-            <div className="px-6 pb-4">
-              <select
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-mint focus:border-transparent cursor-pointer"
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value) {
-                    const selectedItem = riskItems[parseInt(e.target.value)]
-                    if (selectedItem && chatRef.current) {
-                      chatRef.current.sendMessage(`I'd like to discuss this compliance gap: "${selectedItem.text}". What specific documentation or evidence do I need to address this?`)
-                    }
-                    e.target.value = "" // Reset selection
-                  }
-                }}
-              >
-                <option value="" disabled>Discuss a compliance gap ({riskItems.length})...</option>
-                {riskItems.map((item, index) => (
-                  <option key={index} value={index}>
-                    {item.severity === 'instant' ? '● ' : item.severity === 'very-high' ? '● ' : '● '}{item.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="flex-1 min-h-0 border-t border-gray-100">
-            <ChatInterface
-              ref={chatRef}
-              caseId={caseData?.id || ""}
-              caseData={caseData}
-              onGenerate={async () => {
-                setIsChatExpanded(false)
-                setRegenerateModalOpen(true)
-              }}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Chat Overlay - Fullscreen chat experience */}
+      <ChatOverlay
+        isOpen={isChatExpanded}
+        onClose={() => setIsChatExpanded(false)}
+      >
+        <ChatInterface
+          ref={chatRef}
+          caseId={caseData?.id || ""}
+          caseData={caseData}
+          onGenerate={async () => {
+            setIsChatExpanded(false)
+            if (isInChatMode) {
+              setGenerating(true)
+            } else {
+              setRegenerateModalOpen(true)
+            }
+          }}
+          riskItems={riskItems}
+          caseContext={caseContext}
+        />
+      </ChatOverlay>
     </div >
   )
 }
