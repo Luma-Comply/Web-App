@@ -1,4 +1,4 @@
-import { type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 // Polyfill for libraries that expect 'self' to be defined (like some pdf or crypto libs)
 if (typeof self === 'undefined') {
@@ -8,6 +8,12 @@ if (typeof self === 'undefined') {
 import { updateSession } from '@/lib/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
+    // Proxy generation requests to Railway when configured (bypasses Vercel serverless timeout)
+    const railwayUrl = process.env.RAILWAY_GENERATION_URL
+    if (railwayUrl && request.nextUrl.pathname === '/api/generate/stream') {
+        return NextResponse.rewrite(new URL(`${railwayUrl}/generate/stream`))
+    }
+
     return await updateSession(request)
 }
 

@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Autocomplete } from "@/components/ui/autocomplete"
 import {
   Dialog,
@@ -35,7 +34,6 @@ import {
   ArrowLeft,
   Loader2,
   Sparkles,
-  CheckCircle2,
   AlertTriangle,
   Shield,
   ExternalLink,
@@ -1045,20 +1043,12 @@ export default function NewCasePage() {
           {/* Step 3: Shows after patient info is complete - NOW OPTIONAL */}
           {isStep1Complete && isStep2Complete && (
           <Card className="p-6 glass-card border border-mint/30 shadow-sm">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-sans font-semibold text-dark-bg">3. Paste Clinical Notes (Optional)</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Paste clinical context here, or skip to chat with our AI assistant.
-                  You can provide notes during the chat conversation instead.
-                </p>
-              </div>
-              {pastedText.length > 0 && (
-                <Badge variant="default" className="bg-mint text-white">
-                  <CheckCircle2 className="w-3 h-3 mr-1" />
-                  {pastedText.length} chars
-                </Badge>
-              )}
+            <div className="mb-4">
+              <h2 className="text-xl font-sans font-semibold text-dark-bg">3. Paste Clinical Notes (Optional)</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Paste clinical context here, or skip to chat with our AI assistant.
+                You can provide notes during the chat conversation instead.
+              </p>
             </div>
 
             <Textarea
@@ -1071,8 +1061,21 @@ Patient is a 45yo male with RA.
 Failed Methotrexate (3 months) and Humira (6 months).
 Current DAS28 is 5.2.
 Requesting Rinvoq 15mg daily."
-              className="min-h-[200px] font-mono text-sm mb-4 bg-white/80"
+              className="min-h-[200px] font-mono text-sm bg-white/80"
             />
+            {pastedText.length > 0 && pastedText.length < 50 && (
+              <p className="text-xs text-gray-400 mt-1.5">
+                Minimum 50 characters for clinical notes ({pastedText.length}/50)
+              </p>
+            )}
+            {pastedText.length > 10000 && (
+              <p className="text-xs text-tan mt-1.5">
+                Large notes detected ({Math.round(pastedText.length / 1000)}k chars). Luma will automatically extract the key clinical details for your letter.
+              </p>
+            )}
+            {pastedText.length >= 50 && pastedText.length <= 10000 && (
+              <div className="mt-1.5" />
+            )}
 
             {/* Divider */}
             <div className="relative my-4">

@@ -919,7 +919,7 @@ export default function CaseDetailPage() {
   }
 
   const hasGenerated = Boolean(caseData?.generated_output || editedOutput)
-  const needsGeneration = caseData && !caseData.generated_output && caseData.status === 'draft'
+  const needsGeneration = caseData && !caseData.generated_output && (caseData.status === 'draft' || caseData.status === 'generating')
 
   // Always use database values for display
   // Only show extracted values as a hint when user left fields empty
@@ -999,6 +999,10 @@ export default function CaseDetailPage() {
             description: error || "Failed to generate documentation. Please try again.",
           })
           setGenerating(false)
+        }}
+        onRetry={() => {
+          setGenerating(true)
+          setGenerationKey(k => k + 1)
         }}
       />
     )

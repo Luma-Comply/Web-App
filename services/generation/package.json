@@ -1,0 +1,26 @@
+{
+  "name": "luma-generation-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "copy-libs": "cp ../../src/lib/lcd-validation.ts src/lib/ && cp ../../src/lib/lcd-requirements.ts src/lib/ && cp ../../src/lib/novitas-ctp-products.ts src/lib/ && cp ../../src/lib/mac-jurisdictions.ts src/lib/ && cp ../../src/lib/phi-utils.ts src/lib/ && mkdir -p src/lib/validation && cp ../../src/lib/validation/medical-necessity-validation.ts src/lib/validation/ && cp ../../src/lib/validation/appeal-validation.ts src/lib/validation/ && cp ../../src/lib/validation/validation-types.ts src/lib/validation/ && mkdir -p src/lib/requirements && cp ../../src/lib/requirements/medical-necessity-requirements.ts src/lib/requirements/ && cp ../../src/lib/requirements/appeal-requirements.ts src/lib/requirements/",
+    "dev": "npm run copy-libs && tsx watch src/index.ts",
+    "build": "tsc && tsc-alias --resolve-full-paths",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@hono/node-server": "^1.14.0",
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^17.2.3",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsc-alias": "^1.8.16",
+    "tsx": "^4.19.0",
+    "typescript": "^5"
+  }
+}

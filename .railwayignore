@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.git/
+.env
+.env.local
+docs/
+public/
+*.pdf
+*.png
+*.jpg
+*.svg
+services/generation/node_modules/
+services/generation/dist/
+services/generation/.env

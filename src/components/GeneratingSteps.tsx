@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LumaLogo } from './LumaLogo'
+import { createClient } from '@/lib/supabase/client'
 
 const tidbits = [
   "Did you know? Insurance denials cost healthcare practices over $262 billion annually.",
@@ -116,9 +117,10 @@ interface GeneratingStepsProps {
   docType?: string
   onComplete?: (result: any) => void
   onError?: (error: string) => void
+  onRetry?: () => void
 }
 
-export function GeneratingSteps({ caseId, docType, onComplete, onError }: GeneratingStepsProps) {
+export function GeneratingSteps({ caseId, docType, onComplete, onError, onRetry }: GeneratingStepsProps) {
   const steps = getStepsForDocType(docType)
   const [currentPhase, setCurrentPhase] = useState<GenerationPhase>('loading_case')
   const [completedPhases, setCompletedPhases] = useState<GenerationPhase[]>([])
@@ -130,13 +132,19 @@ export function GeneratingSteps({ caseId, docType, onComplete, onError }: Genera
   // Use ref to track if we've seen 'generating' status - persists across remounts
   const sawGeneratingRef = useRef(false)
 
-  // Update elapsed time every second
+  // Update elapsed time every second + detect client-side timeout
   useEffect(() => {
     const interval = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - startTime) / 1000))
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      setElapsedTime(elapsed)
+      if (elapsed >= 600 && !error) {
+        setError('Generation is taking longer than expected. Please try again.')
+        setCurrentPhase('error')
+        onError?.('Generation timed out')
+      }
     }, 1000)
     return () => clearInterval(interval)
-  }, [startTime])
+  }, [startTime, error, onError])
 
   // Rotate tidbits every 6 seconds
   useEffect(() => {
@@ -204,9 +212,19 @@ export function GeneratingSteps({ caseId, docType, onComplete, onError }: Genera
           }
         }, 5000)
 
+        const supabase = createClient()
+        const { data: { session } } = await supabase.auth.getSession()
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`
+        }
+
         const response = await fetch('/api/generate/stream', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ caseId }),
         })
 
@@ -359,7 +377,15 @@ export function GeneratingSteps({ caseId, docType, onComplete, onError }: Genera
 
           {error ? (
             <div className="mt-6 pt-4 border-t border-gray-100">
-              <p className="text-sm text-coral">{error}</p>
+              <p className="text-sm text-coral mb-3">{error}</p>
+              {onRetry && (
+                <button
+                  onClick={onRetry}
+                  className="w-full py-2.5 px-4 bg-[#1652C5] text-white text-sm font-medium rounded-lg hover:bg-[#1241a0] transition-colors"
+                >
+                  Try Again
+                </button>
+              )}
             </div>
           ) : (
             <div className="mt-6 pt-4 border-t border-gray-100">
