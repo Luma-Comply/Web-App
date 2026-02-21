@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { checkRateLimit } from "@/lib/rate-limit-middleware"
 import {
   validateAgainstLCD,
   LCDValidationResult,
@@ -11,6 +12,7 @@ import { getMACInfo, isWiserActiveForSkinSubs } from "@/lib/mac-jurisdictions"
 import { validateMedicalNecessity, MedicalNecessityValidationResult } from "@/lib/validation/medical-necessity-validation"
 import { validateAppeal, AppealValidationResult } from "@/lib/validation/appeal-validation"
 import { computeAgeTags, formatAgeTagsForPrompt, reinsertPatientName, PATIENT_PLACEHOLDER } from "@/lib/phi-utils"
+import { getCachedResearch, cacheResearch } from "@/lib/research-cache"
 
 // Unified validation result type for all doc types
 type ValidationResult = LCDValidationResult | MedicalNecessityValidationResult | AppealValidationResult
@@ -32,6 +34,9 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 export async function POST(request: NextRequest) {
+  const rateLimitResponse = await checkRateLimit(request, { limit: 10, windowMs: 60_000 })
+  if (rateLimitResponse) return rateLimitResponse
+
   const encoder = new TextEncoder()
 
   // Use TransformStream for better flushing behavior
@@ -112,23 +117,35 @@ export async function POST(request: NextRequest) {
       }
 
       if (pp_apiKey && caseData.payer_name && caseData.payer_name !== "Unknown") {
-        try {
-          const docTypeLabel = getDocTypeLabel(caseData.doc_type)
-          const clinicalNotes = [
-            caseData.disease_activity,
-            caseData.prior_treatments,
-            caseData.lab_values,
-            caseData.diagnosis_codes?.join(", ")
-          ].filter(Boolean).join("\n\n")
+        // Check research cache first
+        const cached = await getCachedResearch(
+          caseData.payer_name,
+          caseData.requested_medication || "",
+          caseData.patient_state || "",
+          caseData.doc_type || ""
+        ).catch(() => null)
 
-          // Get state-specific MAC information
-          const macInfo = getMACInfo(caseData.patient_state)
-          const isWiserState = isWiserActiveForSkinSubs(caseData.patient_state)
-          const lcdNumber = macInfo?.lcdPolicyNumber || "L35041"
+        if (cached) {
+          researchContext = cached.research_result
+          console.log('[SSE] Using cached research, length:', researchContext.length)
+        } else {
+          try {
+            const docTypeLabel = getDocTypeLabel(caseData.doc_type)
+            const clinicalNotes = [
+              caseData.disease_activity,
+              caseData.prior_treatments,
+              caseData.lab_values,
+              caseData.diagnosis_codes?.join(", ")
+            ].filter(Boolean).join("\n\n")
 
-          let researchQuery: string
-          if (isBiologicsPA) {
-            researchQuery = `Research current Medicare Part B LCD ${lcdNumber} requirements for CTP/skin substitutes:
+            // Get state-specific MAC information
+            const macInfo = getMACInfo(caseData.patient_state)
+            const isWiserState = isWiserActiveForSkinSubs(caseData.patient_state)
+            const lcdNumber = macInfo?.lcdPolicyNumber || "L35041"
+
+            let researchQuery: string
+            if (isBiologicsPA) {
+              researchQuery = `Research current Medicare Part B LCD ${lcdNumber} requirements for CTP/skin substitutes:
 
 STATE-SPECIFIC MAC INFO:
 - State: ${caseData.patient_state}
@@ -143,61 +160,72 @@ PATIENT CASE:
 CLINICAL CONTEXT: ${clinicalNotes.substring(0, 1500)}
 
 Find for LCD ${lcdNumber} (${macInfo?.macName || "this MAC"}): LCD effective date, product coverage on THIS MAC's list, application limits, SOC failure criteria, ABI thresholds, debridement requirements, common denial reasons.`
-          } else {
-            researchQuery = `Research ${docTypeLabel} criteria for ${caseData.payer_name} in ${caseData.patient_state}:
+            } else {
+              researchQuery = `Research ${docTypeLabel} criteria for ${caseData.payer_name} in ${caseData.patient_state}:
 Diagnosis: ${formatIcd10ForPrompt()}
 Medication: ${caseData.requested_medication}
 Patient: ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}
 Clinical context: ${clinicalNotes.substring(0, 1000)}
 
 Find: coverage criteria, step therapy requirements, medical necessity requirements.`
+            }
+
+            // Add 20 second timeout to prevent hanging
+            const abortController = new AbortController()
+            const timeoutId = setTimeout(() => {
+              console.log('[SSE] Perplexity timeout - aborting')
+              abortController.abort()
+            }, 20000)
+            console.log('[SSE] Starting Perplexity research call...')
+
+            // Build state-aware system prompt for biologics PA
+            const systemPrompt = isBiologicsPA
+              ? `You are a Medicare LCD compliance researcher for CTP/skin substitutes. The patient is in ${caseData.patient_state} under ${macInfo?.macName || "Medicare"} (${macInfo?.jurisdiction || "unknown"}). Research LCD ${lcdNumber} requirements SPECIFIC to this MAC.${isWiserState ? ` This is a WISeR pilot state - PA processed by ${macInfo?.aiVendor}.` : ""}`
+              : "You are a medical insurance researcher specializing in payer policies."
+
+            const researchResponse = await fetch("https://api.perplexity.ai/chat/completions", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${pp_apiKey}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                model: "sonar-pro",
+                messages: [
+                  { role: "system", content: systemPrompt },
+                  { role: "user", content: researchQuery }
+                ],
+                temperature: 0.1
+              }),
+              signal: abortController.signal
+            })
+
+            clearTimeout(timeoutId)
+            console.log('[SSE] Perplexity response status:', researchResponse.status)
+
+            if (researchResponse.ok) {
+              const researchData = await researchResponse.json()
+              researchContext = researchData.choices[0]?.message?.content || "No research data returned."
+              console.log('[SSE] Perplexity research completed, length:', researchContext.length)
+
+              // Cache the research result (fire-and-forget)
+              cacheResearch(
+                caseData.payer_name,
+                caseData.requested_medication || "",
+                caseData.patient_state || "",
+                caseData.doc_type || "",
+                researchContext,
+                researchData.citations || []
+              ).catch(() => {})
+            }
+          } catch (ppError: any) {
+            if (ppError.name === 'AbortError') {
+              console.error("[SSE] Perplexity Call Timed Out after 20s")
+            } else {
+              console.error("[SSE] Perplexity Call Failed:", ppError)
+            }
+            // Continue with default context - don't block generation
           }
-
-          // Add 20 second timeout to prevent hanging
-          const abortController = new AbortController()
-          const timeoutId = setTimeout(() => {
-            console.log('[SSE] Perplexity timeout - aborting')
-            abortController.abort()
-          }, 20000)
-          console.log('[SSE] Starting Perplexity research call...')
-
-          // Build state-aware system prompt for biologics PA
-          const systemPrompt = isBiologicsPA
-            ? `You are a Medicare LCD compliance researcher for CTP/skin substitutes. The patient is in ${caseData.patient_state} under ${macInfo?.macName || "Medicare"} (${macInfo?.jurisdiction || "unknown"}). Research LCD ${lcdNumber} requirements SPECIFIC to this MAC.${isWiserState ? ` This is a WISeR pilot state - PA processed by ${macInfo?.aiVendor}.` : ""}`
-            : "You are a medical insurance researcher specializing in payer policies."
-
-          const researchResponse = await fetch("https://api.perplexity.ai/chat/completions", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${pp_apiKey}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              model: "sonar-pro",
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: researchQuery }
-              ],
-              temperature: 0.1
-            }),
-            signal: abortController.signal
-          })
-
-          clearTimeout(timeoutId)
-          console.log('[SSE] Perplexity response status:', researchResponse.status)
-
-          if (researchResponse.ok) {
-            const researchData = await researchResponse.json()
-            researchContext = researchData.choices[0]?.message?.content || "No research data returned."
-            console.log('[SSE] Perplexity research completed, length:', researchContext.length)
-          }
-        } catch (ppError: any) {
-          if (ppError.name === 'AbortError') {
-            console.error("[SSE] Perplexity Call Timed Out after 20s")
-          } else {
-            console.error("[SSE] Perplexity Call Failed:", ppError)
-          }
-          // Continue with default context - don't block generation
         }
       }
       console.log('[SSE] Research phase complete, moving to validating...')

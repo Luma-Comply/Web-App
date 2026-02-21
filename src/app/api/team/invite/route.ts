@@ -2,8 +2,13 @@ import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import { sendInvitationEmail } from "@/lib/email"
+import { logAudit } from "@/lib/audit-log"
+import { checkRateLimit } from "@/lib/rate-limit-middleware"
 
 export async function POST(request: NextRequest) {
+  const rateLimitResponse = await checkRateLimit(request, { limit: 10, windowMs: 60_000 })
+  if (rateLimitResponse) return rateLimitResponse
+
   try {
     const supabase = await createClient()
 
@@ -138,6 +143,13 @@ export async function POST(request: NextRequest) {
     })
 
     console.log(`Invitation created for ${email}: ${invitationLink}`)
+
+    logAudit({
+      action: 'team_invite_sent',
+      resourceType: 'team',
+      userId: session.user.id,
+      metadata: { invited_email: email },
+    }).catch(() => {})
 
     return NextResponse.json({
       success: true,

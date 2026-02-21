@@ -2,10 +2,16 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 import { computeAgeTags, formatAgeTagsForPrompt, reinsertPatientName, PATIENT_PLACEHOLDER } from '@/lib/phi-utils';
+import { logAudit } from '@/lib/audit-log';
+import { checkRateLimit } from '@/lib/rate-limit-middleware';
+import { getCachedResearch, cacheResearch } from '@/lib/research-cache';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export async function POST(req: NextRequest) {
+    const rateLimitResponse = await checkRateLimit(req, { limit: 10, windowMs: 60_000 })
+    if (rateLimitResponse) return rateLimitResponse
+
     try {
         const formData = await req.json();
 
@@ -17,34 +23,60 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // STEP 1: Research with Perplexity
-        const researchPrompt = `
+        // STEP 1: Research with Perplexity (with caching)
+        let researchContent: string;
+        let citations: any[];
+
+        const cached = await getCachedResearch(
+            formData.payerName,
+            formData.requestedMedication,
+            formData.patientState || "",
+            "biologics_pa"
+        ).catch(() => null);
+
+        if (cached) {
+            researchContent = cached.research_result;
+            citations = cached.citations;
+            console.log('Using cached research, length:', researchContent.length);
+        } else {
+            const researchPrompt = `
       Find current ${formData.payerName} requirements for
       ${formData.requestedMedication} for ICD-10 ${formData.diagnosisCodes}.
       Include LCD/NCD requirements, step therapy, and documentation needed.
     `;
 
-        const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: 'sonar-pro',
-                messages: [{ role: 'user', content: researchPrompt }],
-            }),
-        });
+            const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'sonar-pro',
+                    messages: [{ role: 'user', content: researchPrompt }],
+                }),
+            });
 
-        if (!perplexityResponse.ok) {
-            const errorText = await perplexityResponse.text();
-            console.error('Perplexity API Error:', errorText);
-            throw new Error(`Perplexity API (Research) failed: ${perplexityResponse.statusText}`);
+            if (!perplexityResponse.ok) {
+                const errorText = await perplexityResponse.text();
+                console.error('Perplexity API Error:', errorText);
+                throw new Error(`Perplexity API (Research) failed: ${perplexityResponse.statusText}`);
+            }
+
+            const researchData = await perplexityResponse.json();
+            researchContent = researchData.choices[0]?.message?.content || "No research found.";
+            citations = researchData.citations || [];
+
+            // Cache the research result (fire-and-forget)
+            cacheResearch(
+                formData.payerName,
+                formData.requestedMedication,
+                formData.patientState || "",
+                "biologics_pa",
+                researchContent,
+                citations
+            ).catch(() => {});
         }
-
-        const researchData = await perplexityResponse.json();
-        const researchContent = researchData.choices[0]?.message?.content || "No research found.";
-        const citations = researchData.citations || [];
 
         // STEP 2: Generate with Gemini
         const generationPrompt = `
@@ -77,6 +109,16 @@ export async function POST(req: NextRequest) {
             formData.patientFirstName || '',
             formData.patientLastName || ''
         );
+
+        logAudit({
+            action: 'document_generated',
+            resourceType: 'document',
+            metadata: {
+                doc_type: 'biologics_pa',
+                medication: formData.requestedMedication,
+                payer: formData.payerName,
+            },
+        }).catch(() => {})
 
         return NextResponse.json({
             documentation,

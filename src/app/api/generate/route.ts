@@ -14,6 +14,7 @@ import { getMACInfo, buildStateSpecificContext, isWiserActiveForSkinSubs } from 
 import { validateMedicalNecessity, MedicalNecessityValidationResult } from "@/lib/validation/medical-necessity-validation"
 import { validateAppeal, AppealValidationResult } from "@/lib/validation/appeal-validation"
 import { computeAgeTags, formatAgeTagsForPrompt, reinsertPatientName, PATIENT_PLACEHOLDER } from "@/lib/phi-utils"
+import { getCachedResearch, cacheResearch } from "@/lib/research-cache"
 
 // Unified validation result type for all doc types
 type ValidationResult = LCDValidationResult | MedicalNecessityValidationResult | AppealValidationResult
@@ -76,6 +77,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (pp_apiKey && caseData.payer_name && caseData.payer_name !== "Unknown") {
+      // Check research cache first
+      const cached = await getCachedResearch(
+        caseData.payer_name,
+        caseData.requested_medication || "",
+        caseData.patient_state || "",
+        caseData.doc_type || ""
+      ).catch(() => null)
+
+      if (cached) {
+        researchContext = cached.research_result
+        console.log("Using cached research, length:", researchContext.length)
+      } else {
       try {
         const docTypeLabel = getDocTypeLabel(caseData.doc_type)
 
@@ -224,12 +237,23 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
           const researchData = await researchResponse.json()
           researchContext = researchData.choices[0]?.message?.content || "No research data returned."
           console.log("Perplexity Research Complete")
+
+          // Cache the research result (fire-and-forget)
+          cacheResearch(
+            caseData.payer_name,
+            caseData.requested_medication || "",
+            caseData.patient_state || "",
+            caseData.doc_type || "",
+            researchContext,
+            researchData.citations || []
+          ).catch(() => {})
         } else {
           console.error("Perplexity API Error:", await researchResponse.text())
         }
       } catch (ppError) {
         console.error("Perplexity Call Failed:", ppError)
       }
+      } // end else (no cache hit)
     }
 
     // --- STEP 1.25: DOCUMENT VALIDATION (ALL DOC TYPES) ---

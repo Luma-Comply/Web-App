@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resend } from '@/lib/resend/client';
 import { z } from 'zod';
+import { checkRateLimit } from '@/lib/rate-limit-middleware';
+import { logAudit } from '@/lib/audit-log';
 
 // Validation Schema
 const feedbackSchema = z.object({
@@ -13,6 +15,9 @@ const feedbackSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+    const rateLimitResponse = await checkRateLimit(req, { limit: 5, windowMs: 60_000 })
+    if (rateLimitResponse) return rateLimitResponse
+
     try {
         const body = await req.json();
         const result = feedbackSchema.safeParse(body);
@@ -99,6 +104,13 @@ ${description}
                 console.error('Failed to create GitHub issue:', ghError);
             }
         }
+
+        logAudit({
+            action: 'feedback_submitted',
+            resourceType: 'settings',
+            userId: userId || undefined,
+            metadata: { type, path },
+        }).catch(() => {})
 
         return NextResponse.json({ success: true, issueUrl });
     } catch (error) {

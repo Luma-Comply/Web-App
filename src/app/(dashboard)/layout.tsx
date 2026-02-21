@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { FeedbackWidget } from "@/components/FeedbackWidget"
 import { SubscriptionGate } from "@/components/dashboard/SubscriptionGate"
 import { LumaLogo } from "@/components/LumaLogo"
+import { SessionTimeoutProvider } from "@/components/SessionTimeoutProvider"
 
 export default async function DashboardLayout({
   children,
@@ -61,6 +62,7 @@ export default async function DashboardLayout({
     <>
       {children}
       <FeedbackWidget />
+      <SessionTimeoutProvider />
     </>
   )
 }

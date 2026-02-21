@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Mail, Eye, EyeOff, Building2 } from "lucide-react"
 import { updateProfile, updatePassword } from "@/app/actions/profile"
+import { MFAEnrollment } from "@/components/settings/MFAEnrollment"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -443,6 +444,9 @@ export default function ProfilePage() {
           </div>
         </div>
       </Card>
+
+      {/* Two-Factor Authentication Section */}
+      <MFAEnrollment />
     </div>
   )
 }

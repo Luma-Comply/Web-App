@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation"
 import { LumaLogo } from "@/components/LumaLogo"
 import { Button } from "@/components/ui/button"
-import { User, Users, CreditCard, ChevronLeft, Plus, ChevronDown, LogOut } from "lucide-react"
+import { User, Users, CreditCard, ChevronLeft, Plus, ChevronDown, LogOut, Shield, Building2 } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -27,6 +27,7 @@ export default function SettingsLayout({
   const [userEmail, setUserEmail] = useState("")
   const [practiceName, setPracticeName] = useState("")
   const [isTeamOwner, setIsTeamOwner] = useState(true) // Default to true to avoid flash
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function SettingsLayout({
         // Load practice name and ownership status from users table
         const { data: userData } = await supabase
           .from("users")
-          .select("practice_name, team_owner_id, is_team_owner")
+          .select("practice_name, team_owner_id, is_team_owner, is_super_admin")
           .eq("id", session.user.id)
           .single()
 
@@ -52,6 +53,7 @@ export default function SettingsLayout({
           // Check if user is a team owner (either is_team_owner flag or no team_owner_id)
           const ownerStatus = userData.is_team_owner || !userData.team_owner_id
           setIsTeamOwner(ownerStatus)
+          setIsSuperAdmin(userData.is_super_admin || false)
 
           // If user is a team member, fetch owner's practice name
           if (userData.team_owner_id) {
@@ -67,6 +69,11 @@ export default function SettingsLayout({
 
           // Redirect team members away from Team/Billing pages
           if (!ownerStatus && (pathname === "/settings/team" || pathname === "/settings/billing")) {
+            router.push("/settings/profile")
+          }
+
+          // Redirect non-super-admins away from Security page
+          if (!(userData.is_super_admin) && pathname === "/settings/security") {
             router.push("/settings/profile")
           }
         }
@@ -86,6 +93,9 @@ export default function SettingsLayout({
     ...(isTeamOwner ? [
       { name: "Team", href: "/settings/team", icon: Users },
       { name: "Billing", href: "/settings/billing", icon: CreditCard },
+    ] : []),
+    ...(isSuperAdmin ? [
+      { name: "Security", href: "/settings/security", icon: Shield },
     ] : []),
   ]
 
@@ -137,6 +147,25 @@ export default function SettingsLayout({
                     >
                       <CreditCard className="mr-2 h-4 w-4" />
                       Billing
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {isSuperAdmin && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => router.push('/settings/security')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <Shield className="mr-2 h-4 w-4" />
+                      Security
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => router.push('/admin/enterprise-contacts')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <Building2 className="mr-2 h-4 w-4" />
+                      Enterprise CRM
                     </DropdownMenuItem>
                   </>
                 )}

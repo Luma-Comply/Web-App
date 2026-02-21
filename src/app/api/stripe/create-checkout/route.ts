@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { stripe, PRICE_IDS } from "@/lib/stripe";
+import { logAudit } from "@/lib/audit-log";
 
 export async function POST(req: NextRequest) {
   try {
@@ -137,6 +138,13 @@ export async function POST(req: NextRequest) {
         : `${process.env.NEXT_PUBLIC_APP_URL}/checkout`,
       allow_promotion_codes: true,
     });
+
+    logAudit({
+      action: 'checkout_initiated',
+      resourceType: 'settings',
+      userId: authUser.id,
+      metadata: { checkout_session_id: checkoutSession.id },
+    }).catch(() => {})
 
     return NextResponse.json({ url: checkoutSession.url });
   } catch (error: any) {

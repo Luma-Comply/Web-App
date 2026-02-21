@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
+import { logAudit } from "@/lib/audit-log"
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,6 +70,13 @@ export async function POST(request: NextRequest) {
       console.error("Error removing team member:", updateError)
       return NextResponse.json({ error: "Failed to remove team member" }, { status: 500 })
     }
+
+    logAudit({
+      action: 'team_member_removed',
+      resourceType: 'team',
+      userId: session.user.id,
+      metadata: { removed_member_id: memberId },
+    }).catch(() => {})
 
     return NextResponse.json({
       success: true,

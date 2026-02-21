@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { logAudit } from '@/lib/audit-log'
 
 export async function login(formData: FormData) {
     const supabase = await createClient()
@@ -52,6 +53,13 @@ export async function login(formData: FormData) {
             }
         }
     }
+
+    logAudit({
+        action: 'user_login',
+        resourceType: 'auth',
+        userId: user?.id,
+        metadata: { email },
+    }).catch(() => {})
 
     revalidatePath('/', 'layout')
     redirect(redirectTo)
@@ -128,6 +136,13 @@ export async function signup(formData: FormData) {
             }, {
                 onConflict: 'id'
             })
+
+        logAudit({
+            action: 'user_signup',
+            resourceType: 'auth',
+            userId: data.user.id,
+            metadata: { email, practice_name: practiceName },
+        }).catch(() => {})
     }
 
     revalidatePath('/', 'layout')

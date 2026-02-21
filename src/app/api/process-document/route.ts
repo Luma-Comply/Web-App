@@ -4,6 +4,8 @@ import mammoth from "mammoth";
 import { createClient } from "@supabase/supabase-js";
 // @ts-ignore
 import PDFParser from "pdf2json";
+import { logAudit } from "@/lib/audit-log";
+import { checkRateLimit } from "@/lib/rate-limit-middleware";
 
 // --- Configuration ---
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -79,6 +81,9 @@ function getPdfPages(pdfData: any): any[] | null {
 }
 
 export async function POST(req: NextRequest) {
+  const rateLimitResponse = await checkRateLimit(req, { limit: 20, windowMs: 60_000 })
+  if (rateLimitResponse) return rateLimitResponse
+
   const warnings: string[] = [];
 
   try {
@@ -239,6 +244,18 @@ export async function POST(req: NextRequest) {
         // We don't throw here to ensure the client gets the file path back
       }
     }
+
+    logAudit({
+      action: 'document_uploaded',
+      resourceType: 'document',
+      userId: userId || undefined,
+      metadata: {
+        file_name: file.name,
+        file_type: fileType,
+        file_size: file.size,
+        redacted_count: redactedCount,
+      },
+    }).catch(() => {})
 
     return NextResponse.json({
       success: true,
