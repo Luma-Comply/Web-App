@@ -3,6 +3,7 @@ import { IBM_Plex_Mono, Inter, Newsreader } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { Analytics } from "@vercel/analytics/next";
 
 const newsreader = Newsreader({
   subsets: ["latin"],
@@ -123,6 +124,7 @@ export default function RootLayout({
 
       <body className={`${newsreader.variable} ${inter.variable} ${ibmPlexMono.variable} font-sans antialiased`}>
         {children}
+        <Analytics />
         <Toaster />
       </body>
     </html>
