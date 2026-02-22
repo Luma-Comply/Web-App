@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
             const researchPrompt = `
       Find current ${formData.payerName} requirements for
       ${formData.requestedMedication} for ICD-10 ${formData.diagnosisCodes}.
-      Include LCD/NCD requirements, step therapy, and documentation needed.
+      Include LCD/NCD requirements, step therapy, documentation needed, and relevant clinical society guideline recommendations (NCCN, ACR, AAD, AGA, EULAR, AAN as applicable) including guideline name, edition/year, recommendation strength, and where the requested medication falls in the treatment algorithm.
     `;
 
             const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
 
         const model = genAI.getGenerativeModel({
             model: "gemini-2.5-flash",
-            systemInstruction: "You are a medical documentation specialist. Create compliant, professional medical necessity letters.",
+            systemInstruction: "You are a medical documentation specialist. Create compliant, professional medical necessity letters. When research data includes clinical society guideline recommendations (NCCN, ACR, AAD, AGA, EULAR, AAN, etc.), include a Clinical Guideline Support section citing the specific guideline, edition/year, recommendation strength, and how the patient aligns with guideline indications. Do NOT fabricate guideline citations.",
         });
 
         const result = await model.generateContent(generationPrompt);

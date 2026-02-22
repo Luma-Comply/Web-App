@@ -168,7 +168,7 @@ Medication: ${caseData.requested_medication}
 Patient: ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}
 Clinical context: ${clinicalNotes.substring(0, 1000)}
 
-Find: coverage criteria, step therapy requirements, medical necessity requirements.`
+Find: coverage criteria, step therapy requirements, medical necessity requirements, and relevant clinical society guideline recommendations (NCCN, ACR, AAD, AGA, EULAR, AAN as applicable) including guideline name, edition/year, recommendation strength, and where the requested medication falls in the treatment algorithm.`
             }
 
             // Add 20 second timeout to prevent hanging
@@ -182,7 +182,7 @@ Find: coverage criteria, step therapy requirements, medical necessity requiremen
             // Build state-aware system prompt for biologics PA
             const systemPrompt = isBiologicsPA
               ? `You are a Medicare LCD compliance researcher for CTP/skin substitutes. The patient is in ${caseData.patient_state} under ${macInfo?.macName || "Medicare"} (${macInfo?.jurisdiction || "unknown"}). Research LCD ${lcdNumber} requirements SPECIFIC to this MAC.${isWiserState ? ` This is a WISeR pilot state - PA processed by ${macInfo?.aiVendor}.` : ""}`
-              : "You are a medical insurance researcher specializing in payer policies."
+              : "You are a medical insurance researcher specializing in payer policies. In addition to payer-specific criteria, always research and cite relevant clinical society practice guidelines (NCCN, ACR, AAD, AGA, EULAR, AAN, etc.) that support the requested treatment. Include the guideline name, year/edition, and recommendation strength."
 
             const researchResponse = await fetch("https://api.perplexity.ai/chat/completions", {
               method: "POST",
@@ -433,11 +433,17 @@ Medication: ${caseData.requested_medication}`
         }
       }
 
+      const guidelineConcordanceInstruction = `
+GUIDELINE CONCORDANCE:
+When the researched guidelines include clinical society recommendations (NCCN, ACR, AAD, AGA, EULAR, AAN, etc.), include a "Clinical Guideline Support" paragraph in the letter that names the specific guideline and edition/year, states where the requested medication falls in the treatment algorithm, cites the recommendation strength and evidence level if available, and explains how the patient's clinical presentation aligns with guideline-recommended indications. Do NOT fabricate guideline citations — only cite guidelines that appear in the researched data.`
+
       const systemContext = validationResult
         ? `You are an AI for ${isBiologicsPA ? 'CTP prior authorization' : isMedicalNecessity ? 'medical necessity letter' : 'appeal letter'} documentation. Generate professional medical documentation.
 Validation: Risk ${validationResult.auditRisk.overallScore}, ${validationResult.summary.foundCount}/${validationResult.summary.totalRequirements} requirements met.
+${!isBiologicsPA ? guidelineConcordanceInstruction : ''}
 CRITICAL: Use ${PATIENT_PLACEHOLDER} as the patient name throughout. Do NOT invent or extract any patient names, dates of birth, or specific identifiers. Use generalized timeframes.`
         : `You are an AI for medical documentation. Generate professional, persuasive prior authorization letters.
+${guidelineConcordanceInstruction}
 CRITICAL: Use ${PATIENT_PLACEHOLDER} as the patient name throughout. Do NOT invent or extract any patient names, dates of birth, or specific identifiers. Use generalized timeframes.`
 
       const fullPrompt = `${systemContext}

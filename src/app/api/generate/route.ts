@@ -193,6 +193,8 @@ CRITICAL: Research ${caseData.payer_name}'s policy specifically for ${caseData.p
 5. Age-group-specific considerations (${computeAgeTags(caseData.patient_age).age_group} patient${computeAgeTags(caseData.patient_age).is_medicare_eligible ? ', Medicare eligible' : ''})
 6. Medical necessity requirements for ${docTypeLabel}
 7. Any state-specific prior authorization requirements
+8. Clinical society guideline recommendations (e.g., NCCN, ACR, AAD, AGA, EULAR, AAN as applicable to the diagnosis) — include guideline name, edition/year, and where the requested medication falls in the treatment algorithm
+9. Strength of recommendation and level of evidence from applicable clinical society guidelines
 
 Focus on the most current policy bulletins and clinical coverage guidelines for ${caseData.payer_name} in ${caseData.patient_state}.`
         }
@@ -208,7 +210,7 @@ Research the SPECIFIC LCD ${macInfoForPrompt?.lcdPolicyNumber || "L35041"} requi
 ${isWiserActiveForSkinSubs(caseData.patient_state) ? `IMPORTANT: ${caseData.patient_state} is a WISeR pilot state (2026). Prior Authorization is processed by ${macInfoForPrompt?.aiVendor}. Claims without PA go to 100% pre-payment review.` : ""}
 
 Focus on: LCD requirements specific to this MAC, covered product list, current audit focus areas, debridement requirements, vascular testing thresholds, and documentation requirements. Be specific about coverage criteria, SOC failure requirements, and common denial reasons for this specific MAC jurisdiction.`
-          : "You are an expert medical insurance researcher specializing in state-specific payer policies. Find the most current clinical coverage guidelines, policy bulletins, and medical necessity criteria. Pay special attention to state-specific variations as payer policies differ significantly by state (e.g., Cigna in California vs Texas). Be comprehensive, factual, and include all relevant criteria."
+          : "You are an expert medical insurance researcher specializing in state-specific payer policies. Find the most current clinical coverage guidelines, policy bulletins, and medical necessity criteria. Pay special attention to state-specific variations as payer policies differ significantly by state (e.g., Cigna in California vs Texas). In addition to payer-specific criteria, always research and cite relevant clinical society practice guidelines (NCCN, ACR, AAD, AGA, EULAR, AAN, etc.) that support the requested treatment. Include the guideline name, year/edition, and recommendation strength. Be comprehensive, factual, and include all relevant criteria."
 
         const researchResponse = await fetch("https://api.perplexity.ai/chat/completions", {
           method: "POST",
@@ -542,7 +544,7 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
       console.error("Error extracting/saving forms:", formError)
     }
 
-    // --- STEP 2: GENERATE WITH OPENAI ---
+    // --- STEP 2: GENERATE WITH GEMINI ---
 
     // Build user edits context from checklist edits (if any)
     let userEditsContext = ""
@@ -689,6 +691,14 @@ CRITICAL - PATIENT INFORMATION:
     - Start directly with the payer information and subject line.
     - Use actual dates, addresses, and information from the clinical notes when available.
     - If information is not available, simply omit it rather than using placeholders.
+
+    GUIDELINE CONCORDANCE:
+    When the researched guidelines include clinical society recommendations (NCCN, ACR, AAD, AGA, EULAR, AAN, etc.), include a "Clinical Guideline Support" paragraph in the letter that:
+    - Names the specific guideline and edition/year
+    - States where the requested medication falls in the treatment algorithm
+    - Cites the recommendation strength and evidence level if available
+    - Explains how the patient's clinical presentation aligns with guideline-recommended indications
+    Do NOT fabricate guideline citations. Only cite guidelines that appear in the researched data.
 
     CRITICAL - PATIENT INFORMATION:
     - Use ${PATIENT_PLACEHOLDER} as the patient name throughout the letter. Do NOT extract or invent any patient names from the Clinical Notes or elsewhere.
