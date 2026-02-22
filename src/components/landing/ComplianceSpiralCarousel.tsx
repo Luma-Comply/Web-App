@@ -65,7 +65,7 @@ const CARDS = [
     title: "Denial Huddle",
     image: "/stock-photos-ai/AnotherDenialHuddle.webp",
     description:
-      "27% of PAs are denied. Most practices don&apos;t track why. Luma categorizes every denial and shows which payers are hardest to work with.",
+      "27% of PAs are denied. Most practices don\u2019t track why. Luma categorizes every denial and shows which payers are hardest to work with.",
   },
   {
     id: "behind",
@@ -79,7 +79,7 @@ const CARDS = [
 const NUM = CARDS.length
 const GAP_RAD = Math.PI * 0.55
 const GAP_CENTER = -Math.PI / 2
-const RPM = 2.5
+const RPM = 2.0
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t
@@ -91,7 +91,7 @@ function getEnvelope(angle: number) {
   const absDelta = Math.abs(delta)
   const halfGap = GAP_RAD / 2
   if (absDelta <= halfGap) return 0
-  const rampWidth = Math.PI * 0.22
+  const rampWidth = Math.PI * 0.38
   const rampEnd = halfGap + rampWidth
   if (absDelta < rampEnd) {
     const t = (absDelta - halfGap) / rampWidth
@@ -118,7 +118,6 @@ export default function ComplianceSpiralCarousel() {
   const hoverSprings = useRef(CARDS.map(() => ({ scale: 1, velocity: 0 })))
 
   const [expandedCard, setExpandedCard] = useState<string | null>(null)
-  const [showResolution, setShowResolution] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [mobileActiveIndex, setMobileActiveIndex] = useState(0)
 
@@ -175,8 +174,8 @@ export default function ComplianceSpiralCarousel() {
         const env = getEnvelope(angle)
         const x = cx + Math.cos(angle) * dims.rx
         const y = cy + Math.sin(angle) * dims.ry
-        const baseScale = lerp(0.0, 1.05, env)
-        const blur = lerp(10, 0, env)
+        const baseScale = lerp(0.0, 1.0, env)
+        const blur = lerp(8, 0, env)
         const opacity = lerp(0, 1, env)
         const zIndex = Math.round(50 + Math.sin(angle) * 40)
         const tilt = Math.cos(angle) * 10
@@ -227,8 +226,8 @@ export default function ComplianceSpiralCarousel() {
       const env = getEnvelope(angle)
       const x = cx + Math.cos(angle) * dims.rx
       const y = cy + Math.sin(angle) * dims.ry
-      const scale = lerp(0.0, 1.05, env)
-      const blur = lerp(10, 0, env)
+      const scale = lerp(0.0, 1.0, env)
+      const blur = lerp(8, 0, env)
       const opacity = lerp(0, 1, env)
       const zIndex = Math.round(50 + Math.sin(angle) * 40)
       const tilt = Math.cos(angle) * 10
@@ -252,41 +251,6 @@ export default function ComplianceSpiralCarousel() {
     }, 3500)
     return () => clearInterval(timer)
   }, [isMobile, expandedCard, prefersReduced])
-
-  // Intersection observer for center text crossfade
-  useEffect(() => {
-    const section = sectionRef.current
-    if (!section) return
-    let hasTriggered = false
-    let autoTimer: ReturnType<typeof setTimeout> | null = null
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && !hasTriggered) {
-            const delay = prefersReduced ? 0 : 4000
-            autoTimer = setTimeout(() => {
-              if (!hasTriggered) {
-                hasTriggered = true
-                setShowResolution(true)
-              }
-            }, delay)
-          }
-          if (!entry.isIntersecting && autoTimer) {
-            clearTimeout(autoTimer)
-            autoTimer = null
-          }
-        })
-      },
-      { threshold: 0.5 }
-    )
-    observer.observe(section)
-
-    return () => {
-      observer.disconnect()
-      if (autoTimer) clearTimeout(autoTimer)
-    }
-  }, [prefersReduced])
 
   // Escape key to close overlay
   useEffect(() => {
@@ -453,67 +417,30 @@ export default function ComplianceSpiralCarousel() {
       <section
         ref={sectionRef}
         className="w-full flex items-center justify-center"
-        style={{ minHeight: "100vh", backgroundColor: "#edeae2" }}
+        style={{ backgroundColor: "#edeae2" }}
       >
         <div className="w-full flex flex-col items-center md:block md:w-auto">
           {/* Center Text */}
           {isMobile ? (
-            <div className="spiral-center" style={{ marginBottom: 32, paddingTop: 40 }}>
-              <AnimatePresence mode="wait">
-                {!showResolution ? (
-                  <motion.div
-                    key="chaos"
-                    initial={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.4 }}
-                  >
-                    <h2
-                      className="font-serif"
-                      style={{
-                        fontSize: "clamp(36px, 7vw, 42px)",
-                        fontWeight: 900,
-                        lineHeight: 1.0,
-                        color: "#111",
-                        letterSpacing: "-2px",
-                        marginBottom: 16,
-                      }}
-                    >
-                      You didn&apos;t go into medicine for this.
-                    </h2>
-                    <p style={{ fontSize: 16, color: "#444", lineHeight: 1.6 }}>
-                      Prior auths. Denial appeals. LCD lookups.
-                      <br />
-                      45 minutes of hold music. Your patients are waiting.
-                    </p>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="resolution"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    <h2
-                      className="font-serif"
-                      style={{
-                        fontSize: "clamp(36px, 7vw, 42px)",
-                        fontWeight: 900,
-                        lineHeight: 1.0,
-                        color: "#111",
-                        letterSpacing: "-2px",
-                        marginBottom: 16,
-                      }}
-                    >
-                      From 45 minutes to under 2.
-                    </h2>
-                    <p style={{ fontSize: 16, color: "#444", lineHeight: 1.6 }}>
-                      AI-generated medical necessity documentation.
-                      <br />
-                      HIPAA-safe. Audit-proof. So you can focus on patients.
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            <div className="spiral-center" style={{ marginBottom: 24, paddingTop: 20 }}>
+              <h2
+                className="font-serif"
+                style={{
+                  fontSize: "clamp(28px, 6vw, 36px)",
+                  fontWeight: 900,
+                  lineHeight: 1.0,
+                  color: "#111",
+                  letterSpacing: "-1.5px",
+                  marginBottom: 12,
+                }}
+              >
+                Every PA. Under two minutes.
+              </h2>
+              <p style={{ fontSize: 15, color: "#444", lineHeight: 1.6 }}>
+                AI-generated medical necessity documentation.
+                <br />
+                HIPAA-safe. Audit-proof. So you can focus on patients.
+              </p>
             </div>
           ) : null}
 
@@ -522,65 +449,28 @@ export default function ComplianceSpiralCarousel() {
             <div
               ref={sceneRef}
               className="relative mx-auto"
-              style={{ width: 900, height: 900, maxWidth: "100vw", marginTop: -60 }}
+              style={{ width: 900, height: 900, maxWidth: "100vw", marginTop: -120 }}
             >
               {/* Desktop center text */}
               <div className="spiral-center">
-                <AnimatePresence mode="wait">
-                  {!showResolution ? (
-                    <motion.div
-                      key="chaos-desktop"
-                      initial={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.4 }}
-                    >
-                      <h2
-                        className="font-serif"
-                        style={{
-                          fontSize: "clamp(28px, 5vw, 42px)",
-                          fontWeight: 900,
-                          lineHeight: 1.0,
-                          color: "#111",
-                          letterSpacing: "-2px",
-                          marginBottom: 16,
-                        }}
-                      >
-                        You didn&apos;t go into medicine for this.
-                      </h2>
-                      <p style={{ fontSize: 14, color: "#444", lineHeight: 1.6 }}>
-                        Prior auths. Denial appeals. LCD lookups.
-                        <br />
-                        45 minutes of hold music. Your patients are waiting.
-                      </p>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="resolution-desktop"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5 }}
-                    >
-                      <h2
-                        className="font-serif"
-                        style={{
-                          fontSize: "clamp(28px, 5vw, 42px)",
-                          fontWeight: 900,
-                          lineHeight: 1.0,
-                          color: "#111",
-                          letterSpacing: "-2px",
-                          marginBottom: 16,
-                        }}
-                      >
-                        From 45 minutes to under 2.
-                      </h2>
-                      <p style={{ fontSize: 14, color: "#444", lineHeight: 1.6 }}>
-                        AI-generated medical necessity documentation.
-                        <br />
-                        HIPAA-safe. Audit-proof. So you can focus on patients.
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <h2
+                  className="font-serif"
+                  style={{
+                    fontSize: "clamp(26px, 4vw, 36px)",
+                    fontWeight: 900,
+                    lineHeight: 1.0,
+                    color: "#111",
+                    letterSpacing: "-1.5px",
+                    marginBottom: 12,
+                  }}
+                >
+                  Every PA. Under two minutes.
+                </h2>
+                <p style={{ fontSize: 14, color: "#444", lineHeight: 1.6 }}>
+                  AI-generated medical necessity documentation.
+                  <br />
+                  HIPAA-safe. Audit-proof. So you can focus on patients.
+                </p>
               </div>
 
               {/* Orbit cards */}

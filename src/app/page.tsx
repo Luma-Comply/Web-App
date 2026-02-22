@@ -2,6 +2,8 @@ import Hero from "@/components/landing/Hero"
 import StatsBar from "@/components/landing/StatsBar"
 import ProblemSolutionSection from "@/components/landing/ProblemSolutionSection"
 import TimelineSection from "@/components/landing/TimelineSection"
+import ResultsStrip from "@/components/landing/ResultsStrip"
+import SpecialtiesSection from "@/components/landing/SpecialtiesSection"
 import TestimonialsSection from "@/components/landing/TestimonialsSection"
 import ComplianceSpiralCarousel from "@/components/landing/ComplianceSpiralCarousel"
 import { ComplianceSection } from "@/components/landing/ComplianceSection"
@@ -17,6 +19,8 @@ export default function Home() {
       <StatsBar />
       <ProblemSolutionSection />
       <TimelineSection />
+      <ResultsStrip />
+      <SpecialtiesSection />
       <TestimonialsSection />
       <ComplianceSpiralCarousel />
       <ComplianceSection />
