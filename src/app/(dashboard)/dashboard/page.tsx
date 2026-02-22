@@ -904,7 +904,6 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-sans font-semibold text-dark-bg flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-mint" />
                   Web Analytics
                   <span className="text-xs font-normal text-gray-400 ml-1">Last 3 days via Clarity</span>
                 </h2>
