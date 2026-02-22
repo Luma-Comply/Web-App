@@ -1645,8 +1645,7 @@ export default function CaseDetailPage() {
 
                   return (
                     <>
-                      <div className="flex items-center gap-2 mb-4">
-                        <Sparkles className="w-4 h-4 text-mint" />
+                      <div className="mb-4">
                         <h2 className="text-lg md:text-xl font-sans font-semibold text-dark-bg">Submission Readiness</h2>
                       </div>
 
