@@ -26,10 +26,11 @@ import { SuggestedForms } from "@/components/dashboard/SuggestedForms"
 import { LCDValidationPanel } from "@/components/dashboard/LCDValidationPanel"
 import { ChecklistItemEditModal } from "@/components/dashboard/ChecklistItemEditModal"
 import { ChatInterface, ChatInterfaceRef } from "@/components/chat/ChatInterface"
+import { ChatMessage } from "@/components/chat/ChatMessage"
 import { ChatOverlay } from "@/components/chat/ChatOverlay"
 import type { CaseContext } from "@/components/chat/ChatInput"
 import { GeneratingSteps } from "@/components/GeneratingSteps"
-import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, RefreshCw, ChevronDown, MessageSquare, FileText, Image, AlertTriangle, Send, ThumbsUp, ThumbsDown, Clock, Calendar, Hash, FileWarning, Bell, RotateCcw } from "lucide-react"
+import { ArrowLeft, Loader2, Sparkles, Copy, Download, CheckCircle, Check, RefreshCw, ChevronDown, MessageSquare, FileText, Image, AlertTriangle, Send, ThumbsUp, ThumbsDown, Clock, Calendar, Hash, FileWarning, Bell, RotateCcw, Square, X } from "lucide-react"
 import type { LCDValidationResult, ChecklistEdit, ChecklistEditsData, ChecklistItemWithEdits } from "@/lib/lcd-validation"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -144,6 +145,17 @@ export default function CaseDetailPage() {
   const [regenerateAcknowledged, setRegenerateAcknowledged] = useState(false)
   const [generationKey, setGenerationKey] = useState(0) // Forces GeneratingSteps remount on regeneration
   const [isChatExpanded, setIsChatExpanded] = useState(false) // Opens when user clicks "Chat with Luma" card
+  const [isP2POpen, setIsP2POpen] = useState(false)
+  const [p2pRehearsalId, setP2PRehearsalId] = useState<string | null>(null)
+  const [p2pMessages, setP2PMessages] = useState<{ id: string; role: "user" | "assistant"; content: string; created_at: string }[]>([])
+  const [p2pInput, setP2PInput] = useState("")
+  const [p2pStreaming, setP2PStreaming] = useState(false)
+  const [p2pStreamingContent, setP2PStreamingContent] = useState("")
+  const [p2pScore, setP2PScore] = useState<{ overall_readiness: number; strengths: string[]; weaknesses: string[]; suggested_responses: { objection: string; better_response: string }[] } | null>(null)
+  const [p2pEnding, setP2PEnding] = useState(false)
+  const [p2pStatus, setP2PStatus] = useState<"idle" | "active" | "completed">("idle")
+  const p2pEndRef = useRef<HTMLDivElement>(null)
+  const p2pInputRef = useRef<HTMLTextAreaElement>(null)
   const [uploadedDocs, setUploadedDocs] = useState<{ filename: string; fileType: string; storagePath: string | null }[]>([])
   const chatRef = useRef<ChatInterfaceRef>(null)
   const [lcdValidation, setLcdValidation] = useState<{
@@ -879,6 +891,124 @@ export default function CaseDetailPage() {
       toast({ variant: "destructive", title: "Appeal Failed", description: error?.message || "Failed to create appeal case." })
     } finally {
       setIsCreatingAppeal(false)
+    }
+  }
+
+  // ─── Payer Call Practice (P2P Rehearsal) ─────────────────────────
+  async function startP2PSession() {
+    if (!caseData) return
+    setP2PMessages([])
+    setP2PScore(null)
+    setP2PRehearsalId(null)
+    setP2PStatus("idle")
+    setIsP2POpen(true)
+    setP2PStreaming(true)
+    setP2PStreamingContent("")
+
+    try {
+      const response = await fetch("/api/p2p-rehearsal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start", caseId: caseData.id }),
+      })
+      if (!response.ok) throw new Error("Failed to start session")
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error("No stream")
+      const decoder = new TextDecoder()
+      let full = ""
+      let newId: string | null = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        for (const line of decoder.decode(value, { stream: true }).split("\n")) {
+          if (!line.startsWith("data: ") || line === "data: [DONE]") continue
+          try {
+            const d = JSON.parse(line.slice(6))
+            if (d.rehearsalId) { newId = d.rehearsalId; setP2PRehearsalId(d.rehearsalId) }
+            if (d.content) { full += d.content; setP2PStreamingContent(full) }
+          } catch { /* skip malformed */ }
+        }
+      }
+
+      if (full) {
+        setP2PMessages([{ id: "msg-0", role: "assistant", content: full, created_at: new Date().toISOString() }])
+      }
+      setP2PStreamingContent("")
+      setP2PStreaming(false)
+      setP2PStatus("active")
+      if (newId) setP2PRehearsalId(newId)
+      setTimeout(() => p2pInputRef.current?.focus(), 100)
+    } catch {
+      setP2PStreaming(false)
+      toast({ title: "Error", description: "Could not start payer call practice session.", variant: "destructive" })
+    }
+  }
+
+  async function sendP2PMessage() {
+    if (!p2pInput.trim() || p2pStreaming || !p2pRehearsalId || !caseData) return
+    const text = p2pInput.trim()
+    const userMsg = { id: `msg-${p2pMessages.length}`, role: "user" as const, content: text, created_at: new Date().toISOString() }
+    setP2PMessages((prev) => [...prev, userMsg])
+    setP2PInput("")
+    setP2PStreaming(true)
+    setP2PStreamingContent("")
+
+    try {
+      const response = await fetch("/api/p2p-rehearsal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "message", caseId: caseData.id, rehearsalId: p2pRehearsalId, message: text }),
+      })
+      if (!response.ok) throw new Error("Failed to send")
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error("No stream")
+      const decoder = new TextDecoder()
+      let full = ""
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        for (const line of decoder.decode(value, { stream: true }).split("\n")) {
+          if (!line.startsWith("data: ") || line === "data: [DONE]") continue
+          try {
+            const d = JSON.parse(line.slice(6))
+            if (d.content) { full += d.content; setP2PStreamingContent(full) }
+          } catch { /* skip */ }
+        }
+      }
+
+      if (full) {
+        setP2PMessages((prev) => [...prev, { id: `msg-${prev.length}`, role: "assistant", content: full, created_at: new Date().toISOString() }])
+      }
+      setP2PStreamingContent("")
+      setP2PStreaming(false)
+      setTimeout(() => p2pInputRef.current?.focus(), 100)
+    } catch {
+      setP2PStreaming(false)
+      toast({ title: "Error", description: "Failed to get response.", variant: "destructive" })
+    }
+  }
+
+  async function endP2PSession() {
+    if (!p2pRehearsalId || !caseData || p2pEnding) return
+    setP2PEnding(true)
+    try {
+      const response = await fetch("/api/p2p-rehearsal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "end_session", caseId: caseData.id, rehearsalId: p2pRehearsalId }),
+      })
+      if (!response.ok) throw new Error("Failed to score")
+      const scoreData = await response.json()
+      setP2PScore(scoreData)
+      setP2PStatus("completed")
+    } catch {
+      toast({ title: "Error", description: "Could not generate scorecard.", variant: "destructive" })
+    } finally {
+      setP2PEnding(false)
     }
   }
 
@@ -1951,6 +2081,18 @@ export default function CaseDetailPage() {
                       </Button>
                     </div>
                   )}
+                  {/* Payer Call Practice — visible when documentation exists */}
+                  {caseData.generated_output && (
+                    <Button
+                      onClick={startP2PSession}
+                      variant="outline"
+                      className="w-full border-purple-200 text-purple-700 hover:bg-purple-50"
+                      size="sm"
+                    >
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Payer Call Practice
+                    </Button>
+                  )}
                 </div>
 
                 {/* Denial Details (when denied) */}
@@ -2744,6 +2886,182 @@ export default function CaseDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Payer Call Practice Overlay */}
+      <AnimatePresence>
+        {isP2POpen && (
+          <>
+            <motion.div
+              className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+              onClick={() => { if (p2pStatus !== "active" || p2pMessages.length === 0) setIsP2POpen(false) }}
+            />
+            <motion.button
+              className="fixed top-6 right-6 z-[80] w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
+              onClick={() => setIsP2POpen(false)}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1], delay: 0.15 }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              aria-label="Close payer call practice"
+            >
+              <X className="w-5 h-5" />
+            </motion.button>
+            <motion.div
+              className="fixed inset-0 z-[70] flex flex-col"
+              style={{ background: 'linear-gradient(135deg, #131B2E 0%, #0F1629 50%, #0A0E1A 100%)' }}
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative z-[2] flex-1 flex flex-col min-h-0 max-w-3xl w-full mx-auto px-4">
+                {/* Header */}
+                <div className="py-6 flex-shrink-0">
+                  <h2 className="text-xl font-serif font-semibold text-white">Payer Call Practice</h2>
+                  {caseData && (
+                    <p className="text-sm text-white/40 mt-1">
+                      {caseData.patient_first_name} {caseData.patient_last_name} &middot; {caseData.requested_medication || "—"} &middot; {caseData.payer_name || "—"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pb-4" role="log" aria-label="Payer call practice conversation" aria-live="polite">
+                  {p2pStatus === "idle" && p2pStreaming && !p2pStreamingContent && (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-5 h-5 animate-spin text-white/40 mr-2" />
+                      <span className="text-sm text-white/40">Medical director is reviewing your case...</span>
+                    </div>
+                  )}
+                  {p2pMessages.map((msg) => (
+                    <ChatMessage key={msg.id} message={msg} isStreaming={false} patientName={caseData ? `${caseData.patient_first_name} ${caseData.patient_last_name}`.trim() : ""} darkMode />
+                  ))}
+                  {p2pStreamingContent && (
+                    <ChatMessage
+                      message={{ id: "p2p-streaming", role: "assistant", content: p2pStreamingContent, created_at: new Date().toISOString() }}
+                      isStreaming={true}
+                      patientName={caseData ? `${caseData.patient_first_name} ${caseData.patient_last_name}`.trim() : ""}
+                      darkMode
+                    />
+                  )}
+                  <div ref={p2pEndRef} />
+                </div>
+
+                {/* Scorecard */}
+                {p2pScore && (
+                  <div className="flex-shrink-0 mb-4 p-5 rounded-xl bg-white/5 border border-white/10 overflow-y-auto max-h-[50vh]">
+                    <h3 className="text-lg font-serif font-semibold text-white mb-4">Readiness Score</h3>
+                    <div className="flex items-baseline justify-between mb-2">
+                      <span className="text-sm text-white/50">Overall Readiness</span>
+                      <span className={`text-3xl font-bold ${p2pScore.overall_readiness >= 7 ? "text-green-400" : p2pScore.overall_readiness >= 4 ? "text-amber-400" : "text-coral"}`}>
+                        {p2pScore.overall_readiness}/10
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden mb-5">
+                      <div
+                        className={`h-full rounded-full ${p2pScore.overall_readiness >= 7 ? "bg-green-500" : p2pScore.overall_readiness >= 4 ? "bg-amber-500" : "bg-coral"}`}
+                        style={{ width: `${p2pScore.overall_readiness * 10}%` }}
+                      />
+                    </div>
+                    {p2pScore.strengths?.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold text-green-400 uppercase tracking-wider mb-2">Strengths</p>
+                        <ul className="space-y-1">
+                          {p2pScore.strengths.map((s, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-white/70">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5 flex-shrink-0" />{s}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {p2pScore.weaknesses?.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">Areas to Improve</p>
+                        <ul className="space-y-1">
+                          {p2pScore.weaknesses.map((w, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-white/70">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 flex-shrink-0" />{w}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {p2pScore.suggested_responses?.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-2">Suggested Stronger Responses</p>
+                        <div className="space-y-2">
+                          {p2pScore.suggested_responses.map((sr, i) => (
+                            <div key={i} className="p-3 rounded-lg bg-white/5 border border-white/10">
+                              <p className="text-[10px] font-semibold text-white/30 uppercase mb-1">Objection</p>
+                              <p className="text-sm text-white/50 mb-2">{sr.objection}</p>
+                              <p className="text-[10px] font-semibold text-mint uppercase mb-1">Better Response</p>
+                              <p className="text-sm text-white/80">{sr.better_response}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex gap-3 mt-4 pt-3 border-t border-white/10">
+                      <button
+                        onClick={() => { setP2PScore(null); startP2PSession() }}
+                        className="text-sm text-white/50 hover:text-white flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> New Session
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Input */}
+                {p2pStatus === "active" && !p2pScore && (
+                  <div className="flex-shrink-0 pb-6 pt-2 border-t border-white/10">
+                    <div className="flex gap-2">
+                      <textarea
+                        ref={p2pInputRef}
+                        value={p2pInput}
+                        onChange={(e) => setP2PInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendP2PMessage() } }}
+                        placeholder="Defend your prior authorization..."
+                        className="flex-1 resize-none rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-mint/30 focus:border-mint/30"
+                        rows={2}
+                        disabled={p2pStreaming}
+                        aria-label="Your response to the medical director"
+                      />
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={sendP2PMessage}
+                          disabled={!p2pInput.trim() || p2pStreaming}
+                          className="h-10 px-4 rounded-lg bg-white/10 text-white hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center"
+                          aria-label="Send message"
+                        >
+                          {p2pStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        </button>
+                        <button
+                          onClick={endP2PSession}
+                          disabled={p2pStreaming || p2pEnding || p2pMessages.length < 2}
+                          className="h-10 px-3 rounded-lg border border-coral/30 text-coral hover:bg-coral/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center text-xs"
+                          aria-label="End session and get scorecard"
+                        >
+                          {p2pEnding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Square className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-white/20 mt-2">Enter to send · Shift+Enter for new line · End session when ready for your score</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Chat Overlay - Fullscreen chat experience */}
       <ChatOverlay
