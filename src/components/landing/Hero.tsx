@@ -59,7 +59,7 @@ export default function Hero() {
               </span>
             </h1>
 
-            <p className="text-base md:text-lg text-muted-foreground mb-10 max-w-2xl leading-relaxed">
+            <p className="text-base md:text-lg text-foreground/70 mb-10 max-w-2xl leading-relaxed">
               Generate compliant medical necessity documentation in seconds. So you can secure approvals faster and ensure your patients get the treatments they need. Audit-proof, HIPAA-compliant, and built for care.
             </p>
 
