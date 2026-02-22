@@ -48,6 +48,7 @@ export default function CheckoutButton() {
             } else {
                 throw new Error('No checkout URL received');
             }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
             console.error("Checkout error:", error);
             alert(error.message || "Failed to start checkout. Please try again.");

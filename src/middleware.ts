@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 // Polyfill for libraries that expect 'self' to be defined (like some pdf or crypto libs)
 if (typeof self === 'undefined') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     globalThis.self = globalThis as any
 }
 

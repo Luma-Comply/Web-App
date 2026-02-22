@@ -29,7 +29,7 @@ export interface PolicyCheckResult {
   allAlerts: PolicyChangeAlert[]
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     // Verify user is authenticated (basic protection)
     const supabase = await createClient()

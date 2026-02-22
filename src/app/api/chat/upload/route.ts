@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import mammoth from "mammoth"
-// @ts-ignore
 import PDFParser from "pdf2json"
 import * as XLSX from 'xlsx'
 
@@ -35,9 +34,10 @@ async function extractTextFromPDF(buffer: Buffer): Promise<string> {
       reject(new Error("PDF parsing timed out"))
     }, PDF_PARSE_TIMEOUT)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     pdfParser.on("pdfParser_dataError", (err: any) => {
       clearTimeout(timeout)
-      reject(new Error(err.parserError))
+      reject(new Error(err?.parserError || String(err)))
     })
 
     pdfParser.on("pdfParser_dataReady", () => {
@@ -246,6 +246,7 @@ export async function POST(request: NextRequest) {
       summary,
       extractedText,
     })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("Upload error:", error)
     return NextResponse.json(

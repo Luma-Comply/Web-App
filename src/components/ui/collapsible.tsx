@@ -64,8 +64,10 @@ const CollapsibleTrigger = React.forwardRef<
   const { open, onOpenChange } = React.useContext(CollapsibleContext)
 
   if (asChild && React.isValidElement(children)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return React.cloneElement(children as React.ReactElement<any>, {
       onClick: (e: React.MouseEvent) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(children as React.ReactElement<any>).props.onClick?.(e)
         onOpenChange(!open)
       },

@@ -343,11 +343,10 @@ export const MAC_DATA_VERSION = {
  */
 export function detectPolicyChanges(
   perplexityContext: string,
-  patientState: string
+  _patientState: string
 ): PolicyChangeAlert[] {
   const alerts: PolicyChangeAlert[] = []
   const lowerContext = perplexityContext.toLowerCase()
-  const macInfo = getMACInfo(patientState)
 
   // Check for new WISeR states mentioned
   const stateAbbreviations = [

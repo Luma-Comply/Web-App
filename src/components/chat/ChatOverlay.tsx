@@ -25,9 +25,11 @@ export function ChatOverlay({ isOpen, onClose, children }: ChatOverlayProps) {
   useEffect(() => {
     if (isOpen) {
       // Expose on window for ChatInterface to call on message send
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(window as any).__lumaChatGlow = triggerGlow
     }
     return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (window as any).__lumaChatGlow
     }
   }, [isOpen, triggerGlow])

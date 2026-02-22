@@ -33,7 +33,7 @@ const SUFFIXES = ["rn", "bsn", "msn", "md", "do", "np", "pa", "pharmd", "phd", "
 function nameFromLinkedInSlug(url: string): string | null {
   const match = url.match(/linkedin\.com\/in\/([^/?#]+)/i)
   if (!match?.[1]) return null
-  let slug = match[1].replace(/-+/g, " ").trim()
+  const slug = match[1].replace(/-+/g, " ").trim()
 
   // Try to split trailing suffixes: "aguilarrn" → "aguilar rn", "smithmd" → "smith md"
   const words = slug.split(" ")

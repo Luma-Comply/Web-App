@@ -111,7 +111,7 @@ export function SubscriptionBanner({
                 Enjoy unlimited cases during your trial.
               </p>
               <p className="text-sm text-gray-600">
-                After your trial, you'll be charged $399/month for unlimited usage. Cancel anytime.
+                After your trial, you&apos;ll be charged $399/month for unlimited usage. Cancel anytime.
               </p>
             </div>
           </div>

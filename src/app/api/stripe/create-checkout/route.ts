@@ -4,7 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { stripe, PRICE_IDS } from "@/lib/stripe";
 import { logAudit } from "@/lib/audit-log";
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -147,6 +147,7 @@ export async function POST(req: NextRequest) {
     }).catch(() => {})
 
     return NextResponse.json({ url: checkoutSession.url });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("Stripe checkout error:", error);
     return NextResponse.json(

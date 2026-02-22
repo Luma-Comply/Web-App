@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     const invitationToken = crypto.randomBytes(32).toString("hex")
 
     // Create invitation
-    const { data: invitation, error: inviteError } = await supabase
+    const { error: inviteError } = await supabase
       .from("team_invitations")
       .insert({
         team_owner_id: session.user.id,

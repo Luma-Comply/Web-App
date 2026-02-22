@@ -21,7 +21,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   AlertCircle,
-  Info,
   StickyNote,
   Check,
   Pencil,
@@ -516,7 +515,7 @@ export function LCDValidationPanel({
                               </div>
                               {item.evidence && (
                                 <div className="text-xs text-blue-600 mt-0.5 italic">
-                                  Found: "{item.evidence}"
+                                  Found: &quot;{item.evidence}&quot;
                                 </div>
                               )}
                               {item.suggestion &&
@@ -610,7 +609,7 @@ export function LCDValidationPanel({
                       <p className="text-xs text-gray-600">{rec.reason}</p>
                       {rec.suggestedLanguage && (
                         <p className="text-xs text-blue-600 mt-1 italic">
-                          Suggested: "{rec.suggestedLanguage}"
+                          Suggested: &quot;{rec.suggestedLanguage}&quot;
                         </p>
                       )}
                     </div>
@@ -623,6 +622,7 @@ export function LCDValidationPanel({
             {(() => {
               // Handle both LCD fields (currentAuditFocusAreas, recentLcdChanges)
               // and generic fields (auditFocusAreas, recentChanges)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const findings = validation.perplexityFindings as any
               const auditAreas = findings?.currentAuditFocusAreas || findings?.auditFocusAreas || []
               const recentChanges = findings?.recentLcdChanges || findings?.recentChanges || []

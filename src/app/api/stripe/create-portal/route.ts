@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { stripe } from "@/lib/stripe";
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { session } } = await supabase.auth.getSession();
@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ url: portalSession.url });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("Stripe portal error:", error);
     return NextResponse.json(

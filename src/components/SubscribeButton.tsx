@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Loader2, CreditCard } from "lucide-react"
-import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
 export function SubscribeButton({
@@ -14,7 +13,6 @@ export function SubscribeButton({
   isReturningUser?: boolean
 }) {
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   const handleSubscribe = async () => {
     setLoading(true)
@@ -52,6 +50,7 @@ export function SubscribeButton({
       } else {
         throw new Error("No checkout URL received")
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Checkout error:", error)
       alert(error.message || "Failed to start checkout. Please try again.")

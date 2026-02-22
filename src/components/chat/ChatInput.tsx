@@ -87,7 +87,7 @@ export interface CaseContext {
 }
 
 /** Build context-rich presets from real case data */
-function buildPresets(ctx: CaseContext | undefined, riskItems: RiskItem[]): Record<string, PresetPrompt[]> {
+function buildPresets(ctx: CaseContext | undefined, _riskItems: RiskItem[]): Record<string, PresetPrompt[]> {
   if (!ctx) return FALLBACK_PRESETS
 
   const presets: Record<string, PresetPrompt[]> = {

@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
 
         // STEP 1: Research with Perplexity (with caching)
         let researchContent: string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let citations: any[];
 
         const cached = await getCachedResearch(
@@ -125,6 +126,7 @@ export async function POST(req: NextRequest) {
             sources: citations
         });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error('Generation Error:', error);
         return NextResponse.json(

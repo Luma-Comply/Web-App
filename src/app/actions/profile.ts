@@ -43,6 +43,7 @@ export async function updateProfile({ firstName, lastName, email, practiceName }
         }
     )
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {
         user_metadata: {
             first_name: firstName,
@@ -56,7 +57,7 @@ export async function updateProfile({ firstName, lastName, email, practiceName }
     }
 
     // Update user via admin api
-    const { data: updatedUser, error: updateError } = await adminAuth.auth.admin.updateUserById(
+    const { error: updateError } = await adminAuth.auth.admin.updateUserById(
         user.id,
         updateData
     )
@@ -67,6 +68,7 @@ export async function updateProfile({ firstName, lastName, email, practiceName }
     }
 
     // Update public.users table to keep in sync
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const usersUpdateData: any = {
         email: email, // Always ensure email is correct
     }

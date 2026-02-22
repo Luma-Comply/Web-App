@@ -19,8 +19,10 @@ export async function updateSession(request: NextRequest) {
                 getAll() {
                     return request.cookies.getAll()
                 },
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setAll(cookiesToSet: any) {
-                    cookiesToSet.forEach(({ name, value, options }: any) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    cookiesToSet.forEach(({ name, value, options: _options }: any) => {
                         request.cookies.set(name, value)
                     })
                     response = NextResponse.next({
@@ -28,6 +30,7 @@ export async function updateSession(request: NextRequest) {
                             headers: request.headers,
                         },
                     })
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     cookiesToSet.forEach(({ name, value, options }: any) =>
                         response.cookies.set(name, value, options)
                     )

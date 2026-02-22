@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { stripe } from "@/lib/stripe"
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
     const supabase = await createClient()
     const {
@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       message: "Subscription will be canceled at the end of the billing period",
       cancel_at: subscription.cancel_at,
     })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("Stripe cancel error:", error)
     return NextResponse.json(

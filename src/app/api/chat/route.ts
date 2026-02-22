@@ -310,6 +310,7 @@ ${lcdValidationContext}${suggestedFormsContext}`.trim()
         Connection: "keep-alive",
       },
     })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("Error in chat API:", error)
     return new Response(

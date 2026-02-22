@@ -211,6 +211,7 @@ export default function TeamPage() {
       setInviteEmail("")
       setInviteDialogOpen(false)
       loadTeamData()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error inviting team member:", error)
       toast({
@@ -247,6 +248,7 @@ export default function TeamPage() {
       setRemoveDialogOpen(false)
       setMemberToRemove(null)
       loadTeamData()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error removing team member:", error)
       toast({
@@ -277,6 +279,7 @@ export default function TeamPage() {
       })
 
       loadTeamData()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error canceling invitation:", error)
       toast({
@@ -537,7 +540,7 @@ export default function TeamPage() {
           <DialogHeader>
             <DialogTitle>Invite Team Member</DialogTitle>
             <DialogDescription>
-              Send an invitation to add a new team member. They'll receive an email with instructions to join your team.
+              Send an invitation to add a new team member. They&apos;ll receive an email with instructions to join your team.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -660,6 +663,7 @@ export default function TeamPage() {
 
                   // Re-fetch to ensure DB is fully in sync
                   loadTeamData()
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 } catch (error: any) {
                   toast({
                     title: "Error",

@@ -32,7 +32,6 @@ function parseContent(content: string, darkMode = false): React.ReactNode[] {
   let currentList: { type: 'ul' | 'ol'; items: { content: string; value?: number }[] } | null = null;
   let inCodeBlock = false;
   let codeBlockContent: string[] = [];
-  let codeBlockLang = '';
 
   const flushList = () => {
     if (currentList) {
@@ -73,7 +72,6 @@ function parseContent(content: string, darkMode = false): React.ReactNode[] {
         </pre>
       );
       codeBlockContent = [];
-      codeBlockLang = '';
     }
   };
 
@@ -103,7 +101,6 @@ function parseContent(content: string, darkMode = false): React.ReactNode[] {
       } else {
         flushList();
         inCodeBlock = true;
-        codeBlockLang = line.slice(3).trim();
       }
       return;
     }

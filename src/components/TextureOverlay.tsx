@@ -8,7 +8,7 @@ interface TextureOverlayProps {
 
 export default function TextureOverlay({
   intensity = "light",
-  color = "rgba(0, 0, 0, 0.02)",
+  color: _color = "rgba(0, 0, 0, 0.02)",
   className,
 }: TextureOverlayProps) {
   const opacityMap = {

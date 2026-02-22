@@ -19,9 +19,8 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
-import { LumaLogo } from "@/components/LumaLogo"
 import { searchPayers } from "@/lib/payers"
-import { getActiveWiserSkinSubStates, isWiserActiveForSkinSubs, getMACInfo } from "@/lib/mac-jurisdictions"
+import { getActiveWiserSkinSubStates, getMACInfo } from "@/lib/mac-jurisdictions"
 import { icd10ToWoundType } from "@/lib/lcd-requirements"
 import {
   DropdownMenu,
@@ -336,9 +335,6 @@ export default function NewCasePage() {
     formData.patient_state &&
     payerSelected // Only true when payer is selected from dropdown
   )
-  // Step 3 requires either clinical notes (50+ chars) OR uploaded files
-  const isStep3Complete = (pastedText && pastedText.length >= 50) || selectedFiles.length > 0
-
   // Submit handler
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -418,6 +414,7 @@ export default function NewCasePage() {
       // Chat mode only if neither is provided
       const hasClinicaNotes = pastedText && pastedText.length >= 50
       const hasContent = hasClinicaNotes || selectedFiles.length > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const caseInsert: any = {
         user_id: session.user.id,
         created_by_email: session.user.email, // Track who created the case
@@ -509,6 +506,7 @@ export default function NewCasePage() {
       // This matches User intent: "go straight to perplexity ai" (conceptually)
       router.push(`/cases/${caseData.id}`)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error("Error creating case:", err)
       setError(err.message || "Failed to create case")

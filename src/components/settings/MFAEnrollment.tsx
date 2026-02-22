@@ -86,6 +86,7 @@ export function MFAEnrollment() {
       setQrCode(data.totp.qr_code)
       setTotpSecret(data.totp.secret)
       setPendingFactorId(data.id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setEnrollError(err.message || "Failed to start MFA enrollment")
       setStep("idle")
@@ -102,7 +103,7 @@ export function MFAEnrollment() {
     setEnrollError("")
 
     try {
-      const { data, error } = await supabase.auth.mfa.challengeAndVerify({
+      const { error } = await supabase.auth.mfa.challengeAndVerify({
         factorId: pendingFactorId,
         code: verifyCode,
       })
@@ -126,6 +127,7 @@ export function MFAEnrollment() {
         title: "MFA enabled",
         description: "Two-factor authentication is now active on your account.",
       })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setEnrollError(err.message || "Verification failed. Please try again.")
     } finally {
@@ -170,6 +172,7 @@ export function MFAEnrollment() {
         title: "MFA disabled",
         description: "Two-factor authentication has been removed from your account.",
       })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast({
         title: "Error",

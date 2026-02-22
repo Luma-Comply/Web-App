@@ -75,6 +75,7 @@ export async function GET(request: Request) {
 
                 } else {
                     // User exists - update email if changed, and set practice_name if missing
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const updates: any = {}
                     if (existingUser.email !== userEmail) {
                         updates.email = userEmail

@@ -190,10 +190,10 @@ export default function CheckoutPage() {
                   ) : (
                     <>
                       <p className="text-sm text-gray-600 mb-3">
-                        Try Luma free for 7 days. Cancel anytime during the trial and you won't be charged.
+                        Try Luma free for 7 days. Cancel anytime during the trial and you won&apos;t be charged.
                       </p>
                       <p className="text-sm text-gray-600">
-                        After your trial, you'll be automatically charged $399/month. You can cancel or modify your plan anytime.
+                        After your trial, you&apos;ll be automatically charged $399/month. You can cancel or modify your plan anytime.
                       </p>
                     </>
                   )}

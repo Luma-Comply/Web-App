@@ -26,6 +26,7 @@ interface Message {
 
 interface ChatInterfaceProps {
   caseId: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   caseData: any
   onGenerate: () => void
   riskItems?: RiskItem[]
@@ -95,13 +96,15 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(fu
     setStreamingContent('')
 
     // Trigger overlay glow effect on message send
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (typeof window !== 'undefined' && (window as any).__lumaChatGlow) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(window as any).__lumaChatGlow()
     }
 
     try {
       // If there are files, upload them first and collect results
-      let uploadedFileInfo: string[] = []
+      const uploadedFileInfo: string[] = []
       if (files && files.length > 0) {
         setIsUploading(true)
         setUploadProgress(0)

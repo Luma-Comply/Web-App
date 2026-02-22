@@ -84,6 +84,7 @@ function AcceptInvitationContent() {
       })
 
       setLoading(false)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error("Error checking invitation:", err)
       setError("Failed to load invitation details")
@@ -142,6 +143,7 @@ function AcceptInvitationContent() {
       setTimeout(() => {
         router.push("/dashboard")
       }, 2000)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error("Error creating account:", err)
       setError(err.message || "Failed to create account")
@@ -199,7 +201,7 @@ function AcceptInvitationContent() {
               <Users className="w-16 h-16 text-mint" />
             </div>
             <div className="text-center space-y-2">
-              <h2 className="text-xl font-semibold text-dark-bg">You've been invited!</h2>
+              <h2 className="text-xl font-semibold text-dark-bg">You&apos;ve been invited!</h2>
               <p className="text-gray-600">
                 <span className="font-medium">{invitationData.practiceName}</span> has invited you
                 to join their team on Luma.

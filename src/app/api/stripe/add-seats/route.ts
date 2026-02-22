@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
       total_extra_seats: totalExtraSeats,
       total_seats: 3 + totalExtraSeats,
     })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("Add seats error:", error)
     return NextResponse.json(

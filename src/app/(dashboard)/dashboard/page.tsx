@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -45,6 +45,13 @@ import {
   MapPin,
   UserPlus,
   Shield,
+  Clock,
+  AlertTriangle,
+  CalendarClock,
+  XCircle,
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react"
 import {
   Dialog,
@@ -54,8 +61,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { formatDistanceToNow } from "date-fns"
+import { formatDistanceToNow, differenceInDays, format, subMonths, startOfMonth } from "date-fns"
 import { SubscriptionBanner } from "@/components/dashboard/SubscriptionBanner"
+import {
+  AreaChart,
+  DonutChart,
+  BarList,
+  ProgressBar,
+} from "@tremor/react"
 
 interface Case {
   id: string
@@ -69,6 +82,14 @@ interface Case {
   claim_amount: number
   is_archived: boolean
   created_by_email?: string
+  submitted_at: string | null
+  decision_date: string | null
+  denial_category: string | null
+  pa_expiration_date: string | null
+  expected_decision_date: string | null
+  followup_date: string | null
+  parent_case_id: string | null
+  pa_reference_number: string | null
 }
 
 interface PipelineContact {
@@ -122,6 +143,15 @@ const STRATEGY_CONFIG: Record<string, { label: string; className: string }> = {
   design_partner: { label: "Design Partner", className: "bg-pink-100 text-pink-700 border-pink-200" },
 }
 
+const CASE_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  chat: { label: "Chat", className: "bg-purple-100 text-purple-700 border-purple-200" },
+  draft: { label: "Draft", className: "bg-gray-100 text-gray-700 border-gray-200" },
+  generating: { label: "Generating", className: "bg-amber-100 text-amber-700 border-amber-200" },
+  submitted: { label: "Submitted", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  approved: { label: "Approved", className: "bg-green-100 text-green-700 border-green-200" },
+  denied: { label: "Denied", className: "bg-coral/20 text-coral border-coral/30" },
+}
+
 function formatPipelinePrice(low: number | null, high: number | null): string {
   if (!low && !high) return "—"
   if (low && high && low !== high) {
@@ -156,10 +186,14 @@ export default function DashboardPage() {
   const [practiceName, setPracticeName] = useState("")
   const [isTeamOwner, setIsTeamOwner] = useState(true)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [dashboardView, setDashboardView] = useState<"cases" | "analytics">("cases")
   const [activeTab, setActiveTab] = useState("active")
   const [searchQuery, setSearchQuery] = useState("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [caseToDelete, setCaseToDelete] = useState<Case | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [payerSortKey, setPayerSortKey] = useState<"payer" | "cases" | "rate" | "turnaround">("cases")
+  const [payerSortDir, setPayerSortDir] = useState<"asc" | "desc">("desc")
 
   const [stats, setStats] = useState<UserStats>({
     total_cases: 0,
@@ -379,10 +413,202 @@ export default function DashboardPage() {
     (pipelinePage + 1) * PIPELINE_PAGE_SIZE
   )
 
+  // Compute alerts from active (non-archived) cases
+  const activeCases = cases.filter((c) => !c.is_archived)
+  const now = new Date()
+
+  const awaitingDecision = activeCases.filter((c) => c.status === "submitted")
+  const oldestSubmittedDays = awaitingDecision.length > 0
+    ? Math.max(...awaitingDecision.map((c) => differenceInDays(now, new Date(c.submitted_at || c.created_at))))
+    : 0
+
+  const needsFollowUp = activeCases.filter((c) =>
+    c.status === "submitted" && c.expected_decision_date && new Date(c.expected_decision_date) < now
+  )
+
+  const expiringApprovals = activeCases.filter((c) => {
+    if (c.status !== "approved" || !c.pa_expiration_date) return false
+    const expDate = new Date(c.pa_expiration_date)
+    return expDate > now && differenceInDays(expDate, now) <= 30
+  })
+  const soonestExpirationDays = expiringApprovals.length > 0
+    ? Math.min(...expiringApprovals.map((c) => differenceInDays(new Date(c.pa_expiration_date!), now)))
+    : 0
+
+  const deniedCases = activeCases.filter((c) => c.status === "denied")
+
+  const hasAlerts = awaitingDecision.length > 0 || needsFollowUp.length > 0 || expiringApprovals.length > 0 || deniedCases.length > 0
+
+  // Status counts for stats bar (non-archived only)
+  const statusCounts = {
+    draft: activeCases.filter((c) => c.status === "draft" || c.status === "chat").length,
+    submitted: awaitingDecision.length,
+    approved: activeCases.filter((c) => c.status === "approved").length,
+    denied: deniedCases.length,
+  }
+
+  // ═══════════ ANALYTICS COMPUTATIONS ═══════════
+  const analytics = useMemo(() => {
+    const allCases = cases
+    const approved = allCases.filter((c) => c.status === "approved")
+    const denied = allCases.filter((c) => c.status === "denied")
+    const decided = approved.length + denied.length
+
+    // Overall approval rate
+    const approvalRate = decided > 0 ? Math.round((approved.length / decided) * 100) : 0
+
+    // Average turnaround (submitted_at → decision_date)
+    const turnaroundDays: number[] = []
+    allCases.forEach((c) => {
+      if (c.submitted_at && c.decision_date) {
+        const days = differenceInDays(new Date(c.decision_date), new Date(c.submitted_at))
+        if (days >= 0) turnaroundDays.push(days)
+      }
+    })
+    const avgTurnaround = turnaroundDays.length > 0
+      ? Math.round(turnaroundDays.reduce((s, d) => s + d, 0) / turnaroundDays.length)
+      : 0
+
+    // Status distribution for donut chart
+    const statusDistribution = [
+      { name: "Draft", value: allCases.filter((c) => c.status === "draft" || c.status === "chat").length },
+      { name: "Submitted", value: allCases.filter((c) => c.status === "submitted").length },
+      { name: "Approved", value: approved.length },
+      { name: "Denied", value: denied.length },
+    ].filter((s) => s.value > 0)
+
+    // Cases per month (last 12 months)
+    const monthsBack = 12
+    const monthlyData: { month: string; "Cases Created": number; Approved: number; Denied: number }[] = []
+    for (let i = monthsBack - 1; i >= 0; i--) {
+      const monthStart = startOfMonth(subMonths(new Date(), i))
+      const monthEnd = i === 0 ? new Date() : startOfMonth(subMonths(new Date(), i - 1))
+      const monthLabel = format(monthStart, "MMM yyyy")
+      const inRange = allCases.filter((c) => {
+        const d = new Date(c.created_at)
+        return d >= monthStart && d < monthEnd
+      })
+      monthlyData.push({
+        month: monthLabel,
+        "Cases Created": inRange.length,
+        Approved: inRange.filter((c) => c.status === "approved").length,
+        Denied: inRange.filter((c) => c.status === "denied").length,
+      })
+    }
+
+    // Denial breakdown by category
+    const denialMap: Record<string, number> = {}
+    denied.forEach((c) => {
+      const cat = c.denial_category || "Uncategorized"
+      denialMap[cat] = (denialMap[cat] || 0) + 1
+    })
+    const denialBreakdown = Object.entries(denialMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+
+    // Payer comparison
+    const payerMap: Record<string, { total: number; approved: number; denied: number; turnaroundDays: number[]; denialReasons: Record<string, number> }> = {}
+    allCases.forEach((c) => {
+      const payer = c.payer_name || "Unknown"
+      if (!payerMap[payer]) payerMap[payer] = { total: 0, approved: 0, denied: 0, turnaroundDays: [], denialReasons: {} }
+      payerMap[payer].total++
+      if (c.status === "approved") payerMap[payer].approved++
+      if (c.status === "denied") {
+        payerMap[payer].denied++
+        const reason = c.denial_category || "Uncategorized"
+        payerMap[payer].denialReasons[reason] = (payerMap[payer].denialReasons[reason] || 0) + 1
+      }
+      if (c.submitted_at && c.decision_date) {
+        const days = differenceInDays(new Date(c.decision_date), new Date(c.submitted_at))
+        if (days >= 0) payerMap[payer].turnaroundDays.push(days)
+      }
+    })
+
+    const payerComparison = Object.entries(payerMap).map(([payer, data]) => {
+      const decided = data.approved + data.denied
+      const rate = decided > 0 ? Math.round((data.approved / decided) * 100) : null
+      const avgTurn = data.turnaroundDays.length > 0
+        ? Math.round(data.turnaroundDays.reduce((s, d) => s + d, 0) / data.turnaroundDays.length)
+        : null
+      const topDenial = Object.entries(data.denialReasons).sort((a, b) => b[1] - a[1])[0]
+      return {
+        payer,
+        cases: data.total,
+        approved: data.approved,
+        denied: data.denied,
+        rate,
+        avgTurnaround: avgTurn,
+        topDenialReason: topDenial ? topDenial[0] : null,
+      }
+    })
+
+    // Gold Card data: payers with enough decided cases (>=5)
+    const GOLD_CARD_THRESHOLD = 92
+    const goldCardPayers = payerComparison
+      .filter((p) => (p.approved + p.denied) >= 5 && p.rate !== null)
+      .map((p) => ({
+        payer: p.payer,
+        rate: p.rate!,
+        threshold: GOLD_CARD_THRESHOLD,
+        eligible: p.rate! >= GOLD_CARD_THRESHOLD,
+        decidedCount: p.approved + p.denied,
+      }))
+
+    return {
+      approvalRate,
+      avgTurnaround,
+      totalDecided: decided,
+      statusDistribution,
+      monthlyData,
+      denialBreakdown,
+      payerComparison,
+      goldCardPayers,
+    }
+  }, [cases])
+
+  // Payer comparison sorting
+  const sortedPayers = useMemo(() => {
+    const sorted = [...analytics.payerComparison]
+    sorted.sort((a, b) => {
+      let aVal: number | string, bVal: number | string
+      switch (payerSortKey) {
+        case "payer": aVal = a.payer.toLowerCase(); bVal = b.payer.toLowerCase(); break
+        case "cases": aVal = a.cases; bVal = b.cases; break
+        case "rate": aVal = a.rate ?? -1; bVal = b.rate ?? -1; break
+        case "turnaround": aVal = a.avgTurnaround ?? 999; bVal = b.avgTurnaround ?? 999; break
+        default: aVal = a.cases; bVal = b.cases
+      }
+      if (aVal < bVal) return payerSortDir === "asc" ? -1 : 1
+      if (aVal > bVal) return payerSortDir === "asc" ? 1 : -1
+      return 0
+    })
+    return sorted
+  }, [analytics.payerComparison, payerSortKey, payerSortDir])
+
+  function handlePayerSort(key: typeof payerSortKey) {
+    if (payerSortKey === key) {
+      setPayerSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setPayerSortKey(key)
+      setPayerSortDir("desc")
+    }
+  }
+
   const displayCases = cases.filter((c) => {
     const matchesTab = activeTab === "archived" ? c.is_archived === true : !c.is_archived
 
-    if (!searchQuery.trim()) return matchesTab
+    // Status sub-filter only applies to active tab
+    if (activeTab !== "archived" && statusFilter !== "all") {
+      if (statusFilter === "submitted" && c.status !== "submitted") return false
+      if (statusFilter === "approved" && c.status !== "approved") return false
+      if (statusFilter === "denied" && c.status !== "denied") return false
+      if (statusFilter === "followup" && !(c.status === "submitted" && c.expected_decision_date && new Date(c.expected_decision_date) < now)) return false
+      if (statusFilter === "expiring" && !(c.status === "approved" && c.pa_expiration_date && new Date(c.pa_expiration_date) > now && differenceInDays(new Date(c.pa_expiration_date), now) <= 30)) return false
+    }
+
+    if (!matchesTab) return false
+
+    if (!searchQuery.trim()) return true
 
     const query = searchQuery.toLowerCase()
     const matchesSearch =
@@ -393,7 +619,7 @@ export default function DashboardPage() {
       c.created_by_email?.toLowerCase().includes(query) ||
       `${c.patient_first_name} ${c.patient_last_name}`.toLowerCase().includes(query)
 
-    return matchesTab && matchesSearch
+    return matchesSearch
   })
 
   const getDocTypeLabel = (docType: string) => {
@@ -719,7 +945,346 @@ export default function DashboardPage() {
 
         {/* ═══════════ CASE MANAGEMENT ═══════════ */}
         <div className="space-y-4">
-          <h1 className="text-2xl font-sans font-semibold text-dark-bg">Case Management</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-sans font-semibold text-dark-bg">Case Management</h1>
+            <div className="flex items-center gap-1 bg-white/50 border border-sage-medium/30 rounded-lg p-1">
+              <button
+                onClick={() => setDashboardView("cases")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                  dashboardView === "cases"
+                    ? "bg-white text-dark-bg shadow-sm"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
+                }`}
+              >
+                Cases
+              </button>
+              <button
+                onClick={() => setDashboardView("analytics")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                  dashboardView === "analytics"
+                    ? "bg-white text-dark-bg shadow-sm"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                Analytics
+              </button>
+            </div>
+          </div>
+
+          {/* ═══════════ ANALYTICS VIEW ═══════════ */}
+          {dashboardView === "analytics" && (
+            <div className="space-y-6">
+              {/* Core Metrics Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Approval Rate</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <p className="text-3xl font-bold text-dark-bg">{analytics.approvalRate}%</p>
+                    {analytics.totalDecided > 0 && (
+                      <span className="text-xs text-gray-400">of {analytics.totalDecided} decided</span>
+                    )}
+                  </div>
+                  {analytics.approvalRate >= 80 ? (
+                    <div className="flex items-center gap-1 mt-2 text-xs text-green-600">
+                      <TrendingUp className="w-3 h-3" />
+                      <span>Strong performance</span>
+                    </div>
+                  ) : analytics.totalDecided > 0 ? (
+                    <div className="flex items-center gap-1 mt-2 text-xs text-coral">
+                      <TrendingDown className="w-3 h-3" />
+                      <span>Below 80% target</span>
+                    </div>
+                  ) : null}
+                </Card>
+
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Avg Turnaround</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <p className="text-3xl font-bold text-dark-bg">
+                      {analytics.avgTurnaround > 0 ? `${analytics.avgTurnaround}d` : "--"}
+                    </p>
+                    {analytics.avgTurnaround > 0 && (
+                      <span className="text-xs text-gray-400">submission to decision</span>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Cases</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <p className="text-3xl font-bold text-dark-bg">{cases.length}</p>
+                    <span className="text-xs text-gray-400">all time</span>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Charts Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Cases Per Month Area Chart */}
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-sm font-semibold text-dark-bg mb-4">Cases Per Month</p>
+                  {analytics.monthlyData.some((m) => m["Cases Created"] > 0) ? (
+                    <AreaChart
+                      className="h-56"
+                      data={analytics.monthlyData}
+                      index="month"
+                      categories={["Cases Created", "Approved", "Denied"]}
+                      colors={["blue", "emerald", "rose"]}
+                      showLegend={true}
+                      showGridLines={false}
+                      curveType="monotone"
+                      valueFormatter={(v: number) => String(v)}
+                    />
+                  ) : (
+                    <div className="h-56 flex items-center justify-center text-gray-400 text-sm">
+                      No case data available yet
+                    </div>
+                  )}
+                </Card>
+
+                {/* Status Distribution Donut */}
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-sm font-semibold text-dark-bg mb-4">Status Distribution</p>
+                  {analytics.statusDistribution.length > 0 ? (
+                    <div className="flex items-center gap-6">
+                      <DonutChart
+                        className="h-48 w-48 flex-shrink-0"
+                        data={analytics.statusDistribution}
+                        category="value"
+                        index="name"
+                        colors={["gray", "blue", "emerald", "rose"]}
+                        showAnimation={true}
+                        valueFormatter={(v: number) => String(v)}
+                      />
+                      <div className="flex flex-col gap-2">
+                        {analytics.statusDistribution.map((s) => (
+                          <div key={s.name} className="flex items-center gap-2 text-sm">
+                            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                              s.name === "Draft" ? "bg-gray-400" :
+                              s.name === "Submitted" ? "bg-blue-500" :
+                              s.name === "Approved" ? "bg-emerald-500" :
+                              "bg-rose-500"
+                            }`} />
+                            <span className="text-gray-600">{s.name}</span>
+                            <span className="font-semibold text-dark-bg">{s.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
+                      No case data available yet
+                    </div>
+                  )}
+                </Card>
+              </div>
+
+              {/* Denial Breakdown */}
+              {analytics.denialBreakdown.length > 0 && (
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-sm font-semibold text-dark-bg mb-4">Denial Reasons</p>
+                  <BarList
+                    data={analytics.denialBreakdown}
+                    color="rose"
+                    valueFormatter={(v: number) => String(v)}
+                    className="[&>div]:text-sm"
+                  />
+                </Card>
+              )}
+
+              {/* Payer Comparison Table */}
+              {analytics.payerComparison.length > 0 && (
+                <Card className="glass-card border border-sage-medium/30 overflow-hidden">
+                  <div className="p-5 pb-0">
+                    <p className="text-sm font-semibold text-dark-bg mb-4">Payer Comparison</p>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
+                        <TableHead
+                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
+                          onClick={() => handlePayerSort("payer")}
+                        >
+                          <span className="flex items-center gap-1">
+                            Payer
+                            {payerSortKey === "payer" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
+                          </span>
+                        </TableHead>
+                        <TableHead
+                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
+                          onClick={() => handlePayerSort("cases")}
+                        >
+                          <span className="flex items-center gap-1">
+                            Cases
+                            {payerSortKey === "cases" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
+                          </span>
+                        </TableHead>
+                        <TableHead className="text-dark-bg font-semibold">Approved</TableHead>
+                        <TableHead className="text-dark-bg font-semibold">Denied</TableHead>
+                        <TableHead
+                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
+                          onClick={() => handlePayerSort("rate")}
+                        >
+                          <span className="flex items-center gap-1">
+                            Approval Rate
+                            {payerSortKey === "rate" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
+                          </span>
+                        </TableHead>
+                        <TableHead
+                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
+                          onClick={() => handlePayerSort("turnaround")}
+                        >
+                          <span className="flex items-center gap-1">
+                            Avg Turnaround
+                            {payerSortKey === "turnaround" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
+                          </span>
+                        </TableHead>
+                        <TableHead className="text-dark-bg font-semibold">Top Denial Reason</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedPayers.map((p) => (
+                        <TableRow key={p.payer} className="hover:bg-sage-light/20 transition-colors">
+                          <TableCell className="font-semibold text-dark-bg text-sm">{p.payer}</TableCell>
+                          <TableCell className="text-sm text-gray-700">{p.cases}</TableCell>
+                          <TableCell className="text-sm text-gray-700">{p.approved}</TableCell>
+                          <TableCell className="text-sm text-gray-700">{p.denied}</TableCell>
+                          <TableCell>
+                            {p.rate !== null ? (
+                              <span className={`inline-flex items-center gap-1 text-sm font-semibold ${
+                                p.rate >= 80 ? "text-green-600" : p.rate >= 60 ? "text-amber-600" : "text-coral"
+                              }`}>
+                                {p.rate >= 80 ? (
+                                  <TrendingUp className="w-3.5 h-3.5" />
+                                ) : p.rate < 60 ? (
+                                  <TrendingDown className="w-3.5 h-3.5" />
+                                ) : null}
+                                {p.rate}%
+                              </span>
+                            ) : (
+                              <span className="text-sm text-gray-400">--</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-700">
+                            {p.avgTurnaround !== null ? `${p.avgTurnaround}d` : "--"}
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-500 max-w-[180px] truncate">
+                            {p.topDenialReason || "--"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+              )}
+
+              {/* Gold Card Tracker */}
+              {analytics.goldCardPayers.length > 0 && (
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <div className="mb-4">
+                    <p className="text-sm font-semibold text-dark-bg">Gold Card Tracker</p>
+                    <p className="text-xs text-gray-400 mt-0.5">92% approval rate threshold for gold card eligibility</p>
+                  </div>
+                  <div className="space-y-4">
+                    {analytics.goldCardPayers.map((g) => (
+                      <div key={g.payer} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium text-dark-bg">{g.payer}</span>
+                          <span className={`font-semibold ${g.eligible ? "text-green-600" : "text-gray-600"}`}>
+                            {g.rate}%
+                            {g.eligible && (
+                              <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">
+                                Eligible
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <ProgressBar
+                          value={Math.min(g.rate, 100)}
+                          color={g.eligible ? "emerald" : g.rate >= 80 ? "blue" : "rose"}
+                          className="h-2"
+                        />
+                        <p className="text-[11px] text-gray-400">
+                          {g.eligible
+                            ? `Approval rate exceeds ${g.threshold}% threshold (${g.decidedCount} decided cases)`
+                            : `${g.threshold - g.rate}% below gold card threshold (${g.decidedCount} decided cases)`
+                          }
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Empty state for analytics */}
+              {cases.length === 0 && (
+                <Card className="glass-card border border-sage-medium/30 p-12 text-center">
+                  <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm">No case data available for analytics.</p>
+                  <p className="text-gray-400 text-xs mt-1">Create cases to see charts and metrics here.</p>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* ═══════════ CASES VIEW (existing) ═══════════ */}
+          {dashboardView === "cases" && <>
+          {/* Alerts Bar */}
+          {hasAlerts && (
+            <Card className="flex flex-wrap items-center gap-3 md:gap-5 p-3 px-6 glass-card border border-sage-medium/30">
+              {awaitingDecision.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("active"); setStatusFilter("submitted") }}
+                  className="flex items-center gap-1.5 text-sm text-blue-700 hover:text-blue-900 transition-colors cursor-pointer"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span className="font-medium">{awaitingDecision.length}</span>
+                  <span className="text-blue-600">awaiting decision</span>
+                  <span className="text-blue-400 text-xs">(oldest: {oldestSubmittedDays}d)</span>
+                </button>
+              )}
+              {awaitingDecision.length > 0 && (needsFollowUp.length > 0 || expiringApprovals.length > 0 || deniedCases.length > 0) && (
+                <div className="w-px h-5 bg-sage-medium/30" />
+              )}
+              {needsFollowUp.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("active"); setStatusFilter("followup") }}
+                  className="flex items-center gap-1.5 text-sm text-amber-700 hover:text-amber-900 transition-colors cursor-pointer"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span className="font-medium">{needsFollowUp.length}</span>
+                  <span className="text-amber-600">need follow-up</span>
+                </button>
+              )}
+              {needsFollowUp.length > 0 && (expiringApprovals.length > 0 || deniedCases.length > 0) && (
+                <div className="w-px h-5 bg-sage-medium/30" />
+              )}
+              {expiringApprovals.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("active"); setStatusFilter("expiring") }}
+                  className="flex items-center gap-1.5 text-sm text-amber-700 hover:text-amber-900 transition-colors cursor-pointer"
+                >
+                  <CalendarClock className="w-3.5 h-3.5" />
+                  <span className="font-medium">{expiringApprovals.length}</span>
+                  <span className="text-amber-600">PA expiring in {soonestExpirationDays}d</span>
+                </button>
+              )}
+              {expiringApprovals.length > 0 && deniedCases.length > 0 && (
+                <div className="w-px h-5 bg-sage-medium/30" />
+              )}
+              {deniedCases.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("active"); setStatusFilter("denied") }}
+                  className="flex items-center gap-1.5 text-sm text-coral hover:text-coral/80 transition-colors cursor-pointer"
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span className="font-medium">{deniedCases.length}</span>
+                  <span>denied</span>
+                </button>
+              )}
+            </Card>
+          )}
 
           {/* Case Stats Bar */}
           <Card className="flex flex-wrap items-center gap-6 md:gap-8 p-4 px-8 glass-card border border-sage-medium/30">
@@ -737,6 +1302,41 @@ export default function DashboardPage() {
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Revenue Protected</p>
               <p className="text-2xl font-bold leading-none text-dark-bg">${stats.revenue_protected.toLocaleString()}</p>
             </div>
+            {(statusCounts.draft > 0 || statusCounts.submitted > 0 || statusCounts.approved > 0 || statusCounts.denied > 0) && (
+              <>
+                <div className="w-px h-10 bg-sage-medium/20" />
+                <div className="flex items-center gap-4">
+                  {statusCounts.draft > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-gray-400" />
+                      <span className="text-sm font-medium text-gray-600">{statusCounts.draft}</span>
+                      <span className="text-xs text-gray-400">Draft</span>
+                    </div>
+                  )}
+                  {statusCounts.submitted > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="text-sm font-medium text-gray-600">{statusCounts.submitted}</span>
+                      <span className="text-xs text-gray-400">Submitted</span>
+                    </div>
+                  )}
+                  {statusCounts.approved > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="text-sm font-medium text-gray-600">{statusCounts.approved}</span>
+                      <span className="text-xs text-gray-400">Approved</span>
+                    </div>
+                  )}
+                  {statusCounts.denied > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-coral" />
+                      <span className="text-sm font-medium text-gray-600">{statusCounts.denied}</span>
+                      <span className="text-xs text-gray-400">Denied</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Show subscription badge here if no pipeline section above */}
             {!pipeline && isTeamOwner && subscription.subscription_status === "trialing" && subscription.trial_ends_at && (
@@ -775,15 +1375,39 @@ export default function DashboardPage() {
           </Card>
 
           {/* Cases Table */}
-          <Tabs defaultValue="active" onValueChange={setActiveTab} className="w-full">
+          <Tabs defaultValue="active" onValueChange={(v) => { setActiveTab(v); if (v === "archived") setStatusFilter("all") }} className="w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-              <TabsList className="bg-white/50 border border-sage-medium/30">
-                <TabsTrigger value="active" className="data-[state=active]:bg-white">Active Cases</TabsTrigger>
-                <TabsTrigger value="archived" className="gap-2 data-[state=active]:bg-white">
-                  Archived
-                  <Archive className="w-3 h-3" />
-                </TabsTrigger>
-              </TabsList>
+              <div className="flex items-center gap-2">
+                <TabsList className="bg-white/50 border border-sage-medium/30">
+                  <TabsTrigger value="active" className="data-[state=active]:bg-white">Active Cases</TabsTrigger>
+                  <TabsTrigger value="archived" className="gap-2 data-[state=active]:bg-white">
+                    Archived
+                    <Archive className="w-3 h-3" />
+                  </TabsTrigger>
+                </TabsList>
+                {activeTab !== "archived" && (
+                  <div className="flex items-center gap-1 ml-2">
+                    {[
+                      { value: "all", label: "All" },
+                      { value: "submitted", label: "Submitted" },
+                      { value: "approved", label: "Approved" },
+                      { value: "denied", label: "Denied" },
+                    ].map((f) => (
+                      <button
+                        key={f.value}
+                        onClick={() => setStatusFilter(f.value)}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+                          statusFilter === f.value
+                            ? "bg-dark-bg text-white"
+                            : "text-gray-500 hover:bg-gray-100"
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -803,6 +1427,7 @@ export default function DashboardPage() {
                   <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
                     <TableHead className="w-[200px] lg:w-[280px] text-dark-bg font-semibold">Patient & Document</TableHead>
                     <TableHead className="text-dark-bg font-semibold">Payer</TableHead>
+                    <TableHead className="hidden sm:table-cell text-dark-bg font-semibold">Status</TableHead>
                     <TableHead className="hidden sm:table-cell text-dark-bg font-semibold">Created</TableHead>
                     <TableHead className="hidden lg:table-cell text-dark-bg font-semibold">Created By</TableHead>
                     <TableHead className="text-right text-dark-bg font-semibold">Claim Value</TableHead>
@@ -812,12 +1437,14 @@ export default function DashboardPage() {
                 <TableBody>
                   {displayCases.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-32 text-center text-gray-500">
+                      <TableCell colSpan={7} className="h-32 text-center text-gray-500">
                         {searchQuery.trim()
                           ? `No cases found matching "${searchQuery}"`
-                          : activeTab === 'active'
-                            ? "No active cases found. Create a new case to get started."
-                            : "No archived cases."}
+                          : statusFilter !== "all"
+                            ? `No ${statusFilter} cases found.`
+                            : activeTab === 'active'
+                              ? "No active cases found. Create a new case to get started."
+                              : "No archived cases."}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -835,6 +1462,22 @@ export default function DashboardPage() {
                         </TableCell>
                         <TableCell className="text-gray-700 text-sm">
                           {c.payer_name || '-'}
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <div className="flex flex-col gap-0.5">
+                            <Badge variant="outline" className={`text-[10px] w-fit ${CASE_STATUS_CONFIG[c.status]?.className || "bg-gray-100 text-gray-700 border-gray-200"}`}>
+                              {CASE_STATUS_CONFIG[c.status]?.label || c.status}
+                            </Badge>
+                            {c.status === "submitted" && c.submitted_at && (
+                              <span className="text-[10px] text-gray-400">{differenceInDays(now, new Date(c.submitted_at))}d ago</span>
+                            )}
+                            {c.status === "approved" && c.pa_expiration_date && (
+                              <span className="text-[10px] text-gray-400">Expires {format(new Date(c.pa_expiration_date), "MMM d")}</span>
+                            )}
+                            {c.status === "denied" && c.denial_category && (
+                              <span className="text-[10px] text-gray-400 truncate max-w-[120px]">{c.denial_category}</span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell text-gray-700 text-sm">
                           {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
@@ -894,6 +1537,7 @@ export default function DashboardPage() {
               </Table>
             </Card>
           </Tabs>
+          </>}
         </div>
       </div>
 

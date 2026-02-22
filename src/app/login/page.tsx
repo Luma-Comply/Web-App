@@ -160,7 +160,7 @@ function LoginForm() {
 
                 <div className="mt-8 pt-6 border-t border-gray-200 text-center">
                   <p className="text-gray-600">
-                    Don't have an account?{" "}
+                    Don&apos;t have an account?{" "}
                     <Link
                       href="/signup"
                       className="font-semibold text-mint hover:text-mint/80 transition-colors"

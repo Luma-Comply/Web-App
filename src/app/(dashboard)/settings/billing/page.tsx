@@ -100,6 +100,7 @@ export default function BillingPage() {
 
       // Redirect to Stripe portal
       window.location.href = data.url
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error accessing billing portal:", error)
       toast({
@@ -131,6 +132,7 @@ export default function BillingPage() {
 
       setCancelDialogOpen(false)
       loadBillingInfo()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error canceling subscription:", error)
       toast({
@@ -147,7 +149,6 @@ export default function BillingPage() {
     return <BillingLoading />
   }
 
-  const isTrialing = billingInfo?.subscription_status === "trialing"
   const isActive = billingInfo?.subscription_status === "active"
   const isCanceled = billingInfo?.subscription_status === "canceled"
   const isPastDue = billingInfo?.subscription_status === "past_due"
@@ -300,7 +301,7 @@ export default function BillingPage() {
             <div>
               <h3 className="text-lg font-semibold text-dark-bg mb-1">Cancel Subscription</h3>
               <p className="text-sm text-gray-600">
-                You can cancel your subscription at any time. You'll continue to have access until
+                You can cancel your subscription at any time. You&apos;ll continue to have access until
                 the end of your current billing period.
               </p>
             </div>
@@ -340,7 +341,7 @@ export default function BillingPage() {
           <DialogHeader>
             <DialogTitle>Cancel Subscription?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel your subscription? You'll continue to have access
+              Are you sure you want to cancel your subscription? You&apos;ll continue to have access
               until the end of your current billing period.
             </DialogDescription>
           </DialogHeader>

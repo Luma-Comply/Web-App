@@ -98,7 +98,6 @@ export function SuggestedForms({ caseId, lastGenerated }: SuggestedFormsProps) {
                 form.description
             ])
 
-            // @ts-ignore
             autoTable(doc, {
                 startY: 55,
                 head: [['Document Name', 'Type', 'Confidence', 'Reasoning']],
@@ -117,6 +116,7 @@ export function SuggestedForms({ caseId, lastGenerated }: SuggestedFormsProps) {
                     2: { cellWidth: 25 }, // Confidence - Increased to fit header
                     3: { cellWidth: 'auto' } // Description - Maximize space
                 },
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 didParseCell: function (data: any) {
                     // Color coordinate Confidence column
                     if (data.section === 'body' && data.column.index === 2) {

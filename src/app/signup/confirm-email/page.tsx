@@ -60,7 +60,7 @@ function ConfirmEmailContent() {
                   Check your email
                 </h1>
                 <p className="text-gray-600">
-                  We've sent a confirmation link to
+                  We&apos;ve sent a confirmation link to
                 </p>
                 {email && (
                   <p className="text-dark-bg font-semibold mt-1">

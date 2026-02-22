@@ -115,6 +115,7 @@ function EmptyCircle() {
 interface GeneratingStepsProps {
   caseId: string
   docType?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onComplete?: (result: any) => void
   onError?: (error: string) => void
   onRetry?: () => void
@@ -292,6 +293,7 @@ export function GeneratingSteps({ caseId, docType, onComplete, onError, onRetry 
           await new Promise(resolve => setTimeout(resolve, 1000))
           await pollForCompletion()
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         if (!isCancelled) {
           if (pollInterval) clearInterval(pollInterval)
@@ -420,7 +422,7 @@ export function GeneratingSteps({ caseId, docType, onComplete, onError, onRetry 
               transition={{ duration: 0.3 }}
               className="text-sm text-gray-500 italic max-w-sm"
             >
-              "{tidbits[tidbitIndex]}"
+              &quot;{tidbits[tidbitIndex]}&quot;
             </motion.p>
           </AnimatePresence>
         </div>

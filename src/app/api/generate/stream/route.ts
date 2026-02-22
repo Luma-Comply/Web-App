@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
   const writer = writable.getWriter()
 
   // Helper to send and flush events immediately
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sendEvent = async (data: any) => {
     console.log('[SSE] Sending event:', JSON.stringify(data).substring(0, 200))
     await writer.write(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
@@ -218,6 +219,7 @@ Find: coverage criteria, step therapy requirements, medical necessity requiremen
                 researchData.citations || []
               ).catch(() => {})
             }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (ppError: any) {
             if (ppError.name === 'AbortError') {
               console.error("[SSE] Perplexity Call Timed Out after 20s")
@@ -314,6 +316,7 @@ Medication: ${caseData.requested_medication}`
         const suggestedForms = formsOutput.forms || []
 
         if (suggestedForms.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const formsToInsert = suggestedForms.map((form: any) => ({
             case_id: caseId,
             title: form.title || 'Untitled Document',
@@ -515,6 +518,7 @@ Note: These recommendations are based on AI analysis of current payer policies. 
       // --- PHASE: saving ---
       await sendEvent({ phase: 'saving' })
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updateData: any = {
         generated_output: documentation,
         edited_output: documentation,
@@ -598,6 +602,7 @@ Note: These recommendations are based on AI analysis of current payer policies. 
       }
 
       // Build result
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result: any = {
         success: true,
         documentation,
@@ -645,6 +650,7 @@ Note: These recommendations are based on AI analysis of current payer policies. 
       await writer.write(encoder.encode("data: [DONE]\n\n"))
       await writer.close()
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error in generate stream:", error)
 

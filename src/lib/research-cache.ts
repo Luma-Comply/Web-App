@@ -26,6 +26,7 @@ export async function getCachedResearch(
   medication: string,
   state: string,
   docType: string
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ research_result: string; citations: any[] } | null> {
   try {
     const cacheKey = generateCacheKey(payer, medication, state, docType)
@@ -43,6 +44,7 @@ export async function getCachedResearch(
     console.log(`[ResearchCache] HIT for ${cacheKey}`)
     return {
       research_result: data.research_result as string,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       citations: (data.citations as any[]) || [],
     }
   } catch {
@@ -62,6 +64,7 @@ export async function cacheResearch(
   state: string,
   docType: string,
   researchResult: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   citations: any[]
 ): Promise<void> {
   const cacheKey = generateCacheKey(payer, medication, state, docType)

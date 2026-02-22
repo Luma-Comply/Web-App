@@ -26,7 +26,6 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
-  const [originalEmail, setOriginalEmail] = useState("")
 
   // Organization info
   const [practiceName, setPracticeName] = useState("")
@@ -77,7 +76,6 @@ export default function ProfilePage() {
 
       const userEmail = session.user.email || ""
       setEmail(userEmail)
-      setOriginalEmail(userEmail)
 
       // Load user metadata if available
       const metadata = session.user.user_metadata || {}
@@ -138,10 +136,6 @@ export default function ProfilePage() {
         const { data: { session } } = await supabase.auth.refreshSession()
         if (session?.user) {
           setEmail(session.user.email || email)
-          setOriginalEmail(session.user.email || email)
-        } else {
-          // Fallback if refresh doesn't immediately reflect
-          setOriginalEmail(email)
         }
 
         toast({
@@ -149,6 +143,7 @@ export default function ProfilePage() {
           description: "Profile updated successfully",
         })
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error updating profile:", error)
       toast({
@@ -187,6 +182,7 @@ export default function ProfilePage() {
           variant: "destructive",
         })
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error updating password:", error)
       toast({

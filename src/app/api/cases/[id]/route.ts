@@ -37,6 +37,7 @@ export async function GET(
         'Pragma': 'no-cache',
       }
     })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("Error fetching case:", error)
     return NextResponse.json(

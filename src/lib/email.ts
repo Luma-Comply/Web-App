@@ -11,7 +11,7 @@ export interface SendInvitationEmailParams {
 
 export async function sendInvitationEmail({
   to,
-  inviterEmail,
+  inviterEmail: _inviterEmail,
   practiceName,
   invitationLink,
 }: SendInvitationEmailParams) {

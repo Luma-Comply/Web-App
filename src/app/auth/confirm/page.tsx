@@ -31,6 +31,7 @@ function AuthConfirmContent() {
       if (token_hash && type) {
         const { data, error } = await supabase.auth.verifyOtp({
           token_hash,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           type: type as any,
         })
 
@@ -70,6 +71,7 @@ function AuthConfirmContent() {
           throw new Error("No verification token found in URL")
         }
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Email confirmation error:", error)
       setStatus("error")

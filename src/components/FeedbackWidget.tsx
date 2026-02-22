@@ -123,7 +123,7 @@ export function FeedbackWidget({ user: propUser }: FeedbackWidgetProps) {
             setOpen(false);
             setDescription('');
             setType('bug');
-        } catch (error) {
+        } catch {
             toast({
                 title: 'Error',
                 description: 'Something went wrong. Please try again.',

@@ -180,7 +180,7 @@ export function ChecklistItemEditModal({
                 </span>
               </div>
               <p className="text-sm text-emerald-700 leading-relaxed pl-8 italic">
-                "{item.evidence}"
+                &quot;{item.evidence}&quot;
               </p>
             </div>
           )}
@@ -264,7 +264,7 @@ export function ChecklistItemEditModal({
                 Mark as Addressed
               </span>
               <p className="text-xs text-gray-500 mt-0.5">
-                Indicate that you've reviewed this requirement and taken action. This helps track your progress through the checklist.
+                Indicate that you&apos;ve reviewed this requirement and taken action. This helps track your progress through the checklist.
               </p>
             </div>
           </label>

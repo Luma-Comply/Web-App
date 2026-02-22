@@ -62,10 +62,13 @@ export async function POST(req: NextRequest) {
     );
 
     // Billing period moved from subscription-level to item-level in Stripe API 2025-03-31+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const firstItem = (subscription as any).items?.data?.[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const periodStart = firstItem?.current_period_start ?? (subscription as any).current_period_start;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const periodEnd = firstItem?.current_period_end ?? (subscription as any).current_period_end;
-
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: Record<string, any> = {
       stripe_customer_id: session.customer as string,
       stripe_subscription_id: subscriptionId,
@@ -101,6 +104,7 @@ export async function POST(req: NextRequest) {
       status: subscription.status,
       synced: true,
     });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("[verify-session] Error:", error);
     return NextResponse.json(

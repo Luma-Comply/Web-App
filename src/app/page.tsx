@@ -3,6 +3,7 @@ import StatsBar from "@/components/landing/StatsBar"
 import ProblemSolutionSection from "@/components/landing/ProblemSolutionSection"
 import TimelineSection from "@/components/landing/TimelineSection"
 import TestimonialsSection from "@/components/landing/TestimonialsSection"
+import ComplianceSpiralCarousel from "@/components/landing/ComplianceSpiralCarousel"
 import { ComplianceSection } from "@/components/landing/ComplianceSection"
 import PricingFAQSection from "@/components/landing/PricingFAQSection"
 import Footer from "@/components/landing/Footer"
@@ -17,6 +18,7 @@ export default function Home() {
       <ProblemSolutionSection />
       <TimelineSection />
       <TestimonialsSection />
+      <ComplianceSpiralCarousel />
       <ComplianceSection />
       <PricingFAQSection />
       <Footer />

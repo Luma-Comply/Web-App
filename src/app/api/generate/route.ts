@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import {
   validateAgainstLCD,
-  formatValidationSummary,
   LCDValidationResult,
   ChecklistEditsData,
   PerplexityFindings,
@@ -512,6 +511,7 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
       }
 
       if (suggestedForms.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const formsToInsert = suggestedForms.map((form: any) => ({
           case_id: caseId,
           title: form.title || 'Untitled Document',
@@ -566,7 +566,9 @@ IMPORTANT: The user has provided specific notes and clarifications above. Make s
     if (chatContext && Array.isArray(chatContext) && chatContext.length > 0) {
       // Extract relevant information from chat messages
       const relevantMessages = chatContext
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((msg: any) => msg.role === 'user' || msg.role === 'assistant')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((msg: any) => `${msg.role === 'user' ? 'Provider' : 'Luma'}: ${msg.content}`)
         .join("\n\n")
 
@@ -941,6 +943,7 @@ Note: These recommendations are based on AI analysis of current payer policies. 
     }
 
     return NextResponse.json(response)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("Error generating documentation:", error)
     return NextResponse.json(

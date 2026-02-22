@@ -154,16 +154,25 @@ export type Database = {
           claim_amount: number | null
           created_at: string | null
           created_by_email: string | null
+          decision_date: string | null
+          denial_category: string | null
+          denial_notes: string | null
+          denial_reason: string | null
           diagnosis_codes: Json
           disease_activity: string | null
           doc_type: string
           edited_output: string | null
+          expected_decision_date: string | null
+          followup_date: string | null
           generated_output: string | null
           id: string
           is_archived: boolean | null
           lab_values: string | null
           medication_dose: string
           metadata: Json | null
+          pa_expiration_date: string | null
+          pa_reference_number: string | null
+          parent_case_id: string | null
           patient_age: number
           patient_first_name: string
           patient_gender: string | null
@@ -174,6 +183,7 @@ export type Database = {
           prior_treatments: string | null
           requested_medication: string
           status: string | null
+          submitted_at: string | null
           updated_at: string | null
           user_id: string
         }
@@ -181,16 +191,25 @@ export type Database = {
           claim_amount?: number | null
           created_at?: string | null
           created_by_email?: string | null
+          decision_date?: string | null
+          denial_category?: string | null
+          denial_notes?: string | null
+          denial_reason?: string | null
           diagnosis_codes?: Json
           disease_activity?: string | null
           doc_type: string
           edited_output?: string | null
+          expected_decision_date?: string | null
+          followup_date?: string | null
           generated_output?: string | null
           id?: string
           is_archived?: boolean | null
           lab_values?: string | null
           medication_dose: string
           metadata?: Json | null
+          pa_expiration_date?: string | null
+          pa_reference_number?: string | null
+          parent_case_id?: string | null
           patient_age: number
           patient_first_name: string
           patient_gender?: string | null
@@ -201,6 +220,7 @@ export type Database = {
           prior_treatments?: string | null
           requested_medication: string
           status?: string | null
+          submitted_at?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -208,16 +228,25 @@ export type Database = {
           claim_amount?: number | null
           created_at?: string | null
           created_by_email?: string | null
+          decision_date?: string | null
+          denial_category?: string | null
+          denial_notes?: string | null
+          denial_reason?: string | null
           diagnosis_codes?: Json
           disease_activity?: string | null
           doc_type?: string
           edited_output?: string | null
+          expected_decision_date?: string | null
+          followup_date?: string | null
           generated_output?: string | null
           id?: string
           is_archived?: boolean | null
           lab_values?: string | null
           medication_dose?: string
           metadata?: Json | null
+          pa_expiration_date?: string | null
+          pa_reference_number?: string | null
+          parent_case_id?: string | null
           patient_age?: number
           patient_first_name?: string
           patient_gender?: string | null
@@ -228,10 +257,18 @@ export type Database = {
           prior_treatments?: string | null
           requested_medication?: string
           status?: string | null
+          submitted_at?: string | null
           updated_at?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cases_parent_case_id_fkey"
+            columns: ["parent_case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cases_user_id_fkey"
             columns: ["user_id"]

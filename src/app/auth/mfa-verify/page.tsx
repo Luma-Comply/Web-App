@@ -115,6 +115,7 @@ function MFAVerifyForm() {
 
       // Verification successful - redirect to dashboard
       router.replace(redirectTo)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message || "Verification failed. Please try again.")
       setVerifying(false)

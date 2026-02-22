@@ -5,6 +5,7 @@ import { stripe } from "@/lib/stripe";
 
 export const maxDuration = 25;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseClientType = SupabaseClient<any, "public", any>;
 
 /**
@@ -12,6 +13,7 @@ type SupabaseClientType = SupabaseClient<any, "public", any>;
  * As of Stripe API 2025-03-31.basil, current_period_start/end moved from
  * the subscription level to individual subscription items.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getBillingPeriod(subscription: any): {
   start: string | null;
   end: string | null;
@@ -212,10 +214,12 @@ async function handleCheckoutCompleted(
 
   // Fetch subscription from Stripe to get accurate status and billing period
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sub = subscription as any;
   const status = subscription.status;
   const billingPeriod = getBillingPeriod(subscription);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateData: Record<string, any> = {
     stripe_customer_id: customerId,
     stripe_subscription_id: subscriptionId,
@@ -299,9 +303,11 @@ async function handleSubscriptionUpdate(
   }
 
   const status = subscription.status;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sub = subscription as any;
   const billingPeriod = getBillingPeriod(subscription);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateData: Record<string, any> = {
     stripe_customer_id: customerId,
     stripe_subscription_id: subscription.id,
@@ -427,6 +433,7 @@ async function handlePaymentSucceeded(
   invoice: Stripe.Invoice,
   supabase: SupabaseClientType
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inv = invoice as any;
   const subscriptionId = inv.subscription as string;
 
@@ -478,6 +485,7 @@ async function handlePaymentSucceeded(
   const billingPeriod = getBillingPeriod(subscription);
 
   // Update subscription status on successful payment using actual Stripe status
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const paymentUpdateData: Record<string, any> = {
     subscription_status: subscription.status,
   };
@@ -501,6 +509,7 @@ async function handlePaymentFailed(
   invoice: Stripe.Invoice,
   supabase: SupabaseClientType
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inv = invoice as any;
   const subscriptionId = inv.subscription as string;
 

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, rgb } from "pdf-lib";
 import mammoth from "mammoth";
 import { createClient } from "@supabase/supabase-js";
-// @ts-ignore
 import PDFParser from "pdf2json";
 import { logAudit } from "@/lib/audit-log";
 import { checkRateLimit } from "@/lib/rate-limit-middleware";
@@ -33,13 +32,13 @@ function safeDecodeText(text: string): string {
   if (!text) return "";
   try {
     return decodeURIComponent(text);
-  } catch (e) {
+  } catch {
     // Fallback 1: Try to decode manually common patterns
     try {
       return text.replace(/%([0-9A-F]{2})/g, (match, p1) => {
         return String.fromCharCode(parseInt(p1, 16));
       });
-    } catch (e2) {
+    } catch {
       // Fallback 2: Return raw text
       return text;
     }
@@ -49,6 +48,7 @@ function safeDecodeText(text: string): string {
 /**
  * Safely extracts text from various pdf2json item structures
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractTextFromItem(textItem: any): string {
   if (!textItem) return "";
   try {
@@ -58,7 +58,7 @@ function extractTextFromItem(textItem: any): string {
     if (textItem.text) return textItem.text;
     if (textItem.T) return safeDecodeText(textItem.T);
     return "";
-  } catch (e) {
+  } catch {
     return "";
   }
 }
@@ -66,6 +66,7 @@ function extractTextFromItem(textItem: any): string {
 /**
  * Type guard to safely get pages from potentially varying pdf2json structure
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getPdfPages(pdfData: any): any[] | null {
   if (!pdfData) return null;
   if (pdfData.formImage && Array.isArray(pdfData.formImage.Pages)) {
@@ -119,7 +120,9 @@ export async function POST(req: NextRequest) {
         // Parse PDF with Timeout
         const pdfParser = new PDFParser();
         const parsePromise = new Promise((resolve, reject) => {
-          pdfParser.on("pdfParser_dataError", (err: any) => reject(new Error(err.parserError)));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          pdfParser.on("pdfParser_dataError", (err: any) => reject(new Error(err?.parserError || String(err))));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           pdfParser.on("pdfParser_dataReady", (data: any) => resolve(data));
           pdfParser.parseBuffer(buffer);
         });
@@ -128,6 +131,7 @@ export async function POST(req: NextRequest) {
           setTimeout(() => reject(new Error("PDF parsing timed out")), PDF_PARSE_TIMEOUT)
         );
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const pdfData: any = await Promise.race([parsePromise, timeoutPromise]);
         extractedText = pdfParser.getRawTextContent() || "";
 
@@ -138,6 +142,7 @@ export async function POST(req: NextRequest) {
           const pdfDoc = await PDFDocument.load(buffer);
           const pages = pdfDoc.getPages();
 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           pagesData.forEach((pageData: any, pageIndex: number) => {
             if (pageIndex >= pages.length) return;
 
@@ -145,6 +150,7 @@ export async function POST(req: NextRequest) {
             const { height: pageHeight } = pdfLibPage.getSize();
 
             if (pageData.Texts && Array.isArray(pageData.Texts)) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               pageData.Texts.forEach((textItem: any) => {
                 const rawText = extractTextFromItem(textItem);
                 if (!rawText) return;
@@ -186,6 +192,7 @@ export async function POST(req: NextRequest) {
           warnings.push("Could not parse PDF structure for redaction. Only text extracted.");
         }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (pdfError: any) {
         console.error("PDF Processing Error:", pdfError);
         warnings.push(`PDF processing failed: ${pdfError.message}. Using raw file.`);
@@ -199,6 +206,7 @@ export async function POST(req: NextRequest) {
         if (result.messages && result.messages.length > 0) {
           result.messages.forEach(m => warnings.push(`Docx warning: ${m.message}`));
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (docxError: any) {
         warnings.push(`Docx extraction failed: ${docxError.message}`);
       }
@@ -212,6 +220,7 @@ export async function POST(req: NextRequest) {
       await supabase.storage.from('case-documents').upload(originalPath, buffer, {
         contentType: file.type, upsert: false
       });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (storageError: any) {
       throw new Error(`Failed to upload original file: ${storageError.message}`);
     }
@@ -223,6 +232,7 @@ export async function POST(req: NextRequest) {
         await supabase.storage.from('case-documents').upload(redactedPath, redactedBuffer, {
           contentType: 'application/pdf', upsert: false
         });
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
       } catch (redactedError: any) {
         warnings.push("Failed to save redacted copy to storage.");
         redactedPath = null;
@@ -239,6 +249,7 @@ export async function POST(req: NextRequest) {
           original_name: file.name,
           is_redacted: !!redactedPath
         });
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
       } catch (dbError: any) {
         warnings.push("Failed to create database record for document.");
         // We don't throw here to ensure the client gets the file path back
@@ -269,6 +280,7 @@ export async function POST(req: NextRequest) {
       warnings: warnings.length > 0 ? warnings : undefined
     });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("Critical Processing Error:", error);
     return NextResponse.json(
