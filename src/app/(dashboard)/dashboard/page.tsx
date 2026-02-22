@@ -52,6 +52,8 @@ import {
   BarChart3,
   TrendingUp,
   TrendingDown,
+  Activity,
+  ExternalLink,
 } from "lucide-react"
 import {
   Dialog,
@@ -64,11 +66,17 @@ import {
 import { formatDistanceToNow, differenceInDays, format, subMonths, startOfMonth } from "date-fns"
 import { SubscriptionBanner } from "@/components/dashboard/SubscriptionBanner"
 import {
-  AreaChart,
-  DonutChart,
   BarList,
   ProgressBar,
 } from "@tremor/react"
+import {
+  BarChart as RechartsBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts"
 
 interface Case {
   id: string
@@ -127,6 +135,21 @@ interface UserSubscription {
   trial_ends_at: string | null
   billing_period_end: string | null
 }
+
+interface PlatformStats {
+  totalUsers: number
+  activeSubscribers: number
+  trialingUsers: number
+  mrr: number
+  statusBreakdown: { active: number; trialing: number; canceled: number; past_due: number }
+  signupsThisMonth: number
+}
+
+interface ClarityMetric {
+  metricName: string
+  information: Record<string, string | number>[]
+}
+
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   lead: { label: "Lead", className: "bg-blue-100 text-blue-700 border-blue-200" },
@@ -194,6 +217,7 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [payerSortKey, setPayerSortKey] = useState<"payer" | "cases" | "rate" | "turnaround">("cases")
   const [payerSortDir, setPayerSortDir] = useState<"asc" | "desc">("desc")
+  const [casePage, setCasePage] = useState(0)
 
   const [stats, setStats] = useState<UserStats>({
     total_cases: 0,
@@ -211,6 +235,9 @@ export default function DashboardPage() {
   const [pipelineContacts, setPipelineContacts] = useState<PipelineContact[]>([])
   const [pipelineSearch, setPipelineSearch] = useState("")
   const [pipelinePage, setPipelinePage] = useState(0)
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null)
+  const [clarityData, setClarityData] = useState<ClarityMetric[] | null>(null)
+  const [clarityError, setClarityError] = useState<string | null>(null)
   const PIPELINE_PAGE_SIZE = 10
 
   useEffect(() => {
@@ -313,6 +340,21 @@ export default function DashboardPage() {
             active_monthly_high: active.reduce((s, c) => s + (c.monthly_price_high || 0), 0),
           })
         }
+
+        // Fetch platform-level stats
+        fetch("/api/admin/platform-stats")
+          .then((r) => r.ok ? r.json() : null)
+          .then((d) => { if (d) setPlatformStats(d) })
+          .catch(() => {})
+
+        // Fetch Clarity web analytics (last 3 days, by device)
+        fetch("/api/admin/clarity-insights?numOfDays=3&dimension1=Device")
+          .then((r) => {
+            if (!r.ok) throw new Error(r.status === 500 ? "Token not configured" : `Error ${r.status}`)
+            return r.json()
+          })
+          .then((d) => { if (Array.isArray(d)) setClarityData(d) })
+          .catch((e) => setClarityError(e.message))
       }
     } catch (error) {
       console.error("Error loading dashboard:", error)
@@ -622,6 +664,10 @@ export default function DashboardPage() {
     return matchesSearch
   })
 
+  const CASES_PAGE_SIZE = 10
+  const caseTotalPages = Math.ceil(displayCases.length / CASES_PAGE_SIZE)
+  const paginatedCases = displayCases.slice(casePage * CASES_PAGE_SIZE, (casePage + 1) * CASES_PAGE_SIZE)
+
   const getDocTypeLabel = (docType: string) => {
     switch (docType) {
       case "biologics_pa": return "Biologics PA"
@@ -704,12 +750,20 @@ export default function DashboardPage() {
                 {isSuperAdmin && (
                   <>
                     <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-2 py-1">Admin</DropdownMenuLabel>
                     <DropdownMenuItem
-                      onClick={() => router.push('/settings/security')}
+                      onClick={() => document.getElementById('platform-overview')?.scrollIntoView({ behavior: 'smooth' })}
                       className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
                     >
-                      <Shield className="mr-2 h-4 w-4" />
-                      Security
+                      <Activity className="mr-2 h-4 w-4" />
+                      Platform Overview
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => window.open('https://clarity.microsoft.com/projects/view/v64a4br39t/dashboard', '_blank')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Clarity Analytics
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => router.push('/admin/enterprise-contacts')}
@@ -717,6 +771,13 @@ export default function DashboardPage() {
                     >
                       <Building2 className="mr-2 h-4 w-4" />
                       Enterprise CRM
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => router.push('/settings/security')}
+                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                    >
+                      <Shield className="mr-2 h-4 w-4" />
+                      Security
                     </DropdownMenuItem>
                   </>
                 )}
@@ -735,6 +796,911 @@ export default function DashboardPage() {
       </header>
 
       <div className="container mx-auto px-4 py-8 space-y-8">
+        {/* Subscription alerts */}
+        {isTeamOwner && (subscription.subscription_status === "canceled" || subscription.subscription_status === "past_due" || (subscription.subscription_status === "trialing" && subscription.trial_ends_at && new Date(subscription.trial_ends_at) < new Date())) && (
+          <SubscriptionBanner
+            subscriptionStatus={subscription.subscription_status}
+            trialEndsAt={subscription.trial_ends_at}
+            billingPeriodEnd={subscription.billing_period_end}
+          />
+        )}
+
+        {/* ═══════════ PLATFORM OVERVIEW (super admin only) ═══════════ */}
+        {isSuperAdmin && platformStats && (
+          <div id="platform-overview" className="space-y-4">
+            <h1 className="text-2xl font-sans font-semibold text-dark-bg">Platform Overview</h1>
+            <Card className="flex flex-wrap items-center gap-6 md:gap-8 p-4 px-8 glass-card border border-sage-medium/30">
+              <div className="flex flex-col gap-0.5">
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Users</p>
+                <p className="text-2xl font-bold leading-none text-dark-bg">{platformStats.totalUsers}</p>
+              </div>
+              <div className="w-px h-10 bg-sage-medium/20" />
+              <div className="flex flex-col gap-0.5">
+                <p className="text-[11px] font-semibold text-green-600 uppercase tracking-wider">Active Subscribers</p>
+                <p className="text-2xl font-bold leading-none text-green-700">{platformStats.activeSubscribers}</p>
+              </div>
+              <div className="w-px h-10 bg-sage-medium/20" />
+              <div className="flex flex-col gap-0.5">
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">MRR</p>
+                <p className="text-2xl font-bold leading-none text-dark-bg">${platformStats.mrr.toLocaleString()}</p>
+              </div>
+              <div className="w-px h-10 bg-sage-medium/20" />
+              <div className="flex flex-col gap-0.5">
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Signups This Month</p>
+                <p className="text-2xl font-bold leading-none text-dark-bg">{platformStats.signupsThisMonth}</p>
+              </div>
+              <div className="flex items-center gap-4 ml-auto">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-sm font-medium text-gray-600">{platformStats.statusBreakdown.active}</span>
+                  <span className="text-xs text-gray-400">Active</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-sm font-medium text-gray-600">{platformStats.statusBreakdown.trialing}</span>
+                  <span className="text-xs text-gray-400">Trial</span>
+                </div>
+                {platformStats.statusBreakdown.past_due > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span className="text-sm font-medium text-gray-600">{platformStats.statusBreakdown.past_due}</span>
+                    <span className="text-xs text-gray-400">Past Due</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-gray-400" />
+                  <span className="text-sm font-medium text-gray-600">{platformStats.statusBreakdown.canceled}</span>
+                  <span className="text-xs text-gray-400">Canceled</span>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* ═══════════ CLARITY WEB ANALYTICS (super admin only) ═══════════ */}
+        {isSuperAdmin && clarityData && clarityData.length > 0 && (() => {
+          const trafficMetric = clarityData.find(m => m.metricName === "Traffic")
+          const scrollMetric = clarityData.find(m => m.metricName === "Scroll Depth")
+          const engagementMetric = clarityData.find(m => m.metricName === "Engagement Time")
+          const deadClickMetric = clarityData.find(m => m.metricName === "Dead Click Count")
+          const rageClickMetric = clarityData.find(m => m.metricName === "Rage Click Count")
+          const popularPages = clarityData.find(m => m.metricName === "Popular Pages")
+          const quickbackMetric = clarityData.find(m => m.metricName === "Quickback Click")
+          const errorClickMetric = clarityData.find(m => m.metricName === "Error Click Count")
+
+          // Aggregate traffic totals across dimensions
+          const totalSessions = trafficMetric?.information?.reduce((s, d) => s + Number(d.totalSessionCount || 0), 0) ?? 0
+          const totalUsers = trafficMetric?.information?.reduce((s, d) => s + Number(d.distantUserCount || 0), 0) ?? 0
+          const avgPagesPerSession = trafficMetric?.information?.length
+            ? (trafficMetric.information.reduce((s, d) => s + Number(d.PagesPerSessionPercentage || 0), 0) / trafficMetric.information.length).toFixed(1)
+            : "—"
+
+          // Build device breakdown for BarList
+          const deviceData = trafficMetric?.information
+            ?.filter(d => d.Device && String(d.Device) !== "Other")
+            .map(d => ({
+              name: String(d.Device),
+              value: Number(d.totalSessionCount || 0),
+            }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5) ?? []
+
+          // UX signals
+          const totalDeadClicks = deadClickMetric?.information?.reduce((s, d) => s + Number(d.count || d.deadClickCount || 0), 0) ?? 0
+          const totalRageClicks = rageClickMetric?.information?.reduce((s, d) => s + Number(d.count || d.rageClickCount || 0), 0) ?? 0
+          const totalQuickbacks = quickbackMetric?.information?.reduce((s, d) => s + Number(d.count || d.quickbackCount || 0), 0) ?? 0
+          const totalErrorClicks = errorClickMetric?.information?.reduce((s, d) => s + Number(d.count || d.errorClickCount || 0), 0) ?? 0
+
+          // Popular pages for BarList
+          const pageData = popularPages?.information
+            ?.map(d => ({
+              name: String(d.PageUrl || d.URL || d.pageTitle || d.PageTitle || "Unknown"),
+              value: Number(d.totalSessionCount || d.viewCount || d.count || 0),
+            }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5) ?? []
+
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-sans font-semibold text-dark-bg flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-mint" />
+                  Web Analytics
+                  <span className="text-xs font-normal text-gray-400 ml-1">Last 3 days via Clarity</span>
+                </h2>
+                <button
+                  onClick={() => window.open('https://clarity.microsoft.com/projects/view/v64a4br39t/dashboard', '_blank')}
+                  className="text-xs text-mint hover:text-mint-light flex items-center gap-1 cursor-pointer"
+                >
+                  Open Clarity <ExternalLink className="h-3 w-3" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Traffic Overview */}
+                <Card className="p-5 glass-card border border-sage-medium/30 space-y-4">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Traffic</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-2xl font-bold text-dark-bg">{totalSessions.toLocaleString()}</p>
+                      <p className="text-[11px] text-gray-400">Sessions</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-dark-bg">{totalUsers.toLocaleString()}</p>
+                      <p className="text-[11px] text-gray-400">Users</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-dark-bg">{avgPagesPerSession}</p>
+                      <p className="text-[11px] text-gray-400">Pages/Session</p>
+                    </div>
+                  </div>
+                  {deviceData.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">By Device</p>
+                      <BarList data={deviceData} className="text-sm" />
+                    </div>
+                  )}
+                </Card>
+
+                {/* UX Signals */}
+                <Card className="p-5 glass-card border border-sage-medium/30 space-y-4">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">UX Signals</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Dead Clicks</span>
+                      <span className="text-sm font-semibold text-dark-bg">{totalDeadClicks.toLocaleString()}</span>
+                    </div>
+                    <ProgressBar value={Math.min(totalDeadClicks, 100)} color="amber" className="h-1.5" />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Rage Clicks</span>
+                      <span className="text-sm font-semibold text-coral">{totalRageClicks.toLocaleString()}</span>
+                    </div>
+                    <ProgressBar value={Math.min(totalRageClicks, 100)} color="rose" className="h-1.5" />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Quick-backs</span>
+                      <span className="text-sm font-semibold text-dark-bg">{totalQuickbacks.toLocaleString()}</span>
+                    </div>
+                    <ProgressBar value={Math.min(totalQuickbacks, 100)} color="blue" className="h-1.5" />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Error Clicks</span>
+                      <span className="text-sm font-semibold text-dark-bg">{totalErrorClicks.toLocaleString()}</span>
+                    </div>
+                    <ProgressBar value={Math.min(totalErrorClicks, 100)} color="gray" className="h-1.5" />
+                  </div>
+                </Card>
+
+                {/* Popular Pages */}
+                <Card className="p-5 glass-card border border-sage-medium/30 space-y-4">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Popular Pages</p>
+                  {pageData.length > 0 ? (
+                    <BarList
+                      data={pageData.map(d => ({
+                        ...d,
+                        name: d.name.replace(/^https?:\/\/[^/]+/, '').replace(/\/$/, '') || '/',
+                      }))}
+                      className="text-sm"
+                    />
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">No page data available</p>
+                  )}
+                </Card>
+              </div>
+            </div>
+          )
+        })()}
+        {isSuperAdmin && clarityError && (
+          <Card className="p-4 glass-card border border-amber-200/50 bg-amber-50/30">
+            <p className="text-sm text-amber-700 flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Clarity Analytics: {clarityError}
+            </p>
+          </Card>
+        )}
+
+        {/* ═══════════ CASE MANAGEMENT ═══════════ */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-sans font-semibold text-dark-bg">Case Management</h1>
+            <div className="flex items-center gap-1 bg-white/50 border border-sage-medium/30 rounded-lg p-1">
+              <button
+                onClick={() => setDashboardView("cases")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                  dashboardView === "cases"
+                    ? "bg-white text-dark-bg shadow-sm"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
+                }`}
+              >
+                Cases
+              </button>
+              <button
+                onClick={() => setDashboardView("analytics")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                  dashboardView === "analytics"
+                    ? "bg-white text-dark-bg shadow-sm"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                Analytics
+              </button>
+            </div>
+          </div>
+
+          {/* ═══════════ ANALYTICS VIEW ═══════════ */}
+          {dashboardView === "analytics" && (
+            <div className="space-y-6">
+              {/* Core Metrics Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Approval Rate</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <p className="text-3xl font-bold text-dark-bg">{analytics.approvalRate}%</p>
+                    {analytics.totalDecided > 0 && (
+                      <span className="text-xs text-gray-400">of {analytics.totalDecided} decided</span>
+                    )}
+                  </div>
+                  {analytics.approvalRate >= 80 ? (
+                    <div className="flex items-center gap-1 mt-2 text-xs text-green-600">
+                      <TrendingUp className="w-3 h-3" />
+                      <span>Strong performance</span>
+                    </div>
+                  ) : analytics.totalDecided > 0 ? (
+                    <div className="flex items-center gap-1 mt-2 text-xs text-coral">
+                      <TrendingDown className="w-3 h-3" />
+                      <span>Below 80% target</span>
+                    </div>
+                  ) : null}
+                </Card>
+
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Avg Turnaround</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <p className="text-3xl font-bold text-dark-bg">
+                      {analytics.avgTurnaround > 0 ? `${analytics.avgTurnaround}d` : "--"}
+                    </p>
+                    {analytics.avgTurnaround > 0 && (
+                      <span className="text-xs text-gray-400">submission to decision</span>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Cases</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <p className="text-3xl font-bold text-dark-bg">{cases.length}</p>
+                    <span className="text-xs text-gray-400">all time</span>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Charts Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Cases Per Month Bar Chart */}
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-sm font-semibold text-dark-bg">Cases Per Month</p>
+                  <div className="grid grid-cols-3 gap-3 mt-4">
+                    {[
+                      { label: "Cases Created", value: analytics.monthlyData.reduce((s, m) => s + m["Cases Created"], 0), color: "bg-blue-500" },
+                      { label: "Approved", value: analytics.monthlyData.reduce((s, m) => s + m.Approved, 0), color: "bg-emerald-500" },
+                      { label: "Denied", value: analytics.monthlyData.reduce((s, m) => s + m.Denied, 0), color: "bg-rose-500" },
+                    ].map((tab) => (
+                      <div
+                        key={tab.label}
+                        className="rounded-md border border-sage-medium/30 px-3 py-2"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-sm ${tab.color}`} />
+                          <p className="text-xs text-gray-500">{tab.label}</p>
+                        </div>
+                        <p className="mt-0.5 text-lg font-semibold text-dark-bg">{tab.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {analytics.monthlyData.some((m) => m["Cases Created"] > 0) ? (
+                    <div className="mt-4 h-52">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsBarChart data={analytics.monthlyData} barCategoryGap="20%">
+                          <XAxis
+                            dataKey="month"
+                            tick={{ fontSize: 11, fill: "#9ca3af" }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 11, fill: "#9ca3af" }}
+                            axisLine={false}
+                            tickLine={false}
+                            width={28}
+                            allowDecimals={false}
+                          />
+                          <Tooltip
+                            cursor={{ fill: "rgba(0,0,0,0.04)" }}
+                            contentStyle={{
+                              fontSize: 13,
+                              borderRadius: 8,
+                              border: "1px solid #e5e7eb",
+                              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                            }}
+                          />
+                          <Bar dataKey="Approved" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="Denied" stackId="a" fill="#f43f5e" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="Cases Created" stackId="b" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                        </RechartsBarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-52 flex items-center justify-center text-gray-400 text-sm">
+                      No case data available yet
+                    </div>
+                  )}
+                </Card>
+
+                {/* Status Distribution Donut */}
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-sm font-semibold text-dark-bg mb-4">Status Distribution</p>
+                  {analytics.statusDistribution.length > 0 ? (
+                    <div className="flex items-center gap-8">
+                      {/* Custom SVG donut — no Tremor color issues */}
+                      <div className="relative h-40 w-40 flex-shrink-0">
+                        <svg viewBox="0 0 36 36" className="h-full w-full" style={{ transform: "rotate(-90deg)" }}>
+                          {(() => {
+                            const total = analytics.statusDistribution.reduce((s, d) => s + d.value, 0)
+                            const STATUS_COLORS: Record<string, string> = {
+                              Draft: "#9ca3af",
+                              Submitted: "#3b82f6",
+                              Approved: "#10b981",
+                              Denied: "#f43f5e",
+                            }
+                            let cumulative = 0
+                            return analytics.statusDistribution.map((s) => {
+                              const pct = s.value / total
+                              const dashArray = `${pct * 100} ${100 - pct * 100}`
+                              const dashOffset = `${-cumulative * 100}`
+                              cumulative += pct
+                              return (
+                                <circle
+                                  key={s.name}
+                                  cx="18" cy="18" r="15.915"
+                                  fill="none"
+                                  stroke={STATUS_COLORS[s.name] || "#6b7280"}
+                                  strokeWidth="3.8"
+                                  strokeDasharray={dashArray}
+                                  strokeDashoffset={dashOffset}
+                                  strokeLinecap="round"
+                                />
+                              )
+                            })
+                          })()}
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-2xl font-bold text-dark-bg">{cases.length}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-1 flex-col gap-3">
+                        {analytics.statusDistribution.map((s) => (
+                          <div key={s.name} className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2.5">
+                              <span className={`w-1 h-8 rounded-full flex-shrink-0 ${
+                                s.name === "Draft" ? "bg-gray-400" :
+                                s.name === "Submitted" ? "bg-blue-500" :
+                                s.name === "Approved" ? "bg-emerald-500" :
+                                "bg-rose-500"
+                              }`} />
+                              <div>
+                                <p className="text-sm font-medium text-dark-bg">{s.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  {cases.length > 0
+                                    ? `${Math.round((s.value / cases.length) * 100)}% of total`
+                                    : "0%"}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-lg font-semibold text-dark-bg tabular-nums">{s.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
+                      No case data available yet
+                    </div>
+                  )}
+                </Card>
+              </div>
+
+              {/* Denial Breakdown */}
+              {analytics.denialBreakdown.length > 0 && (
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <p className="text-sm font-semibold text-dark-bg mb-4">Denial Reasons</p>
+                  <BarList
+                    data={analytics.denialBreakdown}
+                    color="rose"
+                    valueFormatter={(v: number) => String(v)}
+                    className="[&>div]:text-sm"
+                  />
+                </Card>
+              )}
+
+              {/* Payer Comparison Table */}
+              {analytics.payerComparison.length > 0 && (
+                <Card className="glass-card border border-sage-medium/30 overflow-hidden">
+                  <div className="p-5 pb-0">
+                    <p className="text-sm font-semibold text-dark-bg mb-4">Payer Comparison</p>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
+                        <TableHead
+                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
+                          onClick={() => handlePayerSort("payer")}
+                        >
+                          <span className="flex items-center gap-1">
+                            Payer
+                            {payerSortKey === "payer" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
+                          </span>
+                        </TableHead>
+                        <TableHead
+                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
+                          onClick={() => handlePayerSort("cases")}
+                        >
+                          <span className="flex items-center gap-1">
+                            Cases
+                            {payerSortKey === "cases" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
+                          </span>
+                        </TableHead>
+                        <TableHead className="text-dark-bg font-semibold">Approved</TableHead>
+                        <TableHead className="text-dark-bg font-semibold">Denied</TableHead>
+                        <TableHead
+                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
+                          onClick={() => handlePayerSort("rate")}
+                        >
+                          <span className="flex items-center gap-1">
+                            Approval Rate
+                            {payerSortKey === "rate" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
+                          </span>
+                        </TableHead>
+                        <TableHead
+                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
+                          onClick={() => handlePayerSort("turnaround")}
+                        >
+                          <span className="flex items-center gap-1">
+                            Avg Turnaround
+                            {payerSortKey === "turnaround" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
+                          </span>
+                        </TableHead>
+                        <TableHead className="text-dark-bg font-semibold">Top Denial Reason</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedPayers.map((p) => (
+                        <TableRow key={p.payer} className="hover:bg-sage-light/20 transition-colors">
+                          <TableCell className="font-semibold text-dark-bg text-sm">{p.payer}</TableCell>
+                          <TableCell className="text-sm text-gray-700">{p.cases}</TableCell>
+                          <TableCell className="text-sm text-gray-700">{p.approved}</TableCell>
+                          <TableCell className="text-sm text-gray-700">{p.denied}</TableCell>
+                          <TableCell>
+                            {p.rate !== null ? (
+                              <span className={`inline-flex items-center gap-1 text-sm font-semibold ${
+                                p.rate >= 80 ? "text-green-600" : p.rate >= 60 ? "text-amber-600" : "text-coral"
+                              }`}>
+                                {p.rate >= 80 ? (
+                                  <TrendingUp className="w-3.5 h-3.5" />
+                                ) : p.rate < 60 ? (
+                                  <TrendingDown className="w-3.5 h-3.5" />
+                                ) : null}
+                                {p.rate}%
+                              </span>
+                            ) : (
+                              <span className="text-sm text-gray-400">--</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-700">
+                            {p.avgTurnaround !== null ? `${p.avgTurnaround}d` : "--"}
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-500 max-w-[180px] truncate">
+                            {p.topDenialReason || "--"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+              )}
+
+              {/* Gold Card Tracker */}
+              {analytics.goldCardPayers.length > 0 && (
+                <Card className="glass-card border border-sage-medium/30 p-5">
+                  <div className="mb-4">
+                    <p className="text-sm font-semibold text-dark-bg">Gold Card Tracker</p>
+                    <p className="text-xs text-gray-400 mt-0.5">92% approval rate threshold for gold card eligibility</p>
+                  </div>
+                  <div className="space-y-4">
+                    {analytics.goldCardPayers.map((g) => (
+                      <div key={g.payer} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium text-dark-bg">{g.payer}</span>
+                          <span className={`font-semibold ${g.eligible ? "text-green-600" : "text-gray-600"}`}>
+                            {g.rate}%
+                            {g.eligible && (
+                              <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">
+                                Eligible
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <ProgressBar
+                          value={Math.min(g.rate, 100)}
+                          color={g.eligible ? "emerald" : g.rate >= 80 ? "blue" : "rose"}
+                          className="h-2"
+                        />
+                        <p className="text-[11px] text-gray-400">
+                          {g.eligible
+                            ? `Approval rate exceeds ${g.threshold}% threshold (${g.decidedCount} decided cases)`
+                            : `${g.threshold - g.rate}% below gold card threshold (${g.decidedCount} decided cases)`
+                          }
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Empty state for analytics */}
+              {cases.length === 0 && (
+                <Card className="glass-card border border-sage-medium/30 p-12 text-center">
+                  <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm">No case data available for analytics.</p>
+                  <p className="text-gray-400 text-xs mt-1">Create cases to see charts and metrics here.</p>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* ═══════════ CASES VIEW (existing) ═══════════ */}
+          {dashboardView === "cases" && <>
+          {/* Alerts Bar */}
+          {hasAlerts && (
+            <Card className="flex flex-wrap items-center gap-3 md:gap-5 p-3 px-6 glass-card border border-sage-medium/30">
+              {awaitingDecision.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("active"); setStatusFilter("submitted"); setCasePage(0) }}
+                  className="flex items-center gap-1.5 text-sm text-blue-700 hover:text-blue-900 transition-colors cursor-pointer"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span className="font-medium">{awaitingDecision.length}</span>
+                  <span className="text-blue-600">awaiting decision</span>
+                  <span className="text-blue-400 text-xs">(oldest: {oldestSubmittedDays}d)</span>
+                </button>
+              )}
+              {awaitingDecision.length > 0 && (needsFollowUp.length > 0 || expiringApprovals.length > 0 || deniedCases.length > 0) && (
+                <div className="w-px h-5 bg-sage-medium/30" />
+              )}
+              {needsFollowUp.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("active"); setStatusFilter("followup"); setCasePage(0) }}
+                  className="flex items-center gap-1.5 text-sm text-amber-700 hover:text-amber-900 transition-colors cursor-pointer"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span className="font-medium">{needsFollowUp.length}</span>
+                  <span className="text-amber-600">need follow-up</span>
+                </button>
+              )}
+              {needsFollowUp.length > 0 && (expiringApprovals.length > 0 || deniedCases.length > 0) && (
+                <div className="w-px h-5 bg-sage-medium/30" />
+              )}
+              {expiringApprovals.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("active"); setStatusFilter("expiring"); setCasePage(0) }}
+                  className="flex items-center gap-1.5 text-sm text-amber-700 hover:text-amber-900 transition-colors cursor-pointer"
+                >
+                  <CalendarClock className="w-3.5 h-3.5" />
+                  <span className="font-medium">{expiringApprovals.length}</span>
+                  <span className="text-amber-600">PA expiring in {soonestExpirationDays}d</span>
+                </button>
+              )}
+              {expiringApprovals.length > 0 && deniedCases.length > 0 && (
+                <div className="w-px h-5 bg-sage-medium/30" />
+              )}
+              {deniedCases.length > 0 && (
+                <button
+                  onClick={() => { setActiveTab("active"); setStatusFilter("denied"); setCasePage(0) }}
+                  className="flex items-center gap-1.5 text-sm text-coral hover:text-coral/80 transition-colors cursor-pointer"
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span className="font-medium">{deniedCases.length}</span>
+                  <span>denied</span>
+                </button>
+              )}
+            </Card>
+          )}
+
+          {/* Case Stats Bar */}
+          <Card className="flex flex-wrap items-center gap-6 md:gap-8 p-4 px-8 glass-card border border-sage-medium/30">
+            <div className="flex flex-col gap-0.5">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Cases</p>
+              <p className="text-2xl font-bold leading-none text-dark-bg">{stats.total_cases}</p>
+            </div>
+            <div className="w-px h-10 bg-sage-medium/20" />
+            <div className="flex flex-col gap-0.5">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">This Month</p>
+              <p className="text-2xl font-bold leading-none text-dark-bg">{stats.cases_this_month}</p>
+            </div>
+            <div className="w-px h-10 bg-sage-medium/20" />
+            <div className="flex flex-col gap-0.5">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Revenue Protected</p>
+              <p className="text-2xl font-bold leading-none text-dark-bg">${stats.revenue_protected.toLocaleString()}</p>
+            </div>
+            {(statusCounts.draft > 0 || statusCounts.submitted > 0 || statusCounts.approved > 0 || statusCounts.denied > 0) && (
+              <>
+                <div className="w-px h-10 bg-sage-medium/20" />
+                <div className="flex items-center gap-4">
+                  {statusCounts.draft > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-gray-400" />
+                      <span className="text-sm font-medium text-gray-600">{statusCounts.draft}</span>
+                      <span className="text-xs text-gray-400">Draft</span>
+                    </div>
+                  )}
+                  {statusCounts.submitted > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="text-sm font-medium text-gray-600">{statusCounts.submitted}</span>
+                      <span className="text-xs text-gray-400">Submitted</span>
+                    </div>
+                  )}
+                  {statusCounts.approved > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="text-sm font-medium text-gray-600">{statusCounts.approved}</span>
+                      <span className="text-xs text-gray-400">Approved</span>
+                    </div>
+                  )}
+                  {statusCounts.denied > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-coral" />
+                      <span className="text-sm font-medium text-gray-600">{statusCounts.denied}</span>
+                      <span className="text-xs text-gray-400">Denied</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Show subscription badge here if no pipeline section above */}
+            {!pipeline && isTeamOwner && subscription.subscription_status === "trialing" && subscription.trial_ends_at && (
+              <button
+                onClick={async () => {
+                  const response = await fetch("/api/stripe/create-portal", { method: "POST" })
+                  const data = await response.json()
+                  if (data.url) {
+                    window.location.href = data.url
+                  } else {
+                    window.location.href = "/checkout"
+                  }
+                }}
+                className="ml-auto flex items-center gap-2 bg-mint/10 border border-mint/30 rounded-lg px-4 py-2 text-sm font-semibold text-dark-bg hover:bg-mint/20 transition-colors cursor-pointer"
+              >
+                Trial Active
+                <span className="bg-mint text-white text-xs font-bold px-2 py-0.5 rounded">
+                  {Math.ceil((new Date(subscription.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
+                </span>
+              </button>
+            )}
+
+            {!pipeline && isTeamOwner && subscription.subscription_status === "active" && (
+              <button
+                onClick={async () => {
+                  const response = await fetch("/api/stripe/create-portal", { method: "POST" })
+                  const data = await response.json()
+                  if (data.url) window.location.href = data.url
+                }}
+                className="ml-auto flex items-center gap-2 bg-mint/10 border border-mint/30 rounded-lg px-4 py-2 text-sm font-semibold text-dark-bg hover:bg-mint/20 transition-colors cursor-pointer"
+              >
+                <span className="w-2 h-2 rounded-full bg-mint" />
+                Active
+              </button>
+            )}
+          </Card>
+
+          {/* Cases Table */}
+          <Tabs defaultValue="active" onValueChange={(v) => { setActiveTab(v); if (v === "archived") setStatusFilter("all"); setCasePage(0) }} className="w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <TabsList className="bg-white/50 border border-sage-medium/30">
+                  <TabsTrigger value="active" className="data-[state=active]:bg-white">Active Cases</TabsTrigger>
+                  <TabsTrigger value="archived" className="gap-2 data-[state=active]:bg-white">
+                    Archived
+                    <Archive className="w-3 h-3" />
+                  </TabsTrigger>
+                </TabsList>
+                {activeTab !== "archived" && (
+                  <div className="flex items-center gap-1 ml-2">
+                    {[
+                      { value: "all", label: "All" },
+                      { value: "submitted", label: "Submitted" },
+                      { value: "approved", label: "Approved" },
+                      { value: "denied", label: "Denied" },
+                    ].map((f) => (
+                      <button
+                        key={f.value}
+                        onClick={() => { setStatusFilter(f.value); setCasePage(0) }}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+                          statusFilter === f.value
+                            ? "bg-dark-bg text-white"
+                            : "text-gray-500 hover:bg-gray-100"
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search cases..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCasePage(0) }}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            <Card className="glass-card border border-sage-medium/30 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
+                    <TableHead className="w-[200px] lg:w-[280px] text-dark-bg font-semibold">Patient & Document</TableHead>
+                    <TableHead className="text-dark-bg font-semibold">Payer</TableHead>
+                    <TableHead className="hidden sm:table-cell text-dark-bg font-semibold">Status</TableHead>
+                    <TableHead className="hidden sm:table-cell text-dark-bg font-semibold">Created</TableHead>
+                    <TableHead className="hidden lg:table-cell text-dark-bg font-semibold">Created By</TableHead>
+                    <TableHead className="text-right text-dark-bg font-semibold">Claim Value</TableHead>
+                    <TableHead className="w-[60px] lg:w-[80px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedCases.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-32 text-center text-gray-500">
+                        {searchQuery.trim()
+                          ? `No cases found matching "${searchQuery}"`
+                          : statusFilter !== "all"
+                            ? `No ${statusFilter} cases found.`
+                            : activeTab === 'active'
+                              ? "No active cases found. Create a new case to get started."
+                              : "No archived cases."}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedCases.map((c) => (
+                      <TableRow key={c.id} className="group cursor-pointer hover:bg-sage-light/20 transition-colors">
+                        <TableCell className="font-medium">
+                          <Link href={`/cases/${c.id}`} className="block">
+                            <div className="font-semibold text-dark-bg">
+                              {c.patient_first_name} {c.patient_last_name}
+                            </div>
+                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                              <span className="capitalize">{getDocTypeLabel(c.doc_type)}</span>
+                            </div>
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-gray-700 text-sm">
+                          {c.payer_name || '-'}
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <div className="flex flex-col gap-0.5">
+                            <Badge variant="outline" className={`text-[10px] w-fit ${CASE_STATUS_CONFIG[c.status]?.className || "bg-gray-100 text-gray-700 border-gray-200"}`}>
+                              {CASE_STATUS_CONFIG[c.status]?.label || c.status}
+                            </Badge>
+                            {c.status === "submitted" && c.submitted_at && (
+                              <span className="text-[10px] text-gray-400">{differenceInDays(now, new Date(c.submitted_at))}d ago</span>
+                            )}
+                            {c.status === "approved" && c.pa_expiration_date && (
+                              <span className="text-[10px] text-gray-400">Expires {format(new Date(c.pa_expiration_date), "MMM d")}</span>
+                            )}
+                            {c.status === "denied" && c.denial_category && (
+                              <span className="text-[10px] text-gray-400 truncate max-w-[120px]">{c.denial_category}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell text-gray-700 text-sm">
+                          {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-gray-700 text-sm">
+                          {c.created_by_email || userEmail}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-gray-700">
+                          {c.claim_amount ? `$${c.claim_amount.toLocaleString()}` : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-sage-medium/20 text-gray-400 hover:text-dark-bg">
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-white border border-sage-medium/30">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/cases/${c.id}`)}
+                                className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                              >
+                                <Eye className="mr-2 h-4 w-4" /> View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {c.is_archived ? (
+                                <DropdownMenuItem
+                                  onClick={() => handleArchive(c.id, false)}
+                                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                                >
+                                  <RefreshCw className="mr-2 h-4 w-4" /> Restore to Active
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  onClick={() => handleArchive(c.id, true)}
+                                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                                >
+                                  <Archive className="mr-2 h-4 w-4" /> Archive Case
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => openDeleteDialog(c)}
+                                className="text-coral focus:bg-coral/10 focus:text-coral cursor-pointer"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete Permanently
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+
+              {/* Case Pagination */}
+              {displayCases.length > CASES_PAGE_SIZE && (
+                <div className="flex items-center justify-between px-6 py-3 border-t border-sage-medium/20">
+                  <p className="text-xs text-gray-500">
+                    {displayCases.length} case{displayCases.length !== 1 ? "s" : ""}
+                    {searchQuery.trim() ? ` matching "${searchQuery}"` : ""}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={casePage === 0}
+                      onClick={() => setCasePage((p) => p - 1)}
+                      className="h-8 px-3 text-xs"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-xs text-gray-600 tabular-nums">
+                      {casePage + 1} / {caseTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={casePage + 1 >= caseTotalPages}
+                      onClick={() => setCasePage((p) => p + 1)}
+                      className="h-8 px-3 text-xs"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </Tabs>
+          </>}
+        </div>
+
         {/* ═══════════ ENTERPRISE PIPELINE (super admin only) ═══════════ */}
         {pipeline && pipelineContacts.length > 0 && (
           <div className="space-y-4">
@@ -933,612 +1899,6 @@ export default function DashboardPage() {
             </Card>
           </div>
         )}
-
-        {/* Subscription alerts */}
-        {isTeamOwner && (subscription.subscription_status === "canceled" || subscription.subscription_status === "past_due" || (subscription.subscription_status === "trialing" && subscription.trial_ends_at && new Date(subscription.trial_ends_at) < new Date())) && (
-          <SubscriptionBanner
-            subscriptionStatus={subscription.subscription_status}
-            trialEndsAt={subscription.trial_ends_at}
-            billingPeriodEnd={subscription.billing_period_end}
-          />
-        )}
-
-        {/* ═══════════ CASE MANAGEMENT ═══════════ */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-sans font-semibold text-dark-bg">Case Management</h1>
-            <div className="flex items-center gap-1 bg-white/50 border border-sage-medium/30 rounded-lg p-1">
-              <button
-                onClick={() => setDashboardView("cases")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                  dashboardView === "cases"
-                    ? "bg-white text-dark-bg shadow-sm"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
-                }`}
-              >
-                Cases
-              </button>
-              <button
-                onClick={() => setDashboardView("analytics")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                  dashboardView === "analytics"
-                    ? "bg-white text-dark-bg shadow-sm"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
-                }`}
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                Analytics
-              </button>
-            </div>
-          </div>
-
-          {/* ═══════════ ANALYTICS VIEW ═══════════ */}
-          {dashboardView === "analytics" && (
-            <div className="space-y-6">
-              {/* Core Metrics Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Card className="glass-card border border-sage-medium/30 p-5">
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Approval Rate</p>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <p className="text-3xl font-bold text-dark-bg">{analytics.approvalRate}%</p>
-                    {analytics.totalDecided > 0 && (
-                      <span className="text-xs text-gray-400">of {analytics.totalDecided} decided</span>
-                    )}
-                  </div>
-                  {analytics.approvalRate >= 80 ? (
-                    <div className="flex items-center gap-1 mt-2 text-xs text-green-600">
-                      <TrendingUp className="w-3 h-3" />
-                      <span>Strong performance</span>
-                    </div>
-                  ) : analytics.totalDecided > 0 ? (
-                    <div className="flex items-center gap-1 mt-2 text-xs text-coral">
-                      <TrendingDown className="w-3 h-3" />
-                      <span>Below 80% target</span>
-                    </div>
-                  ) : null}
-                </Card>
-
-                <Card className="glass-card border border-sage-medium/30 p-5">
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Avg Turnaround</p>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <p className="text-3xl font-bold text-dark-bg">
-                      {analytics.avgTurnaround > 0 ? `${analytics.avgTurnaround}d` : "--"}
-                    </p>
-                    {analytics.avgTurnaround > 0 && (
-                      <span className="text-xs text-gray-400">submission to decision</span>
-                    )}
-                  </div>
-                </Card>
-
-                <Card className="glass-card border border-sage-medium/30 p-5">
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Cases</p>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <p className="text-3xl font-bold text-dark-bg">{cases.length}</p>
-                    <span className="text-xs text-gray-400">all time</span>
-                  </div>
-                </Card>
-              </div>
-
-              {/* Charts Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Cases Per Month Area Chart */}
-                <Card className="glass-card border border-sage-medium/30 p-5">
-                  <p className="text-sm font-semibold text-dark-bg mb-4">Cases Per Month</p>
-                  {analytics.monthlyData.some((m) => m["Cases Created"] > 0) ? (
-                    <AreaChart
-                      className="h-56"
-                      data={analytics.monthlyData}
-                      index="month"
-                      categories={["Cases Created", "Approved", "Denied"]}
-                      colors={["blue", "emerald", "rose"]}
-                      showLegend={true}
-                      showGridLines={false}
-                      curveType="monotone"
-                      valueFormatter={(v: number) => String(v)}
-                    />
-                  ) : (
-                    <div className="h-56 flex items-center justify-center text-gray-400 text-sm">
-                      No case data available yet
-                    </div>
-                  )}
-                </Card>
-
-                {/* Status Distribution Donut */}
-                <Card className="glass-card border border-sage-medium/30 p-5">
-                  <p className="text-sm font-semibold text-dark-bg mb-4">Status Distribution</p>
-                  {analytics.statusDistribution.length > 0 ? (
-                    <div className="flex items-center gap-6">
-                      <DonutChart
-                        className="h-48 w-48 flex-shrink-0"
-                        data={analytics.statusDistribution}
-                        category="value"
-                        index="name"
-                        colors={["gray", "blue", "emerald", "rose"]}
-                        showAnimation={true}
-                        valueFormatter={(v: number) => String(v)}
-                      />
-                      <div className="flex flex-col gap-2">
-                        {analytics.statusDistribution.map((s) => (
-                          <div key={s.name} className="flex items-center gap-2 text-sm">
-                            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                              s.name === "Draft" ? "bg-gray-400" :
-                              s.name === "Submitted" ? "bg-blue-500" :
-                              s.name === "Approved" ? "bg-emerald-500" :
-                              "bg-rose-500"
-                            }`} />
-                            <span className="text-gray-600">{s.name}</span>
-                            <span className="font-semibold text-dark-bg">{s.value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
-                      No case data available yet
-                    </div>
-                  )}
-                </Card>
-              </div>
-
-              {/* Denial Breakdown */}
-              {analytics.denialBreakdown.length > 0 && (
-                <Card className="glass-card border border-sage-medium/30 p-5">
-                  <p className="text-sm font-semibold text-dark-bg mb-4">Denial Reasons</p>
-                  <BarList
-                    data={analytics.denialBreakdown}
-                    color="rose"
-                    valueFormatter={(v: number) => String(v)}
-                    className="[&>div]:text-sm"
-                  />
-                </Card>
-              )}
-
-              {/* Payer Comparison Table */}
-              {analytics.payerComparison.length > 0 && (
-                <Card className="glass-card border border-sage-medium/30 overflow-hidden">
-                  <div className="p-5 pb-0">
-                    <p className="text-sm font-semibold text-dark-bg mb-4">Payer Comparison</p>
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
-                        <TableHead
-                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
-                          onClick={() => handlePayerSort("payer")}
-                        >
-                          <span className="flex items-center gap-1">
-                            Payer
-                            {payerSortKey === "payer" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
-                          </span>
-                        </TableHead>
-                        <TableHead
-                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
-                          onClick={() => handlePayerSort("cases")}
-                        >
-                          <span className="flex items-center gap-1">
-                            Cases
-                            {payerSortKey === "cases" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
-                          </span>
-                        </TableHead>
-                        <TableHead className="text-dark-bg font-semibold">Approved</TableHead>
-                        <TableHead className="text-dark-bg font-semibold">Denied</TableHead>
-                        <TableHead
-                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
-                          onClick={() => handlePayerSort("rate")}
-                        >
-                          <span className="flex items-center gap-1">
-                            Approval Rate
-                            {payerSortKey === "rate" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
-                          </span>
-                        </TableHead>
-                        <TableHead
-                          className="text-dark-bg font-semibold cursor-pointer hover:text-mint transition-colors"
-                          onClick={() => handlePayerSort("turnaround")}
-                        >
-                          <span className="flex items-center gap-1">
-                            Avg Turnaround
-                            {payerSortKey === "turnaround" && <span className="text-xs">{payerSortDir === "asc" ? "\u25B2" : "\u25BC"}</span>}
-                          </span>
-                        </TableHead>
-                        <TableHead className="text-dark-bg font-semibold">Top Denial Reason</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sortedPayers.map((p) => (
-                        <TableRow key={p.payer} className="hover:bg-sage-light/20 transition-colors">
-                          <TableCell className="font-semibold text-dark-bg text-sm">{p.payer}</TableCell>
-                          <TableCell className="text-sm text-gray-700">{p.cases}</TableCell>
-                          <TableCell className="text-sm text-gray-700">{p.approved}</TableCell>
-                          <TableCell className="text-sm text-gray-700">{p.denied}</TableCell>
-                          <TableCell>
-                            {p.rate !== null ? (
-                              <span className={`inline-flex items-center gap-1 text-sm font-semibold ${
-                                p.rate >= 80 ? "text-green-600" : p.rate >= 60 ? "text-amber-600" : "text-coral"
-                              }`}>
-                                {p.rate >= 80 ? (
-                                  <TrendingUp className="w-3.5 h-3.5" />
-                                ) : p.rate < 60 ? (
-                                  <TrendingDown className="w-3.5 h-3.5" />
-                                ) : null}
-                                {p.rate}%
-                              </span>
-                            ) : (
-                              <span className="text-sm text-gray-400">--</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-700">
-                            {p.avgTurnaround !== null ? `${p.avgTurnaround}d` : "--"}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-500 max-w-[180px] truncate">
-                            {p.topDenialReason || "--"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Card>
-              )}
-
-              {/* Gold Card Tracker */}
-              {analytics.goldCardPayers.length > 0 && (
-                <Card className="glass-card border border-sage-medium/30 p-5">
-                  <div className="mb-4">
-                    <p className="text-sm font-semibold text-dark-bg">Gold Card Tracker</p>
-                    <p className="text-xs text-gray-400 mt-0.5">92% approval rate threshold for gold card eligibility</p>
-                  </div>
-                  <div className="space-y-4">
-                    {analytics.goldCardPayers.map((g) => (
-                      <div key={g.payer} className="space-y-1.5">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium text-dark-bg">{g.payer}</span>
-                          <span className={`font-semibold ${g.eligible ? "text-green-600" : "text-gray-600"}`}>
-                            {g.rate}%
-                            {g.eligible && (
-                              <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">
-                                Eligible
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                        <ProgressBar
-                          value={Math.min(g.rate, 100)}
-                          color={g.eligible ? "emerald" : g.rate >= 80 ? "blue" : "rose"}
-                          className="h-2"
-                        />
-                        <p className="text-[11px] text-gray-400">
-                          {g.eligible
-                            ? `Approval rate exceeds ${g.threshold}% threshold (${g.decidedCount} decided cases)`
-                            : `${g.threshold - g.rate}% below gold card threshold (${g.decidedCount} decided cases)`
-                          }
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
-
-              {/* Empty state for analytics */}
-              {cases.length === 0 && (
-                <Card className="glass-card border border-sage-medium/30 p-12 text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 text-sm">No case data available for analytics.</p>
-                  <p className="text-gray-400 text-xs mt-1">Create cases to see charts and metrics here.</p>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {/* ═══════════ CASES VIEW (existing) ═══════════ */}
-          {dashboardView === "cases" && <>
-          {/* Alerts Bar */}
-          {hasAlerts && (
-            <Card className="flex flex-wrap items-center gap-3 md:gap-5 p-3 px-6 glass-card border border-sage-medium/30">
-              {awaitingDecision.length > 0 && (
-                <button
-                  onClick={() => { setActiveTab("active"); setStatusFilter("submitted") }}
-                  className="flex items-center gap-1.5 text-sm text-blue-700 hover:text-blue-900 transition-colors cursor-pointer"
-                >
-                  <Clock className="w-3.5 h-3.5" />
-                  <span className="font-medium">{awaitingDecision.length}</span>
-                  <span className="text-blue-600">awaiting decision</span>
-                  <span className="text-blue-400 text-xs">(oldest: {oldestSubmittedDays}d)</span>
-                </button>
-              )}
-              {awaitingDecision.length > 0 && (needsFollowUp.length > 0 || expiringApprovals.length > 0 || deniedCases.length > 0) && (
-                <div className="w-px h-5 bg-sage-medium/30" />
-              )}
-              {needsFollowUp.length > 0 && (
-                <button
-                  onClick={() => { setActiveTab("active"); setStatusFilter("followup") }}
-                  className="flex items-center gap-1.5 text-sm text-amber-700 hover:text-amber-900 transition-colors cursor-pointer"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  <span className="font-medium">{needsFollowUp.length}</span>
-                  <span className="text-amber-600">need follow-up</span>
-                </button>
-              )}
-              {needsFollowUp.length > 0 && (expiringApprovals.length > 0 || deniedCases.length > 0) && (
-                <div className="w-px h-5 bg-sage-medium/30" />
-              )}
-              {expiringApprovals.length > 0 && (
-                <button
-                  onClick={() => { setActiveTab("active"); setStatusFilter("expiring") }}
-                  className="flex items-center gap-1.5 text-sm text-amber-700 hover:text-amber-900 transition-colors cursor-pointer"
-                >
-                  <CalendarClock className="w-3.5 h-3.5" />
-                  <span className="font-medium">{expiringApprovals.length}</span>
-                  <span className="text-amber-600">PA expiring in {soonestExpirationDays}d</span>
-                </button>
-              )}
-              {expiringApprovals.length > 0 && deniedCases.length > 0 && (
-                <div className="w-px h-5 bg-sage-medium/30" />
-              )}
-              {deniedCases.length > 0 && (
-                <button
-                  onClick={() => { setActiveTab("active"); setStatusFilter("denied") }}
-                  className="flex items-center gap-1.5 text-sm text-coral hover:text-coral/80 transition-colors cursor-pointer"
-                >
-                  <XCircle className="w-3.5 h-3.5" />
-                  <span className="font-medium">{deniedCases.length}</span>
-                  <span>denied</span>
-                </button>
-              )}
-            </Card>
-          )}
-
-          {/* Case Stats Bar */}
-          <Card className="flex flex-wrap items-center gap-6 md:gap-8 p-4 px-8 glass-card border border-sage-medium/30">
-            <div className="flex flex-col gap-0.5">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Cases</p>
-              <p className="text-2xl font-bold leading-none text-dark-bg">{stats.total_cases}</p>
-            </div>
-            <div className="w-px h-10 bg-sage-medium/20" />
-            <div className="flex flex-col gap-0.5">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">This Month</p>
-              <p className="text-2xl font-bold leading-none text-dark-bg">{stats.cases_this_month}</p>
-            </div>
-            <div className="w-px h-10 bg-sage-medium/20" />
-            <div className="flex flex-col gap-0.5">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Revenue Protected</p>
-              <p className="text-2xl font-bold leading-none text-dark-bg">${stats.revenue_protected.toLocaleString()}</p>
-            </div>
-            {(statusCounts.draft > 0 || statusCounts.submitted > 0 || statusCounts.approved > 0 || statusCounts.denied > 0) && (
-              <>
-                <div className="w-px h-10 bg-sage-medium/20" />
-                <div className="flex items-center gap-4">
-                  {statusCounts.draft > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-gray-400" />
-                      <span className="text-sm font-medium text-gray-600">{statusCounts.draft}</span>
-                      <span className="text-xs text-gray-400">Draft</span>
-                    </div>
-                  )}
-                  {statusCounts.submitted > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="text-sm font-medium text-gray-600">{statusCounts.submitted}</span>
-                      <span className="text-xs text-gray-400">Submitted</span>
-                    </div>
-                  )}
-                  {statusCounts.approved > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-green-500" />
-                      <span className="text-sm font-medium text-gray-600">{statusCounts.approved}</span>
-                      <span className="text-xs text-gray-400">Approved</span>
-                    </div>
-                  )}
-                  {statusCounts.denied > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-coral" />
-                      <span className="text-sm font-medium text-gray-600">{statusCounts.denied}</span>
-                      <span className="text-xs text-gray-400">Denied</span>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* Show subscription badge here if no pipeline section above */}
-            {!pipeline && isTeamOwner && subscription.subscription_status === "trialing" && subscription.trial_ends_at && (
-              <button
-                onClick={async () => {
-                  const response = await fetch("/api/stripe/create-portal", { method: "POST" })
-                  const data = await response.json()
-                  if (data.url) {
-                    window.location.href = data.url
-                  } else {
-                    window.location.href = "/checkout"
-                  }
-                }}
-                className="ml-auto flex items-center gap-2 bg-mint/10 border border-mint/30 rounded-lg px-4 py-2 text-sm font-semibold text-dark-bg hover:bg-mint/20 transition-colors cursor-pointer"
-              >
-                Trial Active
-                <span className="bg-mint text-white text-xs font-bold px-2 py-0.5 rounded">
-                  {Math.ceil((new Date(subscription.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
-                </span>
-              </button>
-            )}
-
-            {!pipeline && isTeamOwner && subscription.subscription_status === "active" && (
-              <button
-                onClick={async () => {
-                  const response = await fetch("/api/stripe/create-portal", { method: "POST" })
-                  const data = await response.json()
-                  if (data.url) window.location.href = data.url
-                }}
-                className="ml-auto flex items-center gap-2 bg-mint/10 border border-mint/30 rounded-lg px-4 py-2 text-sm font-semibold text-dark-bg hover:bg-mint/20 transition-colors cursor-pointer"
-              >
-                <span className="w-2 h-2 rounded-full bg-mint" />
-                Active
-              </button>
-            )}
-          </Card>
-
-          {/* Cases Table */}
-          <Tabs defaultValue="active" onValueChange={(v) => { setActiveTab(v); if (v === "archived") setStatusFilter("all") }} className="w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2">
-                <TabsList className="bg-white/50 border border-sage-medium/30">
-                  <TabsTrigger value="active" className="data-[state=active]:bg-white">Active Cases</TabsTrigger>
-                  <TabsTrigger value="archived" className="gap-2 data-[state=active]:bg-white">
-                    Archived
-                    <Archive className="w-3 h-3" />
-                  </TabsTrigger>
-                </TabsList>
-                {activeTab !== "archived" && (
-                  <div className="flex items-center gap-1 ml-2">
-                    {[
-                      { value: "all", label: "All" },
-                      { value: "submitted", label: "Submitted" },
-                      { value: "approved", label: "Approved" },
-                      { value: "denied", label: "Denied" },
-                    ].map((f) => (
-                      <button
-                        key={f.value}
-                        onClick={() => setStatusFilter(f.value)}
-                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
-                          statusFilter === f.value
-                            ? "bg-dark-bg text-white"
-                            : "text-gray-500 hover:bg-gray-100"
-                        }`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search cases..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-
-            <Card className="glass-card border border-sage-medium/30 overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
-                    <TableHead className="w-[200px] lg:w-[280px] text-dark-bg font-semibold">Patient & Document</TableHead>
-                    <TableHead className="text-dark-bg font-semibold">Payer</TableHead>
-                    <TableHead className="hidden sm:table-cell text-dark-bg font-semibold">Status</TableHead>
-                    <TableHead className="hidden sm:table-cell text-dark-bg font-semibold">Created</TableHead>
-                    <TableHead className="hidden lg:table-cell text-dark-bg font-semibold">Created By</TableHead>
-                    <TableHead className="text-right text-dark-bg font-semibold">Claim Value</TableHead>
-                    <TableHead className="w-[60px] lg:w-[80px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {displayCases.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="h-32 text-center text-gray-500">
-                        {searchQuery.trim()
-                          ? `No cases found matching "${searchQuery}"`
-                          : statusFilter !== "all"
-                            ? `No ${statusFilter} cases found.`
-                            : activeTab === 'active'
-                              ? "No active cases found. Create a new case to get started."
-                              : "No archived cases."}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    displayCases.map((c) => (
-                      <TableRow key={c.id} className="group cursor-pointer hover:bg-sage-light/20 transition-colors">
-                        <TableCell className="font-medium">
-                          <Link href={`/cases/${c.id}`} className="block">
-                            <div className="font-semibold text-dark-bg">
-                              {c.patient_first_name} {c.patient_last_name}
-                            </div>
-                            <div className="text-xs text-gray-500 flex items-center gap-1">
-                              <span className="capitalize">{getDocTypeLabel(c.doc_type)}</span>
-                            </div>
-                          </Link>
-                        </TableCell>
-                        <TableCell className="text-gray-700 text-sm">
-                          {c.payer_name || '-'}
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          <div className="flex flex-col gap-0.5">
-                            <Badge variant="outline" className={`text-[10px] w-fit ${CASE_STATUS_CONFIG[c.status]?.className || "bg-gray-100 text-gray-700 border-gray-200"}`}>
-                              {CASE_STATUS_CONFIG[c.status]?.label || c.status}
-                            </Badge>
-                            {c.status === "submitted" && c.submitted_at && (
-                              <span className="text-[10px] text-gray-400">{differenceInDays(now, new Date(c.submitted_at))}d ago</span>
-                            )}
-                            {c.status === "approved" && c.pa_expiration_date && (
-                              <span className="text-[10px] text-gray-400">Expires {format(new Date(c.pa_expiration_date), "MMM d")}</span>
-                            )}
-                            {c.status === "denied" && c.denial_category && (
-                              <span className="text-[10px] text-gray-400 truncate max-w-[120px]">{c.denial_category}</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-gray-700 text-sm">
-                          {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell text-gray-700 text-sm">
-                          {c.created_by_email || userEmail}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-gray-700">
-                          {c.claim_amount ? `$${c.claim_amount.toLocaleString()}` : '-'}
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span className="sr-only">Open menu</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-white border border-sage-medium/30">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem
-                                onClick={() => router.push(`/cases/${c.id}`)}
-                                className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
-                              >
-                                <Eye className="mr-2 h-4 w-4" /> View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {c.is_archived ? (
-                                <DropdownMenuItem
-                                  onClick={() => handleArchive(c.id, false)}
-                                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
-                                >
-                                  <RefreshCw className="mr-2 h-4 w-4" /> Restore to Active
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem
-                                  onClick={() => handleArchive(c.id, true)}
-                                  className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
-                                >
-                                  <Archive className="mr-2 h-4 w-4" /> Archive Case
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => openDeleteDialog(c)}
-                                className="text-coral focus:bg-coral/10 focus:text-coral cursor-pointer"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete Permanently
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </Card>
-          </Tabs>
-          </>}
-        </div>
       </div>
 
       {/* Delete Confirmation Dialog */}
