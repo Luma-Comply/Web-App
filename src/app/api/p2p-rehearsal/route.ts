@@ -184,23 +184,30 @@ export async function POST(request: NextRequest) {
               "Begin the peer-to-peer review. Introduce yourself and raise your first objection."
             )
 
+            const pFirstName = caseData.patient_first_name as string
+            const pLastName = caseData.patient_last_name as string
+
             for await (const chunk of result.stream) {
-              const content = chunk.text() || ""
-              if (content) {
-                fullResponse += content
+              const rawContent = chunk.text() || ""
+              if (rawContent) {
+                fullResponse += rawContent
+                // Replace __PATIENT__ in each chunk so the client sees the real name
+                const content = reinsertPatientName(rawContent, pFirstName, pLastName)
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)
                 )
               }
             }
 
-            // Save opening to transcript
-            const displayResponse = reinsertPatientName(
-              fullResponse,
-              caseData.patient_first_name as string,
-              caseData.patient_last_name as string
-            )
+            // Save opening to transcript (include the initial user prompt so history is valid for Gemini)
+            const displayResponse = reinsertPatientName(fullResponse, pFirstName, pLastName)
+            const openingUserPrompt = "Begin the peer-to-peer review. Introduce yourself and raise your first objection."
             const transcript = [
+              {
+                role: "user",
+                content: openingUserPrompt,
+                timestamp: new Date().toISOString(),
+              },
               {
                 role: "assistant",
                 content: displayResponse,
@@ -275,12 +282,18 @@ export async function POST(request: NextRequest) {
       if (lastName) scrubbed = scrubbed.replace(new RegExp(lastName, "gi"), PATIENT_PLACEHOLDER)
 
       // Build Gemini history from transcript
-      const history: { role: "user" | "model"; parts: [{ text: string }] }[] = transcript.map(
+      const transcriptHistory: { role: "user" | "model"; parts: [{ text: string }] }[] = transcript.map(
         (turn) => ({
           role: (turn.role === "assistant" ? "model" : "user") as "user" | "model",
           parts: [{ text: turn.content }],
         })
       )
+      // Gemini requires history to start with a user turn — prepend the opening prompt if needed
+      // (handles old transcripts that don't include the initial user prompt)
+      const history =
+        transcriptHistory.length > 0 && transcriptHistory[0].role === "model"
+          ? [{ role: "user" as const, parts: [{ text: "Begin the peer-to-peer review. Introduce yourself and raise your first objection." }] }, ...transcriptHistory]
+          : transcriptHistory
 
       const lcdContext = buildLCDContext(caseData.metadata as Record<string, unknown> | null)
       const generatedDoc = (caseData.edited_output as string) || (caseData.generated_output as string) || ""
@@ -302,9 +315,11 @@ export async function POST(request: NextRequest) {
             const result = await chat.sendMessageStream(scrubbed)
 
             for await (const chunk of result.stream) {
-              const content = chunk.text() || ""
-              if (content) {
-                fullResponse += content
+              const rawContent = chunk.text() || ""
+              if (rawContent) {
+                fullResponse += rawContent
+                // Replace __PATIENT__ in each chunk so the client sees the real name
+                const content = reinsertPatientName(rawContent, firstName, lastName)
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)
                 )
