@@ -145,11 +145,6 @@ interface PlatformStats {
   signupsThisMonth: number
 }
 
-interface ClarityMetric {
-  metricName: string
-  information: Record<string, string | number>[]
-}
-
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   lead: { label: "Lead", className: "bg-blue-100 text-blue-700 border-blue-200" },
@@ -236,8 +231,6 @@ export default function DashboardPage() {
   const [pipelineSearch, setPipelineSearch] = useState("")
   const [pipelinePage, setPipelinePage] = useState(0)
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null)
-  const [clarityData, setClarityData] = useState<ClarityMetric[] | null>(null)
-  const [clarityError, setClarityError] = useState<string | null>(null)
   const PIPELINE_PAGE_SIZE = 10
 
   useEffect(() => {
@@ -347,14 +340,6 @@ export default function DashboardPage() {
           .then((d) => { if (d) setPlatformStats(d) })
           .catch(() => {})
 
-        // Fetch Clarity web analytics (last 3 days, by device)
-        fetch("/api/admin/clarity-insights?numOfDays=3&dimension1=Device")
-          .then((r) => {
-            if (!r.ok) throw new Error(r.status === 500 ? "Token not configured" : `Error ${r.status}`)
-            return r.json()
-          })
-          .then((d) => { if (Array.isArray(d)) setClarityData(d) })
-          .catch((e) => setClarityError(e.message))
       }
     } catch (error) {
       console.error("Error loading dashboard:", error)
@@ -857,144 +842,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ═══════════ CLARITY WEB ANALYTICS (super admin only) ═══════════ */}
-        {isSuperAdmin && clarityData && clarityData.length > 0 && (() => {
-          const trafficMetric = clarityData.find(m => m.metricName === "Traffic")
-          const _scrollMetric = clarityData.find(m => m.metricName === "Scroll Depth")
-          const _engagementMetric = clarityData.find(m => m.metricName === "Engagement Time")
-          const deadClickMetric = clarityData.find(m => m.metricName === "Dead Click Count")
-          const rageClickMetric = clarityData.find(m => m.metricName === "Rage Click Count")
-          const popularPages = clarityData.find(m => m.metricName === "Popular Pages")
-          const quickbackMetric = clarityData.find(m => m.metricName === "Quickback Click")
-          const errorClickMetric = clarityData.find(m => m.metricName === "Error Click Count")
-
-          // Aggregate traffic totals across dimensions
-          const totalSessions = trafficMetric?.information?.reduce((s, d) => s + Number(d.totalSessionCount || 0), 0) ?? 0
-          const totalUsers = trafficMetric?.information?.reduce((s, d) => s + Number(d.distantUserCount || 0), 0) ?? 0
-          const avgPagesPerSession = trafficMetric?.information?.length
-            ? (trafficMetric.information.reduce((s, d) => s + Number(d.PagesPerSessionPercentage || 0), 0) / trafficMetric.information.length).toFixed(1)
-            : "—"
-
-          // Build device breakdown for BarList
-          const deviceData = trafficMetric?.information
-            ?.filter(d => d.Device && String(d.Device) !== "Other")
-            .map(d => ({
-              name: String(d.Device),
-              value: Number(d.totalSessionCount || 0),
-            }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 5) ?? []
-
-          // UX signals
-          const totalDeadClicks = deadClickMetric?.information?.reduce((s, d) => s + Number(d.count || d.deadClickCount || 0), 0) ?? 0
-          const totalRageClicks = rageClickMetric?.information?.reduce((s, d) => s + Number(d.count || d.rageClickCount || 0), 0) ?? 0
-          const totalQuickbacks = quickbackMetric?.information?.reduce((s, d) => s + Number(d.count || d.quickbackCount || 0), 0) ?? 0
-          const totalErrorClicks = errorClickMetric?.information?.reduce((s, d) => s + Number(d.count || d.errorClickCount || 0), 0) ?? 0
-
-          // Popular pages for BarList
-          const pageData = popularPages?.information
-            ?.map(d => ({
-              name: String(d.PageUrl || d.URL || d.pageTitle || d.PageTitle || "Unknown"),
-              value: Number(d.totalSessionCount || d.viewCount || d.count || 0),
-            }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 5) ?? []
-
-          return (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-sans font-semibold text-dark-bg flex items-center gap-2">
-                  Web Analytics
-                  <span className="text-xs font-normal text-gray-400 ml-1">Last 3 days via Clarity</span>
-                </h2>
-                <button
-                  onClick={() => window.open('https://clarity.microsoft.com/projects/view/v64a4br39t/dashboard', '_blank')}
-                  className="text-xs text-mint hover:text-mint-light flex items-center gap-1 cursor-pointer"
-                >
-                  Open Clarity <ExternalLink className="h-3 w-3" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Traffic Overview */}
-                <Card className="p-5 glass-card border border-sage-medium/30 space-y-4">
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Traffic</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <p className="text-2xl font-bold text-dark-bg">{totalSessions.toLocaleString()}</p>
-                      <p className="text-[11px] text-gray-400">Sessions</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-dark-bg">{totalUsers.toLocaleString()}</p>
-                      <p className="text-[11px] text-gray-400">Users</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-dark-bg">{avgPagesPerSession}</p>
-                      <p className="text-[11px] text-gray-400">Pages/Session</p>
-                    </div>
-                  </div>
-                  {deviceData.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">By Device</p>
-                      <BarList data={deviceData} className="text-sm" />
-                    </div>
-                  )}
-                </Card>
-
-                {/* UX Signals */}
-                <Card className="p-5 glass-card border border-sage-medium/30 space-y-4">
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">UX Signals</p>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Dead Clicks</span>
-                      <span className="text-sm font-semibold text-dark-bg">{totalDeadClicks.toLocaleString()}</span>
-                    </div>
-                    <ProgressBar value={Math.min(totalDeadClicks, 100)} color="amber" className="h-1.5" />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Rage Clicks</span>
-                      <span className="text-sm font-semibold text-coral">{totalRageClicks.toLocaleString()}</span>
-                    </div>
-                    <ProgressBar value={Math.min(totalRageClicks, 100)} color="rose" className="h-1.5" />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Quick-backs</span>
-                      <span className="text-sm font-semibold text-dark-bg">{totalQuickbacks.toLocaleString()}</span>
-                    </div>
-                    <ProgressBar value={Math.min(totalQuickbacks, 100)} color="blue" className="h-1.5" />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Error Clicks</span>
-                      <span className="text-sm font-semibold text-dark-bg">{totalErrorClicks.toLocaleString()}</span>
-                    </div>
-                    <ProgressBar value={Math.min(totalErrorClicks, 100)} color="gray" className="h-1.5" />
-                  </div>
-                </Card>
-
-                {/* Popular Pages */}
-                <Card className="p-5 glass-card border border-sage-medium/30 space-y-4">
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Popular Pages</p>
-                  {pageData.length > 0 ? (
-                    <BarList
-                      data={pageData.map(d => ({
-                        ...d,
-                        name: d.name.replace(/^https?:\/\/[^/]+/, '').replace(/\/$/, '') || '/',
-                      }))}
-                      className="text-sm"
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-400 italic">No page data available</p>
-                  )}
-                </Card>
-              </div>
-            </div>
-          )
-        })()}
-        {isSuperAdmin && clarityError && (
-          <Card className="p-4 glass-card border border-amber-200/50 bg-amber-50/30">
-            <p className="text-sm text-amber-700 flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Clarity Analytics: {clarityError}
-            </p>
-          </Card>
-        )}
 
         {/* ═══════════ CASE MANAGEMENT ═══════════ */}
         <div className="space-y-4">
