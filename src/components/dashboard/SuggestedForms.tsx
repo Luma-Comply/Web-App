@@ -20,9 +20,10 @@ interface SuggestedForm {
 interface SuggestedFormsProps {
     caseId: string
     lastGenerated: string | null // Used to trigger refresh
+    onCountChange?: (count: number) => void
 }
 
-export function SuggestedForms({ caseId, lastGenerated }: SuggestedFormsProps) {
+export function SuggestedForms({ caseId, lastGenerated, onCountChange }: SuggestedFormsProps) {
     const [forms, setForms] = useState<SuggestedForm[]>([])
     const [loading, setLoading] = useState(true)
     const supabase = createClient()
@@ -48,6 +49,7 @@ export function SuggestedForms({ caseId, lastGenerated }: SuggestedFormsProps) {
             // Deduplicate by title if needed, or just show all
             // For now, simpler is better
             setForms(data || [])
+            onCountChange?.(data?.length ?? 0)
         } catch (err) {
             console.error("Failed to fetch suggested forms", err)
         } finally {
@@ -173,7 +175,7 @@ export function SuggestedForms({ caseId, lastGenerated }: SuggestedFormsProps) {
                     variant="outline"
                     size="sm"
                     onClick={downloadFormsPDF}
-                    className="gap-2 w-full sm:w-auto shrink-0"
+                    className="gap-2 w-full sm:w-auto shrink-0 bg-white hover:bg-gray-50 hover:text-dark-bg"
                 >
                     <Download className="w-4 h-4" />
                     Download Checklist

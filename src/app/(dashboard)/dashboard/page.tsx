@@ -860,8 +860,8 @@ export default function DashboardPage() {
         {/* ═══════════ CLARITY WEB ANALYTICS (super admin only) ═══════════ */}
         {isSuperAdmin && clarityData && clarityData.length > 0 && (() => {
           const trafficMetric = clarityData.find(m => m.metricName === "Traffic")
-          const scrollMetric = clarityData.find(m => m.metricName === "Scroll Depth")
-          const engagementMetric = clarityData.find(m => m.metricName === "Engagement Time")
+          const _scrollMetric = clarityData.find(m => m.metricName === "Scroll Depth")
+          const _engagementMetric = clarityData.find(m => m.metricName === "Engagement Time")
           const deadClickMetric = clarityData.find(m => m.metricName === "Dead Click Count")
           const rageClickMetric = clarityData.find(m => m.metricName === "Rage Click Count")
           const popularPages = clarityData.find(m => m.metricName === "Popular Pages")

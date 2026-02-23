@@ -212,29 +212,39 @@ ${isWiserActiveForSkinSubs(caseData.patient_state) ? `IMPORTANT: ${caseData.pati
 Focus on: LCD requirements specific to this MAC, covered product list, current audit focus areas, debridement requirements, vascular testing thresholds, and documentation requirements. Be specific about coverage criteria, SOC failure requirements, and common denial reasons for this specific MAC jurisdiction.`
           : "You are an expert medical insurance researcher specializing in state-specific payer policies. Find the most current clinical coverage guidelines, policy bulletins, and medical necessity criteria. Pay special attention to state-specific variations as payer policies differ significantly by state (e.g., Cigna in California vs Texas). In addition to payer-specific criteria, always research and cite relevant clinical society practice guidelines (NCCN, ACR, AAD, AGA, EULAR, AAN, etc.) that support the requested treatment. Include the guideline name, year/edition, and recommendation strength. Be comprehensive, factual, and include all relevant criteria."
 
-        const researchResponse = await fetch("https://api.perplexity.ai/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${pp_apiKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "sonar-pro",
-            messages: [
-              {
-                role: "system",
-                content: systemContent
-              },
-              {
-                role: "user",
-                content: researchQuery
-              }
-            ],
-            temperature: 0.1
+        // Retry with exponential backoff for rate limits (429)
+        const maxRetries = 3
+        let researchResponse: Response | null = null
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          researchResponse = await fetch("https://api.perplexity.ai/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${pp_apiKey}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              model: "sonar-pro",
+              messages: [
+                {
+                  role: "system",
+                  content: systemContent
+                },
+                {
+                  role: "user",
+                  content: researchQuery
+                }
+              ],
+              temperature: 0.1
+            })
           })
-        })
 
-        if (researchResponse.ok) {
+          if (researchResponse.status !== 429) break
+          const backoffMs = 1000 * Math.pow(2, attempt) // 1s, 2s, 4s
+          console.log(`Perplexity rate limited (429), retrying in ${backoffMs}ms (attempt ${attempt + 1}/${maxRetries})`)
+          await new Promise(r => setTimeout(r, backoffMs))
+        }
+
+        if (researchResponse?.ok) {
           const researchData = await researchResponse.json()
           researchContext = researchData.choices[0]?.message?.content || "No research data returned."
           console.log("Perplexity Research Complete")
@@ -249,7 +259,7 @@ Focus on: LCD requirements specific to this MAC, covered product list, current a
             researchData.citations || []
           ).catch(() => {})
         } else {
-          console.error("Perplexity API Error:", await researchResponse.text())
+          console.error("Perplexity API Error:", researchResponse ? await researchResponse.text() : "No response")
         }
       } catch (ppError) {
         console.error("Perplexity Call Failed:", ppError)
@@ -683,14 +693,16 @@ CRITICAL - PATIENT INFORMATION:
     - If the patient meets criteria, explicitly state how (e.g., "Patient meets step therapy requirement having failed Methotrexate...").
     - If specific criteria are missing from the notes, highlight them as "Needed Information".
     - Tone: Professional, persuasive, medical-legal.
-    - Format: Clean, professional letter format WITHOUT placeholders, brackets, or markdown formatting.
-    - DO NOT include placeholders like [Your Medical Facility's Letterhead], [Address], [City, State, ZIP Code], [Phone Number], [Date], [Date of Birth], [Insurance ID], [Patient's Address], [Your Phone Number], [Your Email Address], or [Contact Information].
-    - DO NOT include special formatting characters like ** (bold), __ (underline), # (headers), or any markdown syntax.
-    - DO NOT use asterisks (*) or underscores (_) for formatting.
-    - Use plain text only - no markdown, no special characters for emphasis.
-    - Start directly with the payer information and subject line.
-    - Use actual dates, addresses, and information from the clinical notes when available.
-    - If information is not available, simply omit it rather than using placeholders.
+    - Format: Clean, professional letter. Plain text only — no markdown, no bold, no headers, no brackets.
+    - NEVER use square brackets [] anywhere.
+    - NEVER include empty or placeholder fields. If you don't have data for a field, DO NOT include that line at all. No "Date: ", no "Policy Number: ", no "Clinic Name: ", no "Contact Phone: ", no "NPI: ", etc. Just skip those lines entirely.
+    - DO NOT include a header block with fields like Date, Policy Number, Clinic Name, Contact Phone, Contact Fax, Referring Provider, Age Group, Medicare Eligible, etc. These are NOT part of the letter format.
+    - DO NOT include a "RECOMMENDED SUPPORTING DOCUMENTS" section.
+    - The letter should begin with ONLY:
+      Line 1: The payer name (e.g., "Medicare Part B" or "Novitas Solutions")
+      Line 2: "Prior Authorization Department" (if applicable)
+      Then a blank line, then "Subject:" line, then "Patient:" line with the patient name, then "Age:" line, then diagnosis codes, then "Dear Reviewer," and the letter body.
+    - If information is not available, omit it completely. Do not leave empty labels.
 
     GUIDELINE CONCORDANCE:
     When the researched guidelines include clinical society recommendations (NCCN, ACR, AAD, AGA, EULAR, AAN, etc.), include a "Clinical Guideline Support" paragraph in the letter that:
@@ -702,6 +714,8 @@ CRITICAL - PATIENT INFORMATION:
 
     CRITICAL - PATIENT INFORMATION:
     - Use ${PATIENT_PLACEHOLDER} as the patient name throughout the letter. Do NOT extract or invent any patient names from the Clinical Notes or elsewhere.
+    - NEVER include a "Date of Birth" or "DOB" line in any form. No generalized DOB, no age group DOB, no placeholder DOB. Instead, write "Age: ${caseData.patient_age}" if age is needed.
+    - NEVER include a "Medicare ID" or "Insurance ID" line. We do not collect these for HIPAA Safe Harbor compliance.
     - Do NOT invent any patient identifiers, dates of birth, or specific dates. Use generalized timeframes (e.g., "approximately 10 months" not "January 15, 2025").
     - Extract ALL relevant clinical details from notes: comorbidities, diagnosis codes, lab values, test results (ABI, vascular studies, nutritional assessments).
     - Include ALL wounds/conditions mentioned in the notes, not just one.
@@ -709,15 +723,11 @@ CRITICAL - PATIENT INFORMATION:
     - Extract practice/clinic names from the notes - use the CURRENT practice name if mentioned, not closed practices.
 
     PROVIDER INFORMATION:
-    - At the END of the letter, include provider contact information.
+    - At the END of the letter, close with "Sincerely," followed by provider information.
     - FIRST, carefully search the Clinical Notes for any doctor/provider name, clinic name, practice name, or phone number.
-    - If provider information WITH a phone number is found in the notes, extract it and add it at the end of the letter in this format:
-      "Sincerely,
-      [Provider Name from notes]
-      [Provider Title/Clinic from notes if available]
-      [Phone Number from notes]"
-    - If NO provider information with phone number is found in the notes, do NOT add any provider contact information at the end.
-    - Only extract and use provider info that includes a phone number.`
+    - If provider information WITH a phone number is found in the notes, extract and include the actual name, title, and phone number.
+    - If NO provider information with phone number is found in the notes, end with just "Sincerely," and nothing else. Do NOT add placeholder text like "Advanced Wound Care Provider" or generic titles.
+    - NEVER use square brackets for provider info. Either use the actual data from the notes or omit the line entirely.`
     }
 
     const userPrompt = `GENERATE DOCUMENTATION FOR:
@@ -725,7 +735,7 @@ CRITICAL - PATIENT INFORMATION:
     CASE CONTEXT (Form Input - Use as reference, but Clinical Notes are source of truth):
     - Document Type: ${getDocTypeLabel(caseData.doc_type)}
     - Diagnosis: ${formatIcd10ForPrompt()}
-    - Patient: ${PATIENT_PLACEHOLDER}, ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}, ${caseData.patient_gender || ''} from ${caseData.patient_state}
+    - Patient: ${PATIENT_PLACEHOLDER}, Age: ${caseData.patient_age}, ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}, ${caseData.patient_gender || ''} from ${caseData.patient_state}
     - Payer: ${caseData.payer_name} (${caseData.payer_type})
     - Medication: ${caseData.requested_medication} ${caseData.medication_dose}
 
@@ -774,7 +784,7 @@ CRITICAL - PATIENT INFORMATION:
       systemInstruction: systemPrompt,
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 3000,
+        maxOutputTokens: 8192,
       }
     })
 
@@ -785,36 +795,52 @@ CRITICAL - PATIENT INFORMATION:
     // Re-insert patient name (replace [PATIENT] with actual name)
     documentation = reinsertPatientName(documentation, caseData.patient_first_name, caseData.patient_last_name)
 
+    // Store raw length for safety check
+    const rawLength = documentation.length
+
     // Clean up placeholders and special characters
     documentation = documentation
-      // Remove common placeholders
-      .replace(/\[Your Medical Facility's Letterhead\]/gi, '')
-      .replace(/\[Address\]/gi, '')
-      .replace(/\[City, State, ZIP Code\]/gi, '')
-      .replace(/\[Phone Number\]/gi, '')
-      .replace(/\[Date\]/gi, '')
-      .replace(/\[Date of Birth\]/gi, '')
-      .replace(/\[Insurance ID\]/gi, '')
-      .replace(/\[Patient's Address\]/gi, '')
-      .replace(/\[Your Phone Number\]/gi, '')
-      .replace(/\[Your Email Address\]/gi, '')
-      .replace(/\[Contact Information\]/gi, '')
-      // Remove markdown formatting (**, __, etc.)
-      .replace(/\*\*/g, '') // Remove **bold**
-      .replace(/\*\*/g, '') // Remove any remaining **
-      .replace(/__/g, '') // Remove __underline__
-      .replace(/#{1,6}\s/g, '') // Remove markdown headers
-      .replace(/\*/g, '') // Remove any remaining *
-      .replace(/_/g, '') // Remove any remaining _
-      // Remove empty lines with just brackets or placeholders
-      .replace(/^\s*\[.*?\]\s*$/gm, '')
+      // Remove the entire "RECOMMENDED SUPPORTING DOCUMENTS" section if present
+      // MUST be on its own line (^ anchor with m flag) and NOT case-insensitive to avoid matching "recommended" in body text
+      .replace(/\n*^RECOMMENDED SUPPORTING DOCUMENTS\b.*$[\s\S]*$/m, '')
+      .replace(/\n*^Recommended Supporting Documents\b.*$[\s\S]*$/m, '')
+      // Remove DOB lines in any form — replace with Age
+      .replace(/^\s*(?:Date of Birth|DOB)\s*:.*$/gim, `Age: ${caseData.patient_age}`)
+      // NUCLEAR: Remove ALL square bracket content
+      .replace(/\[[^\]]*\]/g, '')
+      // Remove any line that is a label with empty or whitespace-only value (e.g. "Date: ", "NPI: ", "Clinic Name: ")
+      .replace(/^\s*(?:Date|Policy Number|Clinic Name|Contact Phone|Contact Fax|Fax|Phone|NPI|Medicare ID|Insurance ID|Member ID|Referring Provider|Referring Physician|Provider Name|Provider NPI|Age Group|Medicare Eligible|Provider Contact Information|Letterhead)\s*:?\s*$/gim, '')
+      // Remove "Advanced Wound Care Provider" generic filler (standalone or after label)
+      .replace(/^\s*(?:Referring (?:Provider|Physician))\s*:\s*Advanced Wound Care Provider\s*$/gim, '')
+      .replace(/^\s*Advanced Wound Care Provider\s*$/gim, '')
+      // Remove "Electronically Signed" filler
+      .replace(/^\s*Electronically Signed\s*$/gim, '')
+      // Remove invented future date lines
+      .replace(/^\s*Date\s*:\s*(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s*\d{4}\s*$/gim, '')
+      // Remove markdown formatting
+      .replace(/\*\*/g, '')
+      .replace(/__/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\*/g, '')
       // Clean up multiple consecutive blank lines
       .replace(/\n{3,}/g, '\n\n')
       // Remove leading/trailing whitespace from each line
       .split('\n').map(line => line.trim()).join('\n')
-      // Remove any remaining standalone brackets
-      .replace(/^\s*\[\s*\]\s*$/gm, '')
       .trim()
+
+    // Safety check: if cleanup stripped more than 70% of content, something went wrong
+    // Fall back to gentle cleanup only (just brackets and markdown)
+    if (documentation.length < rawLength * 0.3 && rawLength > 500) {
+      console.warn(`[generate] Aggressive cleanup removed ${Math.round((1 - documentation.length / rawLength) * 100)}% of content. Falling back to gentle cleanup.`)
+      documentation = (docResult.response.text() || "")
+      documentation = reinsertPatientName(documentation, caseData.patient_first_name, caseData.patient_last_name)
+      documentation = documentation
+        .replace(/\[[^\]]*\]/g, '')
+        .replace(/\*\*/g, '').replace(/__/g, '').replace(/#{1,6}\s/g, '').replace(/\*/g, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .split('\n').map(line => line.trim()).join('\n')
+        .trim()
+    }
 
     // Post-process: Check if provider info with phone number was added
     // Look for phone number pattern in the last 500 characters (signature area)

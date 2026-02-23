@@ -48,6 +48,15 @@ const WOUND_TYPE_OPTIONS: { value: WoundType; label: string }[] = [
   { value: "OTHER", label: "Other" },
 ];
 
+function formatWoundTypeLabel(wt: string): string {
+  const match = WOUND_TYPE_OPTIONS.find((o) => o.value === wt);
+  if (match) return match.label.split(" (")[0];
+  return wt
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 interface LCDValidationPanelProps {
   validation: {
     riskLevel: string;
@@ -124,7 +133,7 @@ export function LCDValidationPanel({
   };
 
   const riskLevel = validation.riskLevel as AuditRiskLevel;
-  const riskConfig = AUDIT_RISK_LEVELS[riskLevel] || AUDIT_RISK_LEVELS.MEDIUM;
+  const _riskConfig = AUDIT_RISK_LEVELS[riskLevel] || AUDIT_RISK_LEVELS.MEDIUM;
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) =>
@@ -203,7 +212,7 @@ export function LCDValidationPanel({
   };
 
   return (
-    <Card className="bg-white rounded-xl shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow border-0">
+    <Card className="bg-white rounded-xl border border-gray-200">
       <Collapsible
         open={!isCollapsed}
         onOpenChange={() => setIsCollapsed(!isCollapsed)}
@@ -215,22 +224,8 @@ export function LCDValidationPanel({
                 <CardTitle className="text-lg font-sans font-semibold">
                   {getPanelTitle(docType)}
                 </CardTitle>
-                {/* Badge - hidden on mobile, shown on desktop inline */}
-                <Badge
-                  variant="outline"
-                  className={cn("ml-2 hidden sm:inline-flex", getRiskBadgeColor(riskLevel))}
-                >
-                  {riskConfig.label}
-                </Badge>
               </div>
               <div className="flex items-center justify-between sm:justify-end gap-2">
-                {/* Badge - shown on mobile before the count */}
-                <Badge
-                  variant="outline"
-                  className={cn("sm:hidden", getRiskBadgeColor(riskLevel))}
-                >
-                  {riskConfig.label}
-                </Badge>
                 <span className="text-sm text-gray-500">
                   {validation.foundCount}/{validation.totalRequirements} found
                 </span>
@@ -309,7 +304,7 @@ export function LCDValidationPanel({
                   {isEditable && onWoundTypeChange ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button className="flex items-center gap-2 text-xl font-bold text-dark-bg hover:text-mint transition-colors group">
+                        <button className="flex items-center gap-2 text-sm font-bold text-dark-bg hover:text-mint transition-colors group">
                           {validation.detectedWoundType
                             ? WOUND_TYPE_OPTIONS.find(
                                 (o) => o.value === validation.detectedWoundType,
@@ -336,16 +331,9 @@ export function LCDValidationPanel({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   ) : (
-                    <div className="text-xl font-bold text-dark-bg">
+                    <div className="text-sm font-bold text-dark-bg">
                       {validation.detectedWoundType
-                        ? validation.detectedWoundType
-                            .split("_")
-                            .map(
-                              (word) =>
-                                word.charAt(0).toUpperCase() +
-                                word.slice(1).toLowerCase(),
-                            )
-                            .join(" ")
+                        ? formatWoundTypeLabel(validation.detectedWoundType)
                         : "Unknown"}
                     </div>
                   )}
@@ -359,7 +347,7 @@ export function LCDValidationPanel({
                   </div>
                   <div
                     className={cn(
-                      "text-xl font-bold",
+                      "text-sm font-bold",
                       validation.ctpCovered ? "text-blue-600" : "text-red-600",
                     )}
                   >
@@ -373,58 +361,12 @@ export function LCDValidationPanel({
                   <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                     LCD Date
                   </div>
-                  <div className="text-xl font-bold text-dark-bg">
+                  <div className="text-sm font-bold text-dark-bg">
                     {validation.perplexityFindings.lcdEffectiveDate}
                   </div>
                 </div>
               )}
             </div>
-
-            {/* Instant Denial Warnings */}
-            {validation.instantDenialTriggers.length > 0 && (
-              <div className="bg-red-50 border border-red-300 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
-                  <span className="font-semibold text-red-800">
-                    Instant Denial Triggers
-                  </span>
-                </div>
-                <ul className="space-y-1">
-                  {validation.instantDenialTriggers.map((trigger, i) => (
-                    <li
-                      key={i}
-                      className="text-sm text-red-700 flex items-start gap-2"
-                    >
-                      <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
-                      {trigger}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Very High Risk Items */}
-            {validation.veryHighRiskItems.length > 0 && (
-              <div className="bg-orange-50 border border-orange-300 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="w-5 h-5 text-orange-600" />
-                  <span className="font-semibold text-orange-800">
-                    Very High Risk - Missing
-                  </span>
-                </div>
-                <ul className="space-y-1">
-                  {validation.veryHighRiskItems.map((item, i) => (
-                    <li
-                      key={i}
-                      className="text-sm text-orange-700 flex items-start gap-2"
-                    >
-                      <div className="w-1.5 h-1.5 rounded-full bg-orange-500 mt-1.5 flex-shrink-0" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
 
             {/* Checklist Categories */}
             <div className="space-y-3">

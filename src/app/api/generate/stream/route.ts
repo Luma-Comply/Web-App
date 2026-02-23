@@ -450,7 +450,7 @@ CRITICAL: Use ${PATIENT_PLACEHOLDER} as the patient name throughout. Do NOT inve
 
 Generate ${getDocTypeLabel(caseData.doc_type)} for:
 Diagnosis: ${formatIcd10ForPrompt()}
-Patient: ${PATIENT_PLACEHOLDER}, ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}, ${caseData.patient_state}
+Patient: ${PATIENT_PLACEHOLDER}, Age: ${caseData.patient_age}, ${formatAgeTagsForPrompt(computeAgeTags(caseData.patient_age))}, ${caseData.patient_state}
 Payer: ${caseData.payer_name}
 Medication: ${caseData.requested_medication}
 
@@ -458,13 +458,27 @@ RESEARCH: ${researchContext.substring(0, 3000)}
 ${chatConversationContext}${checklistEditsContext}
 CLINICAL NOTES: ${clinicalNotesSummary}
 
-Generate a professional, persuasive prior authorization letter. Do not use markdown formatting like ** or #. Use plain text only. If provider checklist updates are provided above, incorporate that information into the letter.`
+Generate a professional, persuasive prior authorization letter.
+
+FORMAT RULES:
+- Plain text only — no markdown, no bold (**), no headers (#), no brackets [].
+- NEVER use square brackets [] anywhere in the output.
+- NEVER include empty or placeholder fields. If you don't have data for a field, DO NOT include that line. No "Date: ", no "Policy Number: ", no "Clinic Name: ", no "Contact Phone: ", no "NPI: ", no "Tax ID: ", etc.
+- DO NOT include a header block with fields like Date, Policy Number, Clinic Name, Contact Phone, Contact Fax, Referring Provider, Age Group, Medicare Eligible, Credentials, Tax ID, etc.
+- DO NOT include a "RECOMMENDED SUPPORTING DOCUMENTS" section.
+- The letter should begin with the payer name, then "Prior Authorization Department" or "Attention: Prior Authorization Department", then "Subject:" line, then "Patient:" line, then "Age: ${caseData.patient_age}" line, then the letter body starting with "Dear...".
+- For the Age line, use the NUMERIC age (e.g., "Age: 81"), NOT the age group label like "geriatric".
+- NEVER include a "Date of Birth" or "DOB" line.
+- NEVER include a "Medicare ID" or "Insurance ID" line.
+- NEVER include "Age Group:", "Medicare Eligible:", or "Credentials:" lines.
+- Do NOT invent provider names, credentials, or contact information. If provider info is in the clinical notes or in PROVIDER CHECKLIST UPDATES, use that. If not, end with just "Sincerely," and nothing else.
+- If provider checklist updates are provided above, incorporate that information into the letter.`
 
       const docModel = genAI.getGenerativeModel({
         model: "gemini-2.5-flash",
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 3000,
+          maxOutputTokens: 16384,
         }
       })
 
@@ -489,12 +503,48 @@ Generate a professional, persuasive prior authorization letter. Do not use markd
       // Re-insert patient name (replace [PATIENT] with actual name)
       documentation = reinsertPatientName(documentation, caseData.patient_first_name, caseData.patient_last_name)
 
+      // Store raw text for safety fallback (docResult not accessible outside try/catch)
+      const rawDocumentation = documentation
+      const rawLength = documentation.length
+
       documentation = documentation
+        // Remove RECOMMENDED SUPPORTING DOCUMENTS section (NOT case-insensitive to avoid matching "recommended" in body)
+        .replace(/\n*^RECOMMENDED SUPPORTING DOCUMENTS\b.*$[\s\S]*$/m, '')
+        .replace(/\n*^Recommended Supporting Documents\b.*$[\s\S]*$/m, '')
+        // Remove DOB lines — replace with Age
+        .replace(/^\s*(?:Date of Birth|DOB)\s*:.*$/gim, `Age: ${caseData.patient_age}`)
+        // Remove ALL square bracket content
+        .replace(/\[[^\]]*\]/g, '')
+        // Remove lines that are empty labels (e.g. "Date: ", "NPI: ", "Tax ID: ")
+        .replace(/^\s*(?:Date|Policy Number|Clinic Name|Contact Phone|Contact Fax|Fax|Phone|NPI|Medicare ID|Insurance ID|Member ID|Referring Provider|Referring Physician|Provider Name|Provider NPI|Age Group|Medicare Eligible|Provider Contact Information|Letterhead|Tax ID|TIN|Credentials|Contact Information)\s*:?\s*$/gim, '')
+        // Remove "Contact Information: , " pattern (comma with empty values)
+        .replace(/^\s*Contact Information\s*:\s*,\s*$/gim, '')
+        // Remove generic provider filler
+        .replace(/^\s*(?:Referring (?:Provider|Physician))\s*:\s*Advanced Wound Care Provider\s*$/gim, '')
+        .replace(/^\s*Advanced Wound Care Provider\s*$/gim, '')
+        .replace(/^\s*Electronically Signed\s*$/gim, '')
+        // Remove invented future date lines
+        .replace(/^\s*Date\s*:\s*(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s*\d{4}\s*$/gim, '')
+        // Remove markdown formatting
         .replace(/\*\*/g, '')
+        .replace(/__/g, '')
         .replace(/#{1,6}\s/g, '')
         .replace(/\*/g, '')
+        // Clean up multiple blank lines
         .replace(/\n{3,}/g, '\n\n')
+        .split('\n').map((line: string) => line.trim()).join('\n')
         .trim()
+
+      // Safety check: if cleanup stripped more than 70% of content, fall back to gentle cleanup
+      if (documentation.length < rawLength * 0.3 && rawLength > 500) {
+        console.warn(`[SSE] Aggressive cleanup removed ${Math.round((1 - documentation.length / rawLength) * 100)}% of content. Falling back.`)
+        documentation = rawDocumentation
+          .replace(/\[[^\]]*\]/g, '')
+          .replace(/\*\*/g, '').replace(/__/g, '').replace(/#{1,6}\s/g, '').replace(/\*/g, '')
+          .replace(/\n{3,}/g, '\n\n')
+          .split('\n').map((line: string) => line.trim()).join('\n')
+          .trim()
+      }
 
       const { data: savedForms } = await supabase
         .from("case_suggested_forms")

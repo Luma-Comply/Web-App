@@ -34,13 +34,15 @@ export function formatAgeTagsForPrompt(tags: AgeTags): string {
 
 /**
  * Placeholder token the AI uses instead of the real patient name.
+ * Uses double underscores to avoid being stripped by bracket sanitization.
  * Re-inserted post-generation before saving to DB.
  */
-export const PATIENT_PLACEHOLDER = "[PATIENT]"
+export const PATIENT_PLACEHOLDER = "__PATIENT__"
 
 /**
- * Replaces all occurrences of [PATIENT] in AI-generated text
- * with the actual patient name. Case-insensitive.
+ * Replaces all occurrences of the patient placeholder in AI-generated text
+ * with the actual patient name. Handles both __PATIENT__ and legacy [PATIENT].
+ * Also catches standalone uppercase PATIENT used as a name (not in compound labels).
  */
 export function reinsertPatientName(
   text: string,
@@ -49,5 +51,9 @@ export function reinsertPatientName(
 ): string {
   const fullName = `${firstName} ${lastName}`.trim()
   if (!fullName) return text
-  return text.replace(/\[PATIENT\]/gi, fullName)
+  return text
+    .replace(/__PATIENT__/g, fullName)
+    .replace(/\[PATIENT\]/gi, fullName)
+    // Catch standalone PATIENT (all caps) used as name placeholder — not in labels like "PATIENT DIAGNOSES"
+    .replace(/\bPATIENT\b(?!\s+(?:DIAGNOS|HISTORY|INFORMATION|DEMOGRAPHICS|DATA|DETAILS|STATUS|ASSESSMENT|RECORD|SUMMARY))/g, fullName)
 }
