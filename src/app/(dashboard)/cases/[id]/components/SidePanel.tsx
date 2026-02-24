@@ -109,7 +109,8 @@ export function SidePanel({
             <ChevronRight className="relative z-10 w-4 h-4 text-white/30 group-hover:text-white/50 flex-shrink-0" />
           </button>
 
-          {caseData.generated_output && (
+          {/* P2P Rehearsal - hidden for now, re-enable when needed */}
+          {/* {caseData.generated_output && (
             <button
               onClick={onP2PRehearsal}
               className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors text-left group"
@@ -123,7 +124,7 @@ export function SidePanel({
               </div>
               <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-400 flex-shrink-0" />
             </button>
-          )}
+          )} */}
 
           {!isInChatMode && (
             <button
@@ -242,10 +243,11 @@ export function SidePanel({
                   {isCreatingAppeal ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileWarning className="w-4 h-4 mr-2" />}
                   {isCreatingAppeal ? "Creating..." : "Generate Appeal"}
                 </Button>
-                <Button onClick={onP2PSheet} variant="outline" className="flex-1 border-dark-bg/20 text-dark-bg hover:bg-dark-bg/5" size="sm">
+                {/* P2P Prep - hidden for now */}
+                {/* <Button onClick={onP2PSheet} variant="outline" className="flex-1 border-dark-bg/20 text-dark-bg hover:bg-dark-bg/5" size="sm">
                   <Download className="w-4 h-4 mr-2" />
                   P2P Prep
-                </Button>
+                </Button> */}
               </div>
             )}
           </div>
