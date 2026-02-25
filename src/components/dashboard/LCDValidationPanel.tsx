@@ -30,7 +30,9 @@ import type {
   LCDValidationResult,
   ChecklistEdit,
   ChecklistItemWithEdits,
+  ValidationRecommendation,
 } from "@/lib/lcd-validation";
+import type { RecommendationEdit } from "@/app/(dashboard)/cases/[id]/types";
 import {
   AUDIT_RISK_LEVELS,
   type AuditRiskLevel,
@@ -79,6 +81,8 @@ interface LCDValidationPanelProps {
   onWoundTypeChange?: (woundType: WoundType) => void;
   isEditable?: boolean;
   docType?: string;
+  recommendationEdits?: Record<string, RecommendationEdit>;
+  onRecommendationClick?: (rec: ValidationRecommendation) => void;
 }
 
 // Get panel title based on document type
@@ -103,9 +107,14 @@ export function LCDValidationPanel({
   onWoundTypeChange,
   isEditable = true,
   docType,
+  recommendationEdits,
+  onRecommendationClick,
 }: LCDValidationPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(initialCollapsed);
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(() => {
+    const first = validation.checklist?.[0]?.category
+    return first ? [first] : []
+  });
 
   // Count addressed items from checklistEdits
   const addressedCount = checklistEdits
@@ -373,6 +382,9 @@ export function LCDValidationPanel({
               <h4 className="font-medium text-gray-700">
                 Documentation Checklist
               </h4>
+              <p className="text-xs text-gray-500">
+                Click any item to review details, get AI suggestions, or mark as addressed.
+              </p>
               {validation.checklist.map((category) => {
                 // Calculate effective count: found + addressed items that weren't already found
                 const addressedInCategory = category.items.filter(
@@ -517,45 +529,75 @@ export function LCDValidationPanel({
             {validation.recommendations.length > 0 && (
               <div className="space-y-3">
                 <h4 className="font-medium text-gray-700">Recommendations</h4>
+                <p className="text-xs text-gray-500">
+                  Click any recommendation to get AI-suggested documentation and mark as addressed.
+                </p>
                 <div className="space-y-2">
-                  {validation.recommendations.slice(0, 5).map((rec, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "p-3 rounded-lg border",
-                        rec.priority === "CRITICAL"
-                          ? "bg-red-50 border-red-300"
-                          : rec.priority === "HIGH"
-                            ? "bg-orange-50 border-orange-300"
-                            : "bg-yellow-50 border-yellow-400",
-                      )}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-xs",
-                            rec.priority === "CRITICAL"
-                              ? "bg-red-100 text-red-700 border-red-300"
+                  {validation.recommendations.slice(0, 5).map((rec, i) => {
+                    // Ensure every rec has an ID (fallback for pre-existing data without IDs)
+                    const recId = rec.id || `rec_legacy_${i}`
+                    const recWithId = { ...rec, id: recId }
+                    const isRecAddressed = recommendationEdits?.[recId]?.marked_addressed ?? false
+                    return (
+                      <div
+                        key={recWithId.id}
+                        onClick={() => onRecommendationClick?.(recWithId)}
+                        className={cn(
+                          "p-3 rounded-lg border transition-colors",
+                          onRecommendationClick && "cursor-pointer hover:shadow-md",
+                          isRecAddressed
+                            ? "bg-blue-50/50 border-blue-200"
+                            : rec.priority === "CRITICAL"
+                              ? "bg-red-50 border-red-300"
                               : rec.priority === "HIGH"
-                                ? "bg-orange-100 text-orange-700 border-orange-300"
-                                : "bg-yellow-100 text-yellow-700 border-yellow-400",
+                                ? "bg-orange-50 border-orange-300"
+                                : "bg-yellow-50 border-yellow-400",
+                        )}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          {isRecAddressed && (
+                            <Badge
+                              variant="outline"
+                              className="bg-blue-50 text-blue-700 border-blue-200 text-xs flex items-center gap-1"
+                            >
+                              <Check className="w-3 h-3" />
+                              Addressed
+                            </Badge>
                           )}
-                        >
-                          {rec.priority}
-                        </Badge>
-                        <span className="text-sm font-medium">
-                          {rec.action}
-                        </span>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-xs",
+                              isRecAddressed
+                                ? "bg-blue-50 text-blue-600 border-blue-200"
+                                : rec.priority === "CRITICAL"
+                                  ? "bg-red-100 text-red-700 border-red-300"
+                                  : rec.priority === "HIGH"
+                                    ? "bg-orange-100 text-orange-700 border-orange-300"
+                                    : "bg-yellow-100 text-yellow-700 border-yellow-400",
+                            )}
+                          >
+                            {rec.priority}
+                          </Badge>
+                          <span className={cn(
+                            "text-sm font-medium",
+                            isRecAddressed && "text-blue-700"
+                          )}>
+                            {rec.action}
+                          </span>
+                        </div>
+                        <p className={cn(
+                          "text-xs",
+                          isRecAddressed ? "text-blue-600/70" : "text-gray-600"
+                        )}>{rec.reason}</p>
+                        {rec.suggestedLanguage && !isRecAddressed && (
+                          <p className="text-xs text-blue-600 mt-1 italic">
+                            Suggested: &quot;{rec.suggestedLanguage}&quot;
+                          </p>
+                        )}
                       </div>
-                      <p className="text-xs text-gray-600">{rec.reason}</p>
-                      {rec.suggestedLanguage && (
-                        <p className="text-xs text-blue-600 mt-1 italic">
-                          Suggested: &quot;{rec.suggestedLanguage}&quot;
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}

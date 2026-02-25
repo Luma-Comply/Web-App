@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import type { CaseData, LCDValidationState, AppealCase, UploadedDoc, RiskItem } from "../types"
 import type { CaseContext } from "@/components/chat/ChatInput"
-import type { ChecklistEdit, ChecklistItemWithEdits } from "@/lib/lcd-validation"
+import type { ChecklistEdit, ChecklistItemWithEdits, ValidationRecommendation } from "@/lib/lcd-validation"
+import type { RecommendationEdit } from "../types"
 import { extractPatientNameFromNotes, extractPayerFromNotes, isValidName, sanitizeDocumentOutput } from "../utils"
 
 export function useCaseDetail() {
@@ -42,6 +43,14 @@ export function useCaseDetail() {
   const [editingItem, setEditingItem] = useState<ChecklistItemWithEdits | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isSavingChecklistEdit, setIsSavingChecklistEdit] = useState(false)
+
+  // AI suggestion cache (per-item, session-scoped)
+  const [aiSuggestionCache, setAiSuggestionCache] = useState<Record<string, string>>({})
+  const [loadingAiSuggestion, setLoadingAiSuggestion] = useState<string | null>(null)
+
+  // Recommendation edit state
+  const [recommendationEdits, setRecommendationEdits] = useState<Record<string, RecommendationEdit>>({})
+  const [editingIsRecommendation, setEditingIsRecommendation] = useState(false)
 
   // Tidbit carousel
   const [tidbitIndex, setTidbitIndex] = useState(0)
@@ -242,6 +251,10 @@ export function useCaseDetail() {
       if (data.metadata?.checklist_edits?.edits) {
         setChecklistEdits(data.metadata.checklist_edits.edits as Record<string, ChecklistEdit>)
       }
+
+      if (data.metadata?.recommendation_edits?.edits) {
+        setRecommendationEdits(data.metadata.recommendation_edits.edits as Record<string, RecommendationEdit>)
+      }
     } catch (error: unknown) {
       const err = error as { message?: string; code?: string }
       console.error("Error loading case:", err?.message || err?.code || JSON.stringify(error))
@@ -292,6 +305,7 @@ export function useCaseDetail() {
   // Checklist item click handler
   const handleChecklistItemClick = (item: ChecklistItemWithEdits) => {
     setEditingItem(item)
+    setEditingIsRecommendation(false)
     setIsEditModalOpen(true)
   }
 
@@ -365,6 +379,133 @@ export function useCaseDetail() {
     }
   }
 
+  // Fetch AI suggestion for a checklist item
+  async function fetchAiSuggestion(itemId: string, itemLabel: string, itemSuggestion?: string, itemGuidance?: string, itemStatus?: string, force = false) {
+    if (!force && aiSuggestionCache[itemId]) return
+    if (!caseData) return
+
+    setLoadingAiSuggestion(itemId)
+    try {
+      const response = await fetch("/api/generate/checklist-action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          caseId: caseData.id,
+          itemLabel,
+          itemSuggestion: itemSuggestion || "",
+          itemGuidance: itemGuidance || "",
+          itemStatus: itemStatus || "MISSING",
+        }),
+      })
+      const data = await response.json()
+      if (data.suggestion) {
+        setAiSuggestionCache(prev => ({ ...prev, [itemId]: data.suggestion }))
+      }
+    } catch (err) {
+      console.error("Failed to fetch AI suggestion:", err)
+    } finally {
+      setLoadingAiSuggestion(null)
+    }
+  }
+
+  // Recommendation click handler — adapts rec to ChecklistItemWithEdits shape
+  const handleRecommendationClick = (rec: ValidationRecommendation) => {
+    const edit = rec.id ? recommendationEdits[rec.id] : undefined
+    const adaptedItem: ChecklistItemWithEdits = {
+      id: rec.id || `rec_${Date.now()}`,
+      label: rec.action,
+      status: "MISSING",
+      auditRisk: rec.priority === "CRITICAL" ? "INSTANT_DENIAL"
+        : rec.priority === "HIGH" ? "VERY_HIGH"
+        : rec.priority === "MEDIUM" ? "HIGH" : "MEDIUM",
+      suggestion: rec.suggestedLanguage,
+      guidance: rec.reason,
+      userNotes: edit?.user_notes,
+      markedAddressed: edit?.marked_addressed,
+    }
+    setEditingItem(adaptedItem)
+    setEditingIsRecommendation(true)
+    setIsEditModalOpen(true)
+  }
+
+  // Save recommendation edit
+  async function handleSaveRecommendationEdit(recId: string, notes: string, markedAddressed: boolean) {
+    if (!caseData) return
+
+    setIsSavingChecklistEdit(true)
+    try {
+      const now = new Date().toISOString()
+
+      const newEdit: RecommendationEdit = {
+        rec_id: recId,
+        user_notes: notes,
+        marked_addressed: markedAddressed,
+        updated_at: now,
+        ...(markedAddressed && !recommendationEdits[recId]?.addressed_at
+          ? { addressed_at: now }
+          : { addressed_at: recommendationEdits[recId]?.addressed_at }),
+      }
+
+      const updatedEdits = {
+        ...recommendationEdits,
+        [recId]: newEdit,
+      }
+      setRecommendationEdits(updatedEdits)
+
+      const recommendationEditsData = {
+        version: 1,
+        edits: updatedEdits,
+      }
+
+      const { error } = await supabase
+        .from("cases")
+        .update({
+          metadata: {
+            ...caseData.metadata,
+            recommendation_edits: recommendationEditsData,
+          },
+        })
+        .eq("id", caseData.id)
+
+      if (error) throw error
+
+      setCaseData({
+        ...caseData,
+        metadata: {
+          ...caseData.metadata,
+          recommendation_edits: recommendationEditsData,
+        },
+      })
+
+      setIsEditModalOpen(false)
+      setEditingItem(null)
+      setEditingIsRecommendation(false)
+
+      toast({
+        title: "Saved",
+        description: "Your recommendation notes have been saved.",
+      })
+    } catch (error) {
+      console.error("Error saving recommendation edit:", error)
+      toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: "Failed to save. Please try again.",
+      })
+    } finally {
+      setIsSavingChecklistEdit(false)
+    }
+  }
+
+  // Unified save handler that routes to correct function
+  async function handleSaveEdit(itemId: string, notes: string, markedAddressed: boolean) {
+    if (editingIsRecommendation) {
+      await handleSaveRecommendationEdit(itemId, notes, markedAddressed)
+    } else {
+      await handleSaveChecklistEdit(itemId, notes, markedAddressed)
+    }
+  }
+
   return {
     // Router/params
     params,
@@ -407,6 +548,17 @@ export function useCaseDetail() {
     isSavingChecklistEdit,
     handleChecklistItemClick,
     handleSaveChecklistEdit,
+    handleSaveEdit,
+
+    // AI suggestions
+    aiSuggestionCache,
+    loadingAiSuggestion,
+    fetchAiSuggestion,
+
+    // Recommendation edits
+    recommendationEdits,
+    editingIsRecommendation,
+    handleRecommendationClick,
 
     // Tidbit
     tidbitIndex,

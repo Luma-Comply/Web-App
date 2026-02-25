@@ -78,6 +78,8 @@ export interface PerplexityFindings {
 }
 
 export interface ValidationRecommendation {
+  id?: string
+  sourceItemId?: string
   priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW"
   action: string
   reason: string
@@ -453,6 +455,7 @@ function generateRecommendations(
   // CTP product recommendation
   if (!ctpProductCheck.covered) {
     recommendations.push({
+      id: "rec_ctp_coverage",
       priority: "CRITICAL",
       action: "Verify CTP product is on Novitas covered list",
       reason:
@@ -488,6 +491,8 @@ function generateRecommendations(
     }
 
     recommendations.push({
+      id: `rec_${item.id}`,
+      sourceItemId: item.id,
       priority,
       action: `Add documentation for: ${item.label}`,
       reason: item.guidance || "Required by LCD L35041",
@@ -498,6 +503,7 @@ function generateRecommendations(
   // Add Perplexity-based recommendations
   if (perplexityFindings.currentAuditFocusAreas.length > 0) {
     recommendations.push({
+      id: "rec_audit_focus",
       priority: "MEDIUM",
       action: "Review current audit focus areas",
       reason: `Novitas/Qlarant currently focusing on: ${perplexityFindings.currentAuditFocusAreas.join(", ")}`,

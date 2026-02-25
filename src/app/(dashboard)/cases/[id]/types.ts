@@ -53,6 +53,10 @@ export interface CaseData {
       last_validation_run: string
       edits: Record<string, ChecklistEdit>
     }
+    recommendation_edits?: {
+      version: number
+      edits: Record<string, RecommendationEdit>
+    }
     [key: string]: unknown
   }
 }
@@ -99,5 +103,13 @@ export const DENIAL_CATEGORIES = [
   "Coding error",
   "Other",
 ] as const
+
+export interface RecommendationEdit {
+  rec_id: string
+  user_notes: string
+  marked_addressed: boolean
+  addressed_at?: string
+  updated_at: string
+}
 
 export type { ChecklistEdit, ChecklistItemWithEdits, CaseContext }

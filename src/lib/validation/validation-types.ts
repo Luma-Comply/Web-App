@@ -56,6 +56,8 @@ export interface ChecklistCategory {
 }
 
 export interface ValidationRecommendation {
+  id?: string
+  sourceItemId?: string
   priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW"
   action: string
   reason: string

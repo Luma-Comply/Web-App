@@ -1,8 +1,8 @@
 "use client"
 
 import { LCDValidationPanel } from "@/components/dashboard/LCDValidationPanel"
-import type { CaseData, LCDValidationState } from "../types"
-import type { ChecklistEdit, ChecklistItemWithEdits } from "@/lib/lcd-validation"
+import type { CaseData, LCDValidationState, RecommendationEdit } from "../types"
+import type { ChecklistEdit, ChecklistItemWithEdits, ValidationRecommendation } from "@/lib/lcd-validation"
 import { getMACInfo } from "@/lib/mac-jurisdictions"
 
 
@@ -11,9 +11,11 @@ interface OverviewTabProps {
   lcdValidation: LCDValidationState | null
   checklistEdits: Record<string, ChecklistEdit>
   onChecklistItemClick: (item: ChecklistItemWithEdits) => void
+  recommendationEdits: Record<string, RecommendationEdit>
+  onRecommendationClick: (rec: ValidationRecommendation) => void
 }
 
-export function OverviewTab({ caseData, lcdValidation, checklistEdits, onChecklistItemClick }: OverviewTabProps) {
+export function OverviewTab({ caseData, lcdValidation, checklistEdits, onChecklistItemClick, recommendationEdits, onRecommendationClick }: OverviewTabProps) {
   if (!lcdValidation) {
     return (
       <div className="text-center py-12 text-gray-400">
@@ -132,7 +134,7 @@ export function OverviewTab({ caseData, lcdValidation, checklistEdits, onCheckli
         </div>
 
         {/* Footer metadata */}
-        <div className="flex items-center gap-2 text-[0.72rem] text-dark-bg/40 flex-wrap">
+        <div className="flex items-center gap-2 text-[0.72rem] text-dark-bg/60 flex-wrap">
           <span>{lcdCode}</span>
           <span>·</span>
           <span>
@@ -157,6 +159,8 @@ export function OverviewTab({ caseData, lcdValidation, checklistEdits, onCheckli
         checklistEdits={checklistEdits}
         onItemClick={onChecklistItemClick}
         docType={caseData.doc_type}
+        recommendationEdits={recommendationEdits}
+        onRecommendationClick={onRecommendationClick}
       />
     </div>
   )

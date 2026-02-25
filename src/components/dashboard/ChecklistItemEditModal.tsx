@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,8 @@ import {
   Loader2,
   Check,
   StickyNote,
+  Copy,
+  RefreshCw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ChecklistItemWithEdits } from "@/lib/lcd-validation"
@@ -34,6 +36,10 @@ interface ChecklistItemEditModalProps {
   onOpenChange: (open: boolean) => void
   onSave: (itemId: string, notes: string, markedAddressed: boolean) => Promise<void>
   isSaving?: boolean
+  aiSuggestion?: string | null
+  isLoadingAiSuggestion?: boolean
+  onRequestAiSuggestion?: (item: ChecklistItemWithEdits) => void
+  onRegenerateAiSuggestion?: (item: ChecklistItemWithEdits) => void
 }
 
 export function ChecklistItemEditModal({
@@ -42,23 +48,51 @@ export function ChecklistItemEditModal({
   onOpenChange,
   onSave,
   isSaving = false,
+  aiSuggestion,
+  isLoadingAiSuggestion = false,
+  onRequestAiSuggestion,
+  onRegenerateAiSuggestion,
 }: ChecklistItemEditModalProps) {
   const [notes, setNotes] = useState("")
   const [markedAddressed, setMarkedAddressed] = useState(false)
+  const [copiedSuggestion, setCopiedSuggestion] = useState(false)
 
   // Sync state when item changes
   useEffect(() => {
     if (item) {
       setNotes(item.userNotes || "")
       setMarkedAddressed(item.markedAddressed || false)
+      setCopiedSuggestion(false)
     }
   }, [item])
+
+  // Request AI suggestion when modal opens for MISSING/PARTIAL items
+  const requestSuggestion = useCallback(() => {
+    if (open && item && onRequestAiSuggestion && (item.status === "MISSING" || item.status === "PARTIAL")) {
+      onRequestAiSuggestion(item)
+    }
+  }, [open, item, onRequestAiSuggestion])
+
+  useEffect(() => {
+    requestSuggestion()
+  }, [requestSuggestion])
 
   if (!item) return null
 
   const handleSave = async () => {
     await onSave(item.id, notes, markedAddressed)
   }
+
+  const handleCopy = () => {
+    const textToCopy = aiSuggestion || item.suggestion || ""
+    navigator.clipboard.writeText(textToCopy)
+    setCopiedSuggestion(true)
+    setTimeout(() => setCopiedSuggestion(false), 2000)
+  }
+
+  // The display suggestion: prefer AI-generated, fall back to short suggestion
+  const displaySuggestion = aiSuggestion || item.suggestion
+  const showSuggestionSection = (item.status === "MISSING" || item.status === "PARTIAL") && (displaySuggestion || isLoadingAiSuggestion)
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -185,20 +219,73 @@ export function ChecklistItemEditModal({
             </div>
           )}
 
-          {/* Suggested Action (read-only) */}
-          {item.suggestion && (item.status === "MISSING" || item.status === "PARTIAL") && (
+          {/* AI Suggested Action — with copy button */}
+          {showSuggestionSection && (
             <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-100">
-                  <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-100">
+                    <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
+                  </div>
+                  <span className="text-sm font-medium text-amber-800">
+                    {aiSuggestion ? "AI Suggested Documentation" : "Suggested Action"}
+                  </span>
                 </div>
-                <span className="text-sm font-medium text-amber-800">
-                  Suggested Action
-                </span>
+                {displaySuggestion && !isLoadingAiSuggestion && (
+                  <div className="flex items-center gap-1">
+                    {onRegenerateAiSuggestion && (
+                      <button
+                        onClick={() => onRegenerateAiSuggestion(item)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+                        aria-label="Regenerate suggestion"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Regenerate
+                      </button>
+                    )}
+                    <button
+                      onClick={handleCopy}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+                      aria-label="Copy suggestion to clipboard"
+                    >
+                      {copiedSuggestion ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
-              <p className="text-sm text-amber-700 leading-relaxed pl-8">
-                {item.suggestion}
-              </p>
+
+              {isLoadingAiSuggestion ? (
+                <div className="pl-8 space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-amber-600">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Generating comprehensive suggestion...</span>
+                  </div>
+                  <div className="space-y-1.5 animate-pulse">
+                    <div className="h-3 bg-amber-200/50 rounded w-full" />
+                    <div className="h-3 bg-amber-200/50 rounded w-11/12" />
+                    <div className="h-3 bg-amber-200/50 rounded w-4/5" />
+                    <div className="h-3 bg-amber-200/50 rounded w-full" />
+                    <div className="h-3 bg-amber-200/50 rounded w-3/4" />
+                  </div>
+                </div>
+              ) : (
+                <p className={cn(
+                  "text-sm leading-relaxed pl-8 whitespace-pre-wrap",
+                  aiSuggestion ? "text-amber-800" : "text-amber-700"
+                )}>
+                  {displaySuggestion}
+                </p>
+              )}
             </div>
           )}
 

@@ -249,6 +249,8 @@ function CaseDetailContent() {
                 lcdValidation={detail.lcdValidation}
                 checklistEdits={detail.checklistEdits}
                 onChecklistItemClick={detail.handleChecklistItemClick}
+                recommendationEdits={detail.recommendationEdits}
+                onRecommendationClick={detail.handleRecommendationClick}
               />
             )}
 
@@ -304,8 +306,16 @@ function CaseDetailContent() {
         item={detail.editingItem}
         open={detail.isEditModalOpen}
         onOpenChange={detail.setIsEditModalOpen}
-        onSave={detail.handleSaveChecklistEdit}
+        onSave={detail.handleSaveEdit}
         isSaving={detail.isSavingChecklistEdit}
+        aiSuggestion={detail.editingItem ? detail.aiSuggestionCache[detail.editingItem.id] ?? null : null}
+        isLoadingAiSuggestion={detail.loadingAiSuggestion === detail.editingItem?.id}
+        onRequestAiSuggestion={(item) => {
+          detail.fetchAiSuggestion(item.id, item.label, item.suggestion, item.guidance, item.status)
+        }}
+        onRegenerateAiSuggestion={(item) => {
+          detail.fetchAiSuggestion(item.id, item.label, item.suggestion, item.guidance, item.status, true)
+        }}
       />
 
       {/* All Case Dialogs */}
