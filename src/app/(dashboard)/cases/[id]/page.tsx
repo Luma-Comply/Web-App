@@ -168,7 +168,27 @@ function CaseDetailContent() {
         displayLastName={detail.displayNames.displayLastName}
         displayPayer={detail.displayNames.displayPayer}
         showExtractedNameLabel={detail.displayNames.showExtractedNameLabel}
+        hasGenerated={detail.hasGenerated}
+        isInChatMode={detail.isInChatMode}
         onEdit={docActions.openEditModal}
+        onChat={() => detail.setIsChatExpanded(true)}
+        onSubmit={statusActions.openSubmittedDialog}
+        onApproved={statusActions.openApprovedDialog}
+        onDenied={statusActions.openDeniedDialog}
+        onFollowUp={() => statusActions.setFollowupDialogOpen(true)}
+        onStartRenewal={statusActions.handleStartRenewal}
+        onCreateAppeal={statusActions.handleCreateAppeal}
+        isStartingRenewal={statusActions.isStartingRenewal}
+        isCreatingAppeal={statusActions.isCreatingAppeal}
+        needsFollowup={(() => {
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const expectedDate = caseData.expected_decision_date ? new Date(caseData.expected_decision_date) : null
+          if (expectedDate) expectedDate.setHours(0, 0, 0, 0)
+          const followupDt = caseData.followup_date ? new Date(caseData.followup_date) : null
+          const isPastExpected = expectedDate ? today > expectedDate : false
+          return isPastExpected && (!followupDt || followupDt < (expectedDate ?? today))
+        })()}
       />
 
       {/* Workflow Progress Bar */}
@@ -268,25 +288,11 @@ function CaseDetailContent() {
           {/* Side Panel */}
           <SidePanel
             caseData={caseData}
-            hasGenerated={detail.hasGenerated}
             isInChatMode={detail.isInChatMode}
             appealCases={detail.appealCases}
-            onChat={() => detail.setIsChatExpanded(true)}
-            onP2PRehearsal={p2p.startP2PSession}
             onRegenerate={() => docActions.setRegenerateModalOpen(true)}
             onGenerate={() => detail.setGenerating(true)}
             generating={detail.generating}
-            onSubmit={statusActions.openSubmittedDialog}
-            onApproved={statusActions.openApprovedDialog}
-            onDenied={statusActions.openDeniedDialog}
-            onFollowUp={() => {
-              statusActions.setFollowupDialogOpen(true)
-            }}
-            onStartRenewal={statusActions.handleStartRenewal}
-            onCreateAppeal={statusActions.handleCreateAppeal}
-            onP2PSheet={p2p.generateP2PSheet}
-            isStartingRenewal={statusActions.isStartingRenewal}
-            isCreatingAppeal={statusActions.isCreatingAppeal}
           />
         </div>
       </div>
