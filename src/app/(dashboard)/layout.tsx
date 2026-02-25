@@ -24,14 +24,30 @@ export default async function DashboardLayout({
   // Check subscription status
   const { data: userData } = await supabase
     .from("users")
-    .select("subscription_status, trial_ends_at, stripe_subscription_id")
+    .select("subscription_status, trial_ends_at, stripe_subscription_id, team_owner_id")
     .eq("id", user.id)
     .single()
 
-  const status = userData?.subscription_status || "canceled"
-  const trialEndsAt = userData?.trial_ends_at
+  let status = userData?.subscription_status || "canceled"
+  let trialEndsAt = userData?.trial_ends_at
+  let stripeSubId = userData?.stripe_subscription_id
+
+  // Team members inherit their owner's subscription status
+  if (userData?.team_owner_id) {
+    const { data: ownerData } = await supabase
+      .from("users")
+      .select("subscription_status, trial_ends_at, stripe_subscription_id")
+      .eq("id", userData.team_owner_id)
+      .single()
+    if (ownerData) {
+      status = ownerData.subscription_status || status
+      trialEndsAt = ownerData.trial_ends_at ?? trialEndsAt
+      stripeSubId = ownerData.stripe_subscription_id ?? stripeSubId
+    }
+  }
+
   const trialExpired = status === "trialing" && trialEndsAt && new Date(trialEndsAt) <= new Date()
-  const hasHadSubscription = !!userData?.stripe_subscription_id || trialExpired
+  const hasHadSubscription = !!stripeSubId || trialExpired
 
   // Determine if user has valid access
   const isActive = status === "active"

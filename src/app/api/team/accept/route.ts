@@ -116,14 +116,23 @@ export async function POST(request: NextRequest) {
 
     if (verifyError || !verifyUser) {
       console.error("User record verification failed:", verifyError)
+
+      // Look up team owner's subscription status so the member inherits it
+      const { data: ownerData } = await serviceClient
+        .from("users")
+        .select("subscription_status")
+        .eq("id", invitation.team_owner_id)
+        .single()
+      const ownerStatus = ownerData?.subscription_status || "trialing"
+
       // The upsert silently failed - try a direct INSERT
       const { error: insertError } = await serviceClient.from("users").insert({
         id: newUser.user.id,
         email: invitation.invitee_email,
         team_owner_id: invitation.team_owner_id,
         is_team_owner: false,
-        subscription_status: "trialing",
-        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        subscription_status: ownerStatus,
+        trial_ends_at: ownerStatus === "active" ? null : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       })
 
       if (insertError) {
