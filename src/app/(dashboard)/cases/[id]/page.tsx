@@ -23,7 +23,7 @@ import { useStickyHeader } from "./hooks/useStickyHeader"
 
 // Local components
 import { PatientHeaderStrip } from "./components/PatientHeaderStrip"
-import { WorkflowProgressBar } from "./components/WorkflowProgressBar"
+// import { WorkflowProgressBar } from "./components/WorkflowProgressBar"
 import { SidePanel } from "./components/SidePanel"
 import { OverviewTab } from "./components/OverviewTab"
 import { DocumentsTab } from "./components/DocumentsTab"
@@ -170,29 +170,13 @@ function CaseDetailContent() {
         showExtractedNameLabel={detail.displayNames.showExtractedNameLabel}
         hasGenerated={detail.hasGenerated}
         isInChatMode={detail.isInChatMode}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         onEdit={docActions.openEditModal}
         onChat={() => detail.setIsChatExpanded(true)}
-        onSubmit={statusActions.openSubmittedDialog}
-        onApproved={statusActions.openApprovedDialog}
-        onDenied={statusActions.openDeniedDialog}
-        onFollowUp={() => statusActions.setFollowupDialogOpen(true)}
-        onStartRenewal={statusActions.handleStartRenewal}
-        onCreateAppeal={statusActions.handleCreateAppeal}
-        isStartingRenewal={statusActions.isStartingRenewal}
-        isCreatingAppeal={statusActions.isCreatingAppeal}
-        needsFollowup={(() => {
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          const expectedDate = caseData.expected_decision_date ? new Date(caseData.expected_decision_date) : null
-          if (expectedDate) expectedDate.setHours(0, 0, 0, 0)
-          const followupDt = caseData.followup_date ? new Date(caseData.followup_date) : null
-          const isPastExpected = expectedDate ? today > expectedDate : false
-          return isPastExpected && (!followupDt || followupDt < (expectedDate ?? today))
-        })()}
       />
 
-      {/* Workflow Progress Bar */}
-      <WorkflowProgressBar status={caseData.status} />
+      {/* Workflow Progress Bar — removed per beta feedback (users confused by Draft/Submitted/Decision language) */}
 
       {/* Main Content: Tabs + Side Panel */}
       <div className="max-w-[1400px] mx-auto px-6 py-6">
@@ -201,7 +185,7 @@ function CaseDetailContent() {
           <div className="flex-1 min-w-0">
             {/* Tab Navigation Bar */}
             <div
-              className="flex items-center gap-0.5 border-b border-gray-300 mb-6"
+              className="hidden md:flex items-center gap-0.5 border-b border-gray-300 mb-6 overflow-x-auto scrollbar-hide"
               role="tablist"
               aria-label="Case sections"
             >
@@ -220,7 +204,7 @@ function CaseDetailContent() {
                     role="tab"
                     aria-selected={isActive}
                     className={`relative overflow-visible flex items-center gap-1.5 px-4 py-3 text-[0.78rem] border-none bg-transparent cursor-pointer whitespace-nowrap transition-colors duration-200 ${
-                      isActive ? "text-dark-bg font-semibold" : "text-gray-400 font-medium hover:text-dark-bg"
+                      isActive ? "text-dark-bg font-semibold" : "text-gray-500 font-medium hover:text-dark-bg"
                     }`}
                   >
                     <Icon className="w-[15px] h-[15px]" />

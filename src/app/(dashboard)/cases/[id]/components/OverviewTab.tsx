@@ -3,7 +3,6 @@
 import { LCDValidationPanel } from "@/components/dashboard/LCDValidationPanel"
 import type { CaseData, LCDValidationState, RecommendationEdit } from "../types"
 import type { ChecklistEdit, ChecklistItemWithEdits, ValidationRecommendation } from "@/lib/lcd-validation"
-import { getMACInfo } from "@/lib/mac-jurisdictions"
 
 
 interface OverviewTabProps {
@@ -93,17 +92,6 @@ export function OverviewTab({ caseData, lcdValidation, checklistEdits, onCheckli
     ? "Moderate Risk"
     : "Low Risk"
 
-  // CTP coverage display
-  const ctpStatus = lcdValidation.ctpCovered
-    ? "Covered"
-    : lcdValidation.perplexityFindings?.productCoverageStatus === "VERIFY_MANUALLY"
-    ? "Verify"
-    : "Not Covered"
-
-  // Dynamic LCD code from patient state
-  const macInfo = getMACInfo(caseData.patient_state)
-  const lcdCode = macInfo?.lcdPolicyNumber ? `LCD ${macInfo.lcdPolicyNumber}` : "LCD"
-
   return (
     <div className="space-y-6">
       {/* AI Assessment Card */}
@@ -133,23 +121,6 @@ export function OverviewTab({ caseData, lcdValidation, checklistEdits, onCheckli
           />
         </div>
 
-        {/* Footer metadata */}
-        <div className="flex items-center gap-2 text-[0.72rem] text-dark-bg/60 flex-wrap">
-          <span>{lcdCode}</span>
-          <span>·</span>
-          <span>
-            CTP Product:{" "}
-            <strong className={ctpStatus === "Covered" ? "text-green-600 font-semibold" : "text-coral font-semibold"}>
-              {ctpStatus}
-            </strong>
-          </span>
-          {lcdValidation.perplexityFindings?.lcdEffectiveDate && (
-            <>
-              <span>·</span>
-              <span>LCD Date: {lcdValidation.perplexityFindings.lcdEffectiveDate}</span>
-            </>
-          )}
-        </div>
       </div>
 
       {/* Documentation Checklist — includes recommendations, research notes & audit focus areas */}

@@ -232,15 +232,15 @@ export function ChecklistItemEditModal({
                   </span>
                 </div>
                 {displaySuggestion && !isLoadingAiSuggestion && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
                     {onRegenerateAiSuggestion && (
                       <button
                         onClick={() => onRegenerateAiSuggestion(item)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+                        className="p-1.5 rounded-md text-amber-500 hover:text-amber-700 hover:bg-amber-100 transition-colors"
                         aria-label="Regenerate suggestion"
+                        title="Regenerate"
                       >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        Regenerate
+                        <RefreshCw className="w-3 h-3" />
                       </button>
                     )}
                     <button
