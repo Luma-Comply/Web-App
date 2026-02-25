@@ -3,12 +3,14 @@ import { PDFDocument, rgb } from "pdf-lib";
 import mammoth from "mammoth";
 import { createClient } from "@supabase/supabase-js";
 import PDFParser from "pdf2json";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { logAudit } from "@/lib/audit-log";
 import { checkRateLimit } from "@/lib/rate-limit-middleware";
 
 // --- Configuration ---
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const ALLOWED_FILE_TYPES = ['pdf', 'docx'];
+const ALLOWED_FILE_TYPES = ['pdf', 'docx', 'png', 'jpg', 'jpeg', 'heic', 'webp'];
+const IMAGE_FILE_TYPES = ['png', 'jpg', 'jpeg', 'heic', 'webp'];
 const PDF_PARSE_TIMEOUT = 30000; // 30 seconds
 const COORD_SCALE_FACTOR = 16; // Standard letter is 612 points / 38.25 pdf2json units = 16
 
@@ -209,6 +211,40 @@ export async function POST(req: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (docxError: any) {
         warnings.push(`Docx extraction failed: ${docxError.message}`);
+      }
+    } else if (IMAGE_FILE_TYPES.includes(fileType)) {
+      // OCR via Gemini Vision
+      try {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+        const mimeMap: Record<string, string> = {
+          png: "image/png",
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          heic: "image/heic",
+          webp: "image/webp",
+        };
+
+        const result = await model.generateContent([
+          {
+            inlineData: {
+              mimeType: mimeMap[fileType] || "image/png",
+              data: buffer.toString("base64"),
+            },
+          },
+          "Extract ALL text from this clinical document image. Preserve the original structure, headings, dates, values, and formatting as closely as possible. Output only the extracted text — no commentary or summaries.",
+        ]);
+
+        extractedText = result.response.text() || "";
+
+        if (!extractedText.trim()) {
+          warnings.push("No text could be extracted from this image.");
+        }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (ocrError: any) {
+        console.error("Image OCR Error:", ocrError);
+        warnings.push(`Image text extraction failed: ${ocrError.message}`);
       }
     }
 

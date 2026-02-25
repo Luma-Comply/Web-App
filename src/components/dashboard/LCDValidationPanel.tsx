@@ -94,6 +94,8 @@ function getPanelTitle(docType?: string): string {
       return "Medical Necessity Checklist";
     case "appeal":
       return "Appeal Documentation Checklist";
+    case "audit":
+      return "Pre-Audit Documentation Review";
     default:
       return "Documentation Checklist";
   }
@@ -253,35 +255,8 @@ export function LCDValidationPanel({
             {/* Summary Stats */}
             <div className={cn(
               "grid gap-2 md:gap-4",
-              docType === "biologics_pa" ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2"
+              docType === "biologics_pa" ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2"
             )}>
-              <div className="bg-white rounded-xl p-3 md:p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                  Denial Risk
-                </div>
-                {(() => {
-                  // Calculate effective denial probability accounting for addressed items
-                  const effectiveMissing = validation.missingCount - addressedCount;
-                  const effectiveRisk = effectiveMissing <= 0 ? "LOW" :
-                    effectiveMissing <= 3 ? "MEDIUM" : riskLevel;
-                  const effectiveProbability = effectiveMissing <= 0 ? 5 :
-                    Math.max(5, Math.round(validation.denialProbability * (effectiveMissing / validation.missingCount)));
-                  return (
-                    <div
-                      className={cn(
-                        "text-xl font-bold",
-                        effectiveRisk === "LOW"
-                          ? "text-blue-600"
-                          : effectiveRisk === "MEDIUM"
-                            ? "text-yellow-600"
-                            : "text-red-600",
-                      )}
-                    >
-                      {effectiveProbability}%
-                    </div>
-                  );
-                })()}
-              </div>
               <div className="bg-white rounded-xl p-3 md:p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                   Missing
@@ -391,7 +366,7 @@ export function LCDValidationPanel({
                   (item) => item.status !== "FOUND" && checklistEdits?.[item.id]?.marked_addressed
                 ).length;
                 const effectiveFoundCount = category.foundCount + addressedInCategory;
-                const allResolved = effectiveFoundCount === category.items.length;
+                const allResolved = effectiveFoundCount >= category.items.length;
 
                 return (
                 <Collapsible
@@ -414,7 +389,7 @@ export function LCDValidationPanel({
                               : getRiskBadgeColor(category.categoryRisk),
                           )}
                         >
-                          {effectiveFoundCount}/{category.items.length}
+                          {Math.min(effectiveFoundCount, category.items.length)}/{category.items.length}
                         </Badge>
                         <span className="font-medium">{category.category}</span>
                       </div>

@@ -10,7 +10,6 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { LumaLogo } from "@/components/LumaLogo"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -42,17 +41,10 @@ import {
   Search,
   Building2,
   ArrowRight,
-  MapPin,
-  UserPlus,
   Shield,
-  Clock,
-  AlertTriangle,
-  CalendarClock,
-  XCircle,
   BarChart3,
   TrendingUp,
   TrendingDown,
-  Activity,
   ExternalLink,
 } from "lucide-react"
 import {
@@ -78,6 +70,13 @@ import {
   ResponsiveContainer,
 } from "recharts"
 
+interface LCDValidationSummary {
+  found_count?: number
+  missing_count?: number
+  risk_level?: string
+  denial_probability?: number
+}
+
 interface Case {
   id: string
   doc_type: string
@@ -98,6 +97,22 @@ interface Case {
   followup_date: string | null
   parent_case_id: string | null
   pa_reference_number: string | null
+  metadata?: {
+    lcd_validation?: LCDValidationSummary
+  } | null
+}
+
+interface Audit {
+  id: string
+  case_id: string | null
+  patient_first_name: string | null
+  patient_last_name: string | null
+  requested_medication: string | null
+  risk_level: string | null
+  denial_probability: number | null
+  found_count: number | null
+  total_requirements: number | null
+  created_at: string
 }
 
 interface PipelineContact {
@@ -146,70 +161,27 @@ interface PlatformStats {
 }
 
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  lead: { label: "Lead", className: "bg-blue-100 text-blue-700 border-blue-200" },
-  active: { label: "Active", className: "bg-green-100 text-green-700 border-green-200" },
-  negotiating: { label: "Negotiating", className: "bg-amber-100 text-amber-700 border-amber-200" },
-  churned: { label: "Churned", className: "bg-gray-100 text-gray-500 border-gray-200" },
-}
-
-const STRATEGY_CONFIG: Record<string, { label: string; className: string }> = {
-  founding_partner: { label: "Founding Partner", className: "bg-purple-100 text-purple-700 border-purple-200" },
-  flagship: { label: "Flagship", className: "bg-indigo-100 text-indigo-700 border-indigo-200" },
-  expansion: { label: "Expansion", className: "bg-teal-100 text-teal-700 border-teal-200" },
-  corporate_bundle: { label: "Corporate Bundle", className: "bg-orange-100 text-orange-700 border-orange-200" },
-  design_partner: { label: "Design Partner", className: "bg-pink-100 text-pink-700 border-pink-200" },
-}
-
-const CASE_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  chat: { label: "Chat", className: "bg-purple-100 text-purple-700 border-purple-200" },
-  draft: { label: "Draft", className: "bg-gray-100 text-gray-700 border-gray-200" },
-  generating: { label: "Generating", className: "bg-amber-100 text-amber-700 border-amber-200" },
-  submitted: { label: "Submitted", className: "bg-blue-100 text-blue-700 border-blue-200" },
-  approved: { label: "Approved", className: "bg-green-100 text-green-700 border-green-200" },
-  denied: { label: "Denied", className: "bg-coral/20 text-coral border-coral/30" },
-}
-
-function formatPipelinePrice(low: number | null, high: number | null): string {
-  if (!low && !high) return "—"
-  if (low && high && low !== high) {
-    return `$${low.toLocaleString()}–$${high.toLocaleString()}/mo`
-  }
-  return `$${(low || high || 0).toLocaleString()}/mo`
-}
-
-function getInitials(name: string): string {
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-}
-
-function PipelineAvatar({ src, name }: { src: string | null; name: string }) {
-  const [imgError, setImgError] = useState(false)
-  if (src && !imgError) {
-    return <img src={src} alt={name} onError={() => setImgError(true)} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-  }
-  return (
-    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-mint/60 to-sage-light/80 flex items-center justify-center text-xs font-semibold text-white flex-shrink-0">
-      {getInitials(name)}
-    </div>
-  )
-}
+// Enterprise pipeline configs/helpers removed — hidden for now, code preserved in git history
 
 export default function DashboardPage() {
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
   const [cases, setCases] = useState<Case[]>([])
+  const [audits, setAudits] = useState<Audit[]>([])
   const [loading, setLoading] = useState(true)
   const [userEmail, setUserEmail] = useState("")
   const [practiceName, setPracticeName] = useState("")
   const [isTeamOwner, setIsTeamOwner] = useState(true)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [dashboardView, setDashboardView] = useState<"cases" | "analytics">("cases")
   const [activeTab, setActiveTab] = useState("active")
   const [searchQuery, setSearchQuery] = useState("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [caseToDelete, setCaseToDelete] = useState<Case | null>(null)
-  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [auditDeleteDialogOpen, setAuditDeleteDialogOpen] = useState(false)
+  const [auditToDelete, setAuditToDelete] = useState<Audit | null>(null)
   const [payerSortKey, setPayerSortKey] = useState<"payer" | "cases" | "rate" | "turnaround">("cases")
   const [payerSortDir, setPayerSortDir] = useState<"asc" | "desc">("desc")
   const [casePage, setCasePage] = useState(0)
@@ -228,9 +200,10 @@ export default function DashboardPage() {
 
   const [pipeline, setPipeline] = useState<PipelineStats | null>(null)
   const [pipelineContacts, setPipelineContacts] = useState<PipelineContact[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [pipelineSearch, setPipelineSearch] = useState("")
-  const [pipelinePage, setPipelinePage] = useState(0)
-  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null)
+  const [_pipelinePage, _setPipelinePage] = useState(0)
+  const [_platformStats, _setPlatformStats] = useState<PlatformStats | null>(null)
   const PIPELINE_PAGE_SIZE = 10
 
   useEffect(() => {
@@ -313,6 +286,17 @@ export default function DashboardPage() {
         })
       }
 
+      // Load recent audits
+      const { data: auditsData } = await supabase
+        .from("audits")
+        .select("id, case_id, patient_first_name, patient_last_name, requested_medication, risk_level, denial_probability, found_count, total_requirements, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5)
+
+      if (auditsData) {
+        setAudits(auditsData as Audit[])
+      }
+
       // Load enterprise pipeline (super admin only)
       if (userData?.is_super_admin) {
         const { data: contacts } = await supabase
@@ -337,7 +321,7 @@ export default function DashboardPage() {
         // Fetch platform-level stats
         fetch("/api/admin/platform-stats")
           .then((r) => r.ok ? r.json() : null)
-          .then((d) => { if (d) setPlatformStats(d) })
+          .then((d) => { if (d) _setPlatformStats(d) })
           .catch(() => {})
 
       }
@@ -416,6 +400,26 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleDeleteAudit() {
+    if (!auditToDelete) return
+    try {
+      const { error } = await supabase
+        .from("audits")
+        .delete()
+        .eq("id", auditToDelete.id)
+
+      if (error) throw error
+
+      setAudits(audits.filter((a) => a.id !== auditToDelete.id))
+      setAuditDeleteDialogOpen(false)
+      setAuditToDelete(null)
+      toast({ title: "Audit Deleted", description: "The audit has been removed." })
+    } catch (error) {
+      console.error("Error deleting audit:", error)
+      toast({ variant: "destructive", title: "Delete Failed", description: "Something went wrong. Please try again." })
+    }
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut()
     router.push("/")
@@ -434,45 +438,13 @@ export default function DashboardPage() {
       (c.status?.toLowerCase().includes(q) ?? false)
     )
   })
-  const pipelineTotalPages = Math.max(1, Math.ceil(filteredPipeline.length / PIPELINE_PAGE_SIZE))
-  const paginatedPipeline = filteredPipeline.slice(
-    pipelinePage * PIPELINE_PAGE_SIZE,
-    (pipelinePage + 1) * PIPELINE_PAGE_SIZE
+  const _pipelineTotalPages = Math.max(1, Math.ceil(filteredPipeline.length / PIPELINE_PAGE_SIZE))
+  const _paginatedPipeline = filteredPipeline.slice(
+    _pipelinePage * PIPELINE_PAGE_SIZE,
+    (_pipelinePage + 1) * PIPELINE_PAGE_SIZE
   )
 
-  // Compute alerts from active (non-archived) cases
-  const activeCases = cases.filter((c) => !c.is_archived)
-  const now = new Date()
-
-  const awaitingDecision = activeCases.filter((c) => c.status === "submitted")
-  const oldestSubmittedDays = awaitingDecision.length > 0
-    ? Math.max(...awaitingDecision.map((c) => differenceInDays(now, new Date(c.submitted_at || c.created_at))))
-    : 0
-
-  const needsFollowUp = activeCases.filter((c) =>
-    c.status === "submitted" && c.expected_decision_date && new Date(c.expected_decision_date) < now
-  )
-
-  const expiringApprovals = activeCases.filter((c) => {
-    if (c.status !== "approved" || !c.pa_expiration_date) return false
-    const expDate = new Date(c.pa_expiration_date)
-    return expDate > now && differenceInDays(expDate, now) <= 30
-  })
-  const soonestExpirationDays = expiringApprovals.length > 0
-    ? Math.min(...expiringApprovals.map((c) => differenceInDays(new Date(c.pa_expiration_date!), now)))
-    : 0
-
-  const deniedCases = activeCases.filter((c) => c.status === "denied")
-
-  const hasAlerts = awaitingDecision.length > 0 || needsFollowUp.length > 0 || expiringApprovals.length > 0 || deniedCases.length > 0
-
-  // Status counts for stats bar (non-archived only)
-  const statusCounts = {
-    draft: activeCases.filter((c) => c.status === "draft" || c.status === "chat").length,
-    submitted: awaitingDecision.length,
-    approved: activeCases.filter((c) => c.status === "approved").length,
-    denied: deniedCases.length,
-  }
+  const _now = new Date()
 
   // ═══════════ ANALYTICS COMPUTATIONS ═══════════
   const analytics = useMemo(() => {
@@ -623,16 +595,6 @@ export default function DashboardPage() {
 
   const displayCases = cases.filter((c) => {
     const matchesTab = activeTab === "archived" ? c.is_archived === true : !c.is_archived
-
-    // Status sub-filter only applies to active tab
-    if (activeTab !== "archived" && statusFilter !== "all") {
-      if (statusFilter === "submitted" && c.status !== "submitted") return false
-      if (statusFilter === "approved" && c.status !== "approved") return false
-      if (statusFilter === "denied" && c.status !== "denied") return false
-      if (statusFilter === "followup" && !(c.status === "submitted" && c.expected_decision_date && new Date(c.expected_decision_date) < now)) return false
-      if (statusFilter === "expiring" && !(c.status === "approved" && c.pa_expiration_date && new Date(c.pa_expiration_date) > now && differenceInDays(new Date(c.pa_expiration_date), now) <= 30)) return false
-    }
-
     if (!matchesTab) return false
 
     if (!searchQuery.trim()) return true
@@ -680,17 +642,6 @@ export default function DashboardPage() {
             <span className="text-xl font-serif font-bold text-dark-bg">Luma</span>
           </div>
           <div className="flex items-center gap-4">
-            {isSuperAdmin && (
-              <Button
-                onClick={() => router.push("/admin/enterprise-contacts?action=research")}
-                variant="outline"
-                size="sm"
-                className="border-mint/30 text-mint hover:bg-mint/10 transition-all duration-200"
-              >
-                <UserPlus className="w-4 h-4 mr-2" />
-                Research Contact
-              </Button>
-            )}
             <Button
               onClick={() => router.push("/cases/new")}
               size="sm"
@@ -736,13 +687,7 @@ export default function DashboardPage() {
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-2 py-1">Admin</DropdownMenuLabel>
-                    <DropdownMenuItem
-                      onClick={() => document.getElementById('platform-overview')?.scrollIntoView({ behavior: 'smooth' })}
-                      className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
-                    >
-                      <Activity className="mr-2 h-4 w-4" />
-                      Platform Overview
-                    </DropdownMenuItem>
+                    {/* Platform Overview menu item hidden */}
                     <DropdownMenuItem
                       onClick={() => window.open('https://clarity.microsoft.com/projects/view/v64a4br39t/dashboard', '_blank')}
                       className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
@@ -790,87 +735,12 @@ export default function DashboardPage() {
           />
         )}
 
-        {/* ═══════════ PLATFORM OVERVIEW (super admin only) ═══════════ */}
-        {isSuperAdmin && platformStats && (
-          <div id="platform-overview" className="space-y-4">
-            <h1 className="text-2xl font-sans font-semibold text-dark-bg">Platform Overview</h1>
-            <Card className="flex flex-wrap items-center gap-6 md:gap-8 p-4 px-8 glass-card border border-sage-medium/30">
-              <div className="flex flex-col gap-0.5">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total Users</p>
-                <p className="text-2xl font-bold leading-none text-dark-bg">{platformStats.totalUsers}</p>
-              </div>
-              <div className="w-px h-10 bg-sage-medium/20" />
-              <div className="flex flex-col gap-0.5">
-                <p className="text-[11px] font-semibold text-green-600 uppercase tracking-wider">Active Subscribers</p>
-                <p className="text-2xl font-bold leading-none text-green-700">{platformStats.activeSubscribers}</p>
-              </div>
-              <div className="w-px h-10 bg-sage-medium/20" />
-              <div className="flex flex-col gap-0.5">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">MRR</p>
-                <p className="text-2xl font-bold leading-none text-dark-bg">${platformStats.mrr.toLocaleString()}</p>
-              </div>
-              <div className="w-px h-10 bg-sage-medium/20" />
-              <div className="flex flex-col gap-0.5">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Signups This Month</p>
-                <p className="text-2xl font-bold leading-none text-dark-bg">{platformStats.signupsThisMonth}</p>
-              </div>
-              <div className="flex items-center gap-4 ml-auto">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="text-sm font-medium text-gray-600">{platformStats.statusBreakdown.active}</span>
-                  <span className="text-xs text-gray-400">Active</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-500" />
-                  <span className="text-sm font-medium text-gray-600">{platformStats.statusBreakdown.trialing}</span>
-                  <span className="text-xs text-gray-400">Trial</span>
-                </div>
-                {platformStats.statusBreakdown.past_due > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    <span className="text-sm font-medium text-gray-600">{platformStats.statusBreakdown.past_due}</span>
-                    <span className="text-xs text-gray-400">Past Due</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-gray-400" />
-                  <span className="text-sm font-medium text-gray-600">{platformStats.statusBreakdown.canceled}</span>
-                  <span className="text-xs text-gray-400">Canceled</span>
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
+        {/* Platform Overview hidden — re-enable when ready for admin dashboard */}
 
 
         {/* ═══════════ CASE MANAGEMENT ═══════════ */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-sans font-semibold text-dark-bg">Case Management</h1>
-            <div className="flex items-center gap-1 bg-white/50 border border-sage-medium/30 rounded-lg p-1">
-              <button
-                onClick={() => setDashboardView("cases")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                  dashboardView === "cases"
-                    ? "bg-white text-dark-bg shadow-sm"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
-                }`}
-              >
-                Cases
-              </button>
-              <button
-                onClick={() => setDashboardView("analytics")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                  dashboardView === "analytics"
-                    ? "bg-white text-dark-bg shadow-sm"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
-                }`}
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                Analytics
-              </button>
-            </div>
-          </div>
+          <h1 className="text-2xl font-sans font-semibold text-dark-bg">Case Management</h1>
 
           {/* ═══════════ ANALYTICS VIEW ═══════════ */}
           {dashboardView === "analytics" && (
@@ -1204,62 +1074,6 @@ export default function DashboardPage() {
 
           {/* ═══════════ CASES VIEW (existing) ═══════════ */}
           {dashboardView === "cases" && <>
-          {/* Alerts Bar */}
-          {hasAlerts && (
-            <Card className="flex flex-wrap items-center gap-3 md:gap-5 p-3 px-6 glass-card border border-sage-medium/30">
-              {awaitingDecision.length > 0 && (
-                <button
-                  onClick={() => { setActiveTab("active"); setStatusFilter("submitted"); setCasePage(0) }}
-                  className="flex items-center gap-1.5 text-sm text-blue-700 hover:text-blue-900 transition-colors cursor-pointer"
-                >
-                  <Clock className="w-3.5 h-3.5" />
-                  <span className="font-medium">{awaitingDecision.length}</span>
-                  <span className="text-blue-600">awaiting decision</span>
-                  <span className="text-blue-400 text-xs">(oldest: {oldestSubmittedDays}d)</span>
-                </button>
-              )}
-              {awaitingDecision.length > 0 && (needsFollowUp.length > 0 || expiringApprovals.length > 0 || deniedCases.length > 0) && (
-                <div className="w-px h-5 bg-sage-medium/30" />
-              )}
-              {needsFollowUp.length > 0 && (
-                <button
-                  onClick={() => { setActiveTab("active"); setStatusFilter("followup"); setCasePage(0) }}
-                  className="flex items-center gap-1.5 text-sm text-amber-700 hover:text-amber-900 transition-colors cursor-pointer"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  <span className="font-medium">{needsFollowUp.length}</span>
-                  <span className="text-amber-600">need follow-up</span>
-                </button>
-              )}
-              {needsFollowUp.length > 0 && (expiringApprovals.length > 0 || deniedCases.length > 0) && (
-                <div className="w-px h-5 bg-sage-medium/30" />
-              )}
-              {expiringApprovals.length > 0 && (
-                <button
-                  onClick={() => { setActiveTab("active"); setStatusFilter("expiring"); setCasePage(0) }}
-                  className="flex items-center gap-1.5 text-sm text-amber-700 hover:text-amber-900 transition-colors cursor-pointer"
-                >
-                  <CalendarClock className="w-3.5 h-3.5" />
-                  <span className="font-medium">{expiringApprovals.length}</span>
-                  <span className="text-amber-600">PA expiring in {soonestExpirationDays}d</span>
-                </button>
-              )}
-              {expiringApprovals.length > 0 && deniedCases.length > 0 && (
-                <div className="w-px h-5 bg-sage-medium/30" />
-              )}
-              {deniedCases.length > 0 && (
-                <button
-                  onClick={() => { setActiveTab("active"); setStatusFilter("denied"); setCasePage(0) }}
-                  className="flex items-center gap-1.5 text-sm text-coral hover:text-coral/80 transition-colors cursor-pointer"
-                >
-                  <XCircle className="w-3.5 h-3.5" />
-                  <span className="font-medium">{deniedCases.length}</span>
-                  <span>denied</span>
-                </button>
-              )}
-            </Card>
-          )}
-
           {/* Case Stats Bar */}
           <Card className="flex flex-wrap items-center gap-6 md:gap-8 p-4 px-8 glass-card border border-sage-medium/30">
             <div className="flex flex-col gap-0.5">
@@ -1276,41 +1090,6 @@ export default function DashboardPage() {
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Revenue Protected</p>
               <p className="text-2xl font-bold leading-none text-dark-bg">${stats.revenue_protected.toLocaleString()}</p>
             </div>
-            {(statusCounts.draft > 0 || statusCounts.submitted > 0 || statusCounts.approved > 0 || statusCounts.denied > 0) && (
-              <>
-                <div className="w-px h-10 bg-sage-medium/20" />
-                <div className="flex items-center gap-4">
-                  {statusCounts.draft > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-gray-400" />
-                      <span className="text-sm font-medium text-gray-600">{statusCounts.draft}</span>
-                      <span className="text-xs text-gray-400">Draft</span>
-                    </div>
-                  )}
-                  {statusCounts.submitted > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="text-sm font-medium text-gray-600">{statusCounts.submitted}</span>
-                      <span className="text-xs text-gray-400">Submitted</span>
-                    </div>
-                  )}
-                  {statusCounts.approved > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-green-500" />
-                      <span className="text-sm font-medium text-gray-600">{statusCounts.approved}</span>
-                      <span className="text-xs text-gray-400">Approved</span>
-                    </div>
-                  )}
-                  {statusCounts.denied > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-coral" />
-                      <span className="text-sm font-medium text-gray-600">{statusCounts.denied}</span>
-                      <span className="text-xs text-gray-400">Denied</span>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
 
             {/* Show subscription badge here if no pipeline section above */}
             {!pipeline && isTeamOwner && subscription.subscription_status === "trialing" && subscription.trial_ends_at && (
@@ -1349,7 +1128,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Cases Table */}
-          <Tabs defaultValue="active" onValueChange={(v) => { setActiveTab(v); if (v === "archived") setStatusFilter("all"); setCasePage(0) }} className="w-full">
+          <Tabs defaultValue="active" onValueChange={(v) => { setActiveTab(v); setCasePage(0) }} className="w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
                 <TabsList className="bg-white/50 border border-sage-medium/30">
@@ -1359,28 +1138,6 @@ export default function DashboardPage() {
                     <Archive className="w-3 h-3" />
                   </TabsTrigger>
                 </TabsList>
-                {activeTab !== "archived" && (
-                  <div className="flex items-center gap-1 ml-2">
-                    {[
-                      { value: "all", label: "All" },
-                      { value: "submitted", label: "Submitted" },
-                      { value: "approved", label: "Approved" },
-                      { value: "denied", label: "Denied" },
-                    ].map((f) => (
-                      <button
-                        key={f.value}
-                        onClick={() => { setStatusFilter(f.value); setCasePage(0) }}
-                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
-                          statusFilter === f.value
-                            ? "bg-dark-bg text-white"
-                            : "text-gray-500 hover:bg-gray-100"
-                        }`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <div className="relative w-full sm:w-64">
@@ -1401,7 +1158,7 @@ export default function DashboardPage() {
                   <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
                     <TableHead className="w-[200px] lg:w-[280px] text-dark-bg font-semibold">Patient & Document</TableHead>
                     <TableHead className="text-dark-bg font-semibold">Payer</TableHead>
-                    <TableHead className="hidden sm:table-cell text-dark-bg font-semibold">Status</TableHead>
+                    <TableHead className="hidden sm:table-cell text-dark-bg font-semibold">Readiness</TableHead>
                     <TableHead className="hidden sm:table-cell text-dark-bg font-semibold">Created</TableHead>
                     <TableHead className="hidden lg:table-cell text-dark-bg font-semibold">Created By</TableHead>
                     <TableHead className="text-right text-dark-bg font-semibold">Claim Value</TableHead>
@@ -1414,11 +1171,9 @@ export default function DashboardPage() {
                       <TableCell colSpan={7} className="h-32 text-center text-gray-500">
                         {searchQuery.trim()
                           ? `No cases found matching "${searchQuery}"`
-                          : statusFilter !== "all"
-                            ? `No ${statusFilter} cases found.`
-                            : activeTab === 'active'
-                              ? "No active cases found. Create a new case to get started."
-                              : "No archived cases."}
+                          : activeTab === 'active'
+                            ? "No active cases found. Create a new case to get started."
+                            : "No archived cases."}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1438,20 +1193,17 @@ export default function DashboardPage() {
                           {c.payer_name || '-'}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          <div className="flex flex-col gap-0.5">
-                            <Badge variant="outline" className={`text-[10px] w-fit ${CASE_STATUS_CONFIG[c.status]?.className || "bg-gray-100 text-gray-700 border-gray-200"}`}>
-                              {CASE_STATUS_CONFIG[c.status]?.label || c.status}
-                            </Badge>
-                            {c.status === "submitted" && c.submitted_at && (
-                              <span className="text-[10px] text-gray-400">{differenceInDays(now, new Date(c.submitted_at))}d ago</span>
-                            )}
-                            {c.status === "approved" && c.pa_expiration_date && (
-                              <span className="text-[10px] text-gray-400">Expires {format(new Date(c.pa_expiration_date), "MMM d")}</span>
-                            )}
-                            {c.status === "denied" && c.denial_category && (
-                              <span className="text-[10px] text-gray-400 truncate max-w-[120px]">{c.denial_category}</span>
-                            )}
-                          </div>
+                          {c.metadata?.lcd_validation?.found_count != null && c.metadata?.lcd_validation?.missing_count != null ? (() => {
+                            const found = c.metadata.lcd_validation!.found_count!
+                            const total = found + c.metadata.lcd_validation!.missing_count!
+                            const pct = total > 0 ? Math.round((found / total) * 100) : 0
+                            const pctColor = pct >= 80 ? "text-green-600" : pct >= 60 ? "text-amber-600" : "text-red-600"
+                            return (
+                              <span className={`text-sm font-semibold ${pctColor}`}>{pct}%</span>
+                            )
+                          })() : (
+                            <span className="text-sm text-gray-400">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell text-gray-700 text-sm">
                           {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
@@ -1544,207 +1296,92 @@ export default function DashboardPage() {
               )}
             </Card>
           </Tabs>
+
+          {/* Recent Audits */}
+          {audits.length > 0 && (
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold text-dark-bg">Recent Audits</h2>
+                <Link
+                  href="/audit"
+                  className="flex items-center gap-1.5 text-sm text-mint hover:text-mint/80 font-medium transition-colors"
+                >
+                  New Audit
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+              <Card className="glass-card border border-sage-medium/30 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
+                      <TableHead className="text-dark-bg font-semibold">Patient</TableHead>
+                      <TableHead className="text-dark-bg font-semibold">Medication</TableHead>
+                      <TableHead className="hidden sm:table-cell text-dark-bg font-semibold">Readiness</TableHead>
+                      <TableHead className="text-dark-bg font-semibold">Created</TableHead>
+                      <TableHead className="w-[60px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {audits.map((a) => {
+                      const complianceRate = a.total_requirements
+                        ? Math.round(((a.found_count || 0) / a.total_requirements) * 100)
+                        : 0
+                      const pctColor = complianceRate >= 80 ? "text-green-600" : complianceRate >= 60 ? "text-amber-600" : "text-red-600"
+
+                      return (
+                        <TableRow
+                          key={a.id}
+                          className="group hover:bg-sage-light/20 transition-colors cursor-pointer"
+                          onClick={() => router.push(`/audit?id=${a.id}`)}
+                        >
+                          <TableCell className="font-medium text-dark-bg">
+                            {a.patient_first_name || a.patient_last_name
+                              ? `${a.patient_first_name || ""} ${a.patient_last_name || ""}`.trim()
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-gray-700 text-sm">
+                            {a.requested_medication || "—"}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            <span className={`text-sm font-semibold ${pctColor}`}>
+                              {complianceRate}%
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-gray-700 text-sm">
+                            {formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-sage-medium/20 text-gray-400 hover:text-dark-bg">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="bg-white border border-sage-medium/30">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={(e) => { e.stopPropagation(); setAuditToDelete(a); setAuditDeleteDialogOpen(true) }}
+                                  className="text-coral focus:bg-coral/10 focus:text-coral cursor-pointer"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
+            </div>
+          )}
           </>}
         </div>
 
-        {/* ═══════════ ENTERPRISE PIPELINE (super admin only) ═══════════ */}
-        {pipeline && pipelineContacts.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-sans font-semibold text-dark-bg">Enterprise Pipeline</h1>
-              <Link
-                href="/admin/enterprise-contacts"
-                className="flex items-center gap-1.5 text-sm text-mint hover:text-mint/80 font-medium transition-colors"
-              >
-                Open CRM
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-
-            {/* Pipeline Stats Bar */}
-            <Card className="flex flex-wrap items-center gap-6 md:gap-8 p-4 px-8 glass-card border border-sage-medium/30">
-              <div className="flex flex-col gap-0.5">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Contacts</p>
-                <p className="text-2xl font-bold leading-none text-dark-bg">{pipeline.total_contacts}</p>
-              </div>
-              <div className="w-px h-10 bg-sage-medium/20" />
-              {pipeline.active_contracts > 0 && (
-                <>
-                  <div className="flex flex-col gap-0.5">
-                    <p className="text-[11px] font-semibold text-green-600 uppercase tracking-wider">Active Revenue</p>
-                    <p className="text-2xl font-bold leading-none text-green-700">
-                      {formatPipelinePrice(pipeline.active_monthly_low, pipeline.active_monthly_high)}
-                    </p>
-                  </div>
-                  <div className="w-px h-10 bg-sage-medium/20" />
-                </>
-              )}
-              <div className="flex flex-col gap-0.5">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Potential Pipeline</p>
-                <p className="text-2xl font-bold leading-none text-dark-bg">
-                  {formatPipelinePrice(pipeline.potential_monthly_low, pipeline.potential_monthly_high)}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 ml-auto">
-                {/* Pipeline search */}
-                <div className="relative w-52">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    type="text"
-                    placeholder="Search pipeline..."
-                    value={pipelineSearch}
-                    onChange={(e) => { setPipelineSearch(e.target.value); setPipelinePage(0) }}
-                    className="pl-9 h-9 text-sm"
-                  />
-                </div>
-
-                {isTeamOwner && subscription.subscription_status === "trialing" && subscription.trial_ends_at && (
-                  <button
-                    onClick={async () => {
-                      const response = await fetch("/api/stripe/create-portal", { method: "POST" })
-                      const data = await response.json()
-                      if (data.url) {
-                        window.location.href = data.url
-                      } else {
-                        window.location.href = "/checkout"
-                      }
-                    }}
-                    className="flex items-center gap-2 bg-mint/10 border border-mint/30 rounded-lg px-4 py-2 text-sm font-semibold text-dark-bg hover:bg-mint/20 transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    Trial Active
-                    <span className="bg-mint text-white text-xs font-bold px-2 py-0.5 rounded">
-                      {Math.ceil((new Date(subscription.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
-                    </span>
-                  </button>
-                )}
-
-                {isTeamOwner && subscription.subscription_status === "active" && (
-                  <button
-                    onClick={async () => {
-                      const response = await fetch("/api/stripe/create-portal", { method: "POST" })
-                      const data = await response.json()
-                      if (data.url) window.location.href = data.url
-                    }}
-                    className="flex items-center gap-2 bg-mint/10 border border-mint/30 rounded-lg px-4 py-2 text-sm font-semibold text-dark-bg hover:bg-mint/20 transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-mint" />
-                    Active
-                  </button>
-                )}
-              </div>
-            </Card>
-
-            {/* Pipeline Table */}
-            <Card className="glass-card border border-sage-medium/30 overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-sage-medium/10 hover:bg-sage-medium/10">
-                    <TableHead className="text-dark-bg font-semibold">Contact</TableHead>
-                    <TableHead className="text-dark-bg font-semibold">Organization</TableHead>
-                    <TableHead className="hidden md:table-cell text-dark-bg font-semibold">Location</TableHead>
-                    <TableHead className="hidden lg:table-cell text-dark-bg font-semibold">Strategy</TableHead>
-                    <TableHead className="text-dark-bg font-semibold">Status</TableHead>
-                    <TableHead className="text-right text-dark-bg font-semibold">Monthly</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedPipeline.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-gray-500">
-                        {pipelineSearch.trim()
-                          ? `No contacts matching "${pipelineSearch}"`
-                          : "No contacts in pipeline yet."}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    paginatedPipeline.map((c) => (
-                      <TableRow
-                        key={c.id}
-                        className="group cursor-pointer hover:bg-sage-light/20 transition-colors"
-                        onClick={() => router.push(`/admin/enterprise-contacts?contact=${c.id}`)}
-                      >
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <PipelineAvatar src={c.profile_image_url} name={c.contact_name} />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-semibold text-dark-bg text-sm truncate">{c.contact_name}</span>
-                                {c.is_active_contract && (
-                                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" title="Active contract" />
-                                )}
-                              </div>
-                              {c.title && (
-                                <p className="text-xs text-gray-500 truncate max-w-[200px]">{c.title}</p>
-                              )}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-gray-700">{c.organization}</TableCell>
-                        <TableCell className="hidden md:table-cell text-sm text-gray-600">
-                          {c.hospital_location ? (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3 text-gray-400" />
-                              {c.hospital_location}
-                            </span>
-                          ) : "—"}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          {c.strategy_type && STRATEGY_CONFIG[c.strategy_type] ? (
-                            <Badge variant="outline" className={`text-[10px] ${STRATEGY_CONFIG[c.strategy_type].className}`}>
-                              {STRATEGY_CONFIG[c.strategy_type].label}
-                            </Badge>
-                          ) : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={`text-[10px] ${STATUS_CONFIG[c.status]?.className || ""}`}>
-                            {STATUS_CONFIG[c.status]?.label || c.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-sm font-medium text-gray-700">
-                          {formatPipelinePrice(c.monthly_price_low, c.monthly_price_high)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-
-              {/* Pagination */}
-              {filteredPipeline.length > PIPELINE_PAGE_SIZE && (
-                <div className="flex items-center justify-between px-6 py-3 border-t border-sage-medium/20">
-                  <p className="text-xs text-gray-500">
-                    {filteredPipeline.length} contact{filteredPipeline.length !== 1 ? "s" : ""}
-                    {pipelineSearch.trim() ? ` matching "${pipelineSearch}"` : ""}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={pipelinePage === 0}
-                      onClick={() => setPipelinePage((p) => p - 1)}
-                      className="h-8 px-3 text-xs"
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-xs text-gray-600 tabular-nums">
-                      {pipelinePage + 1} / {pipelineTotalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={pipelinePage + 1 >= pipelineTotalPages}
-                      onClick={() => setPipelinePage((p) => p + 1)}
-                      className="h-8 px-3 text-xs"
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card>
-          </div>
-        )}
+        {/* Enterprise Pipeline — hidden for now, code preserved in git history */}
       </div>
 
       {/* Delete Confirmation Dialog */}
@@ -1783,6 +1420,49 @@ export default function DashboardPage() {
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Delete Permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Audit Delete Confirmation Dialog */}
+      <Dialog open={auditDeleteDialogOpen} onOpenChange={setAuditDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Audit?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this audit? This action cannot be undone.
+            </DialogDescription>
+            {auditToDelete && (
+              <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                <p className="font-medium text-sm text-dark-bg">
+                  {auditToDelete.patient_first_name || auditToDelete.patient_last_name
+                    ? `${auditToDelete.patient_first_name || ""} ${auditToDelete.patient_last_name || ""}`.trim()
+                    : "Unnamed Audit"}
+                </p>
+                {auditToDelete.requested_medication && (
+                  <p className="text-xs text-gray-500 mt-1">{auditToDelete.requested_medication}</p>
+                )}
+              </div>
+            )}
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAuditDeleteDialogOpen(false)
+                setAuditToDelete(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAudit}
+              className="bg-coral hover:bg-coral/90 text-white"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

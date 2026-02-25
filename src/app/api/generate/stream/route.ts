@@ -13,6 +13,8 @@ import { validateMedicalNecessity, MedicalNecessityValidationResult } from "@/li
 import { validateAppeal, AppealValidationResult } from "@/lib/validation/appeal-validation"
 import { computeAgeTags, formatAgeTagsForPrompt, reinsertPatientName, PATIENT_PLACEHOLDER } from "@/lib/phi-utils"
 import { getCachedResearch, cacheResearch } from "@/lib/research-cache"
+import { ratchetMergeValidation } from "@/lib/validation/ratchet-merge"
+import type { ChecklistCategory } from "@/lib/validation/validation-types"
 
 // Unified validation result type for all doc types
 type ValidationResult = LCDValidationResult | MedicalNecessityValidationResult | AppealValidationResult
@@ -338,26 +340,8 @@ Medication: ${caseData.requested_medication}`
         console.error("Error extracting forms:", formError)
       })
 
-      // Task 3: Load chat messages
-      const chatTask = (async () => {
-        const { data: chatMessages } = await supabase
-          .from("case_messages")
-          .select("role, content")
-          .eq("case_id", caseId)
-          .order("created_at", { ascending: true })
-
-        if (chatMessages && chatMessages.length > 0) {
-          const relevantMessages = chatMessages
-            .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
-            .map((msg) => `${msg.role === 'user' ? 'Provider' : 'Luma'}: ${msg.content}`)
-            .join("\n\n")
-
-          if (relevantMessages) {
-            return `\nCHAT CONTEXT:\n${relevantMessages}\n`
-          }
-        }
-        return ""
-      })()
+      // Chat messages intentionally excluded from generation — chat is for
+      // exploration/ideation; checklist edits are the structured improvement channel.
 
       // Task 4: Summarize long clinical notes (only if > 5K chars)
       const rawClinicalNotes = [
@@ -391,10 +375,9 @@ Medication: ${caseData.requested_medication}`
       })
 
       // Await all four in parallel
-      const [validationSettled, , chatConversationContext, clinicalNotesSummary] = await Promise.all([
+      const [validationSettled, , clinicalNotesSummary] = await Promise.all([
         validationTask,
         formExtractionTask,
-        chatTask,
         clinicalSummaryTask,
       ])
       validationResult = validationSettled as ValidationResult | null
@@ -455,7 +438,7 @@ Payer: ${caseData.payer_name}
 Medication: ${caseData.requested_medication}
 
 RESEARCH: ${researchContext.substring(0, 3000)}
-${chatConversationContext}${checklistEditsContext}
+${checklistEditsContext}
 CLINICAL NOTES: ${clinicalNotesSummary}
 
 Generate a professional, persuasive prior authorization letter.
@@ -584,63 +567,95 @@ Note: These recommendations are based on AI analysis of current payer policies. 
       // Save validation results for all doc types
       if (validationResult) {
         const existingChecklistEdits = caseData.metadata?.checklist_edits as ChecklistEditsData | undefined
+        const existingRecommendationEdits = caseData.metadata?.recommendation_edits
+        const previousFull = caseData.metadata?.lcd_validation_full as { checklist?: ChecklistCategory[] } | undefined
 
         if (isBiologicsPA) {
           const lcdResult = validationResult as LCDValidationResult
+
+          // Ratchet merge: prevent score regression on regeneration
+          const merged = ratchetMergeValidation({
+            newChecklist: lcdResult.checklist,
+            previousChecklist: previousFull?.checklist,
+          })
+          const stillMissingIds = new Set(
+            merged.checklist.flatMap(c => c.items)
+              .filter(i => ["MISSING", "PARTIAL", "VIOLATION"].includes(i.status))
+              .map(i => i.id)
+          )
+          const mergedRecs = lcdResult.recommendations.filter(
+            r => !r.sourceItemId || stillMissingIds.has(r.sourceItemId)
+          )
+
           updateData.metadata = {
             ...caseData.metadata,
             lcd_validation: {
               run_at: new Date().toISOString(),
-              risk_level: lcdResult.auditRisk.overallScore,
-              denial_probability: lcdResult.auditRisk.estimatedDenialProbability,
-              found_count: lcdResult.summary.foundCount,
-              missing_count: lcdResult.summary.missingCount,
+              risk_level: merged.auditRisk.overallScore,
+              denial_probability: merged.auditRisk.estimatedDenialProbability,
+              found_count: merged.summary.foundCount,
+              missing_count: merged.summary.missingCount,
               detected_wound_type: lcdResult.detectedWoundType,
               ctp_covered: lcdResult.ctpProductCheck.covered,
             },
             lcd_validation_full: {
-              riskLevel: lcdResult.auditRisk.overallScore,
-              denialProbability: lcdResult.auditRisk.estimatedDenialProbability,
-              foundCount: lcdResult.summary.foundCount,
-              missingCount: lcdResult.summary.missingCount,
-              totalRequirements: lcdResult.summary.totalRequirements,
+              riskLevel: merged.auditRisk.overallScore,
+              denialProbability: merged.auditRisk.estimatedDenialProbability,
+              foundCount: merged.summary.foundCount,
+              missingCount: merged.summary.missingCount,
+              totalRequirements: merged.summary.totalRequirements,
               detectedWoundType: lcdResult.detectedWoundType,
               ctpCovered: lcdResult.ctpProductCheck.covered,
-              instantDenialTriggers: lcdResult.auditRisk.instantDenialTriggers,
-              veryHighRiskItems: lcdResult.auditRisk.veryHighRiskItems,
-              highRiskItems: lcdResult.auditRisk.highRiskItems,
-              checklist: lcdResult.checklist,
-              recommendations: lcdResult.recommendations,
+              instantDenialTriggers: merged.auditRisk.instantDenialTriggers,
+              veryHighRiskItems: merged.auditRisk.veryHighRiskItems,
+              highRiskItems: merged.auditRisk.highRiskItems,
+              checklist: merged.checklist,
+              recommendations: mergedRecs,
               perplexityFindings: lcdResult.perplexityFindings,
             },
             ...(existingChecklistEdits && { checklist_edits: existingChecklistEdits }),
+            ...(existingRecommendationEdits && { recommendation_edits: existingRecommendationEdits }),
           }
         } else {
           // Medical Necessity and Appeal
+          const merged = ratchetMergeValidation({
+            newChecklist: validationResult.checklist,
+            previousChecklist: previousFull?.checklist,
+          })
+          const stillMissingIds = new Set(
+            merged.checklist.flatMap(c => c.items)
+              .filter(i => ["MISSING", "PARTIAL", "VIOLATION"].includes(i.status))
+              .map(i => i.id)
+          )
+          const mergedRecs = validationResult.recommendations.filter(
+            r => !r.sourceItemId || stillMissingIds.has(r.sourceItemId)
+          )
+
           updateData.metadata = {
             ...caseData.metadata,
             lcd_validation: {
               run_at: new Date().toISOString(),
-              risk_level: validationResult.auditRisk.overallScore,
-              denial_probability: validationResult.auditRisk.estimatedDenialProbability,
-              found_count: validationResult.summary.foundCount,
-              missing_count: validationResult.summary.missingCount,
+              risk_level: merged.auditRisk.overallScore,
+              denial_probability: merged.auditRisk.estimatedDenialProbability,
+              found_count: merged.summary.foundCount,
+              missing_count: merged.summary.missingCount,
             },
             lcd_validation_full: {
-              riskLevel: validationResult.auditRisk.overallScore,
-              denialProbability: validationResult.auditRisk.estimatedDenialProbability,
-              foundCount: validationResult.summary.foundCount,
-              missingCount: validationResult.summary.missingCount,
-              totalRequirements: validationResult.summary.totalRequirements,
+              riskLevel: merged.auditRisk.overallScore,
+              denialProbability: merged.auditRisk.estimatedDenialProbability,
+              foundCount: merged.summary.foundCount,
+              missingCount: merged.summary.missingCount,
+              totalRequirements: merged.summary.totalRequirements,
               ctpCovered: true,
-              instantDenialTriggers: validationResult.auditRisk.instantDenialTriggers,
-              veryHighRiskItems: validationResult.auditRisk.veryHighRiskItems,
-              highRiskItems: validationResult.auditRisk.highRiskItems,
-              checklist: validationResult.checklist,
-              recommendations: validationResult.recommendations,
+              instantDenialTriggers: merged.auditRisk.instantDenialTriggers,
+              veryHighRiskItems: merged.auditRisk.veryHighRiskItems,
+              highRiskItems: merged.auditRisk.highRiskItems,
+              checklist: merged.checklist,
+              recommendations: mergedRecs,
               perplexityFindings: validationResult.perplexityFindings,
             },
             ...(existingChecklistEdits && { checklist_edits: existingChecklistEdits }),
+            ...(existingRecommendationEdits && { recommendation_edits: existingRecommendationEdits }),
           }
         }
       }

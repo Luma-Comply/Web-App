@@ -13,3 +13,6 @@ export type { MedicalNecessityValidationResult } from "./medical-necessity-valid
 // Appeal validation
 export { validateAppeal } from "./appeal-validation"
 export type { AppealValidationResult } from "./appeal-validation"
+
+// Pre-Audit Review validation
+export { validateForAudit } from "./audit-validation"

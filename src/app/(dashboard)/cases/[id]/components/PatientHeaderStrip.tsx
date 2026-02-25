@@ -9,6 +9,7 @@ import {
   X,
   MessageSquare,
   Pencil,
+  RefreshCw,
   LayoutGrid,
   FileText,
   Search,
@@ -30,6 +31,9 @@ interface PatientHeaderStripProps {
   onTabChange: (tab: string) => void
   onEdit: () => void
   onChat: () => void
+  onRegenerate: () => void
+  onGenerate: () => void
+  generating: boolean
 }
 
 export function PatientHeaderStrip({
@@ -39,10 +43,15 @@ export function PatientHeaderStrip({
   displayLastName,
   displayPayer,
   showExtractedNameLabel,
+  hasGenerated,
+  isInChatMode,
   activeTab,
   onTabChange,
   onEdit,
   onChat,
+  onRegenerate,
+  onGenerate,
+  generating,
 }: PatientHeaderStripProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const initials = `${(displayFirstName || "?")[0]}${(displayLastName || "?")[0]}`.toUpperCase()
@@ -83,7 +92,7 @@ export function PatientHeaderStrip({
           isCompact ? "py-2.5 shadow-sm" : "py-3 md:py-4"
         }`}
       >
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6 flex items-center justify-between gap-2 md:gap-6">
+        <div className="max-w-4xl mx-auto px-4 flex items-center justify-between gap-2 md:gap-6">
           {/* Left: Back + Patient Info */}
           <div className="flex items-center gap-2 md:gap-4 min-w-0">
             <Link href="/dashboard" className="flex-shrink-0">
@@ -145,24 +154,6 @@ export function PatientHeaderStrip({
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Right: Desktop — inline buttons */}
-          <div className="hidden md:flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={onEdit}
-              className="flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-gray-500 hover:text-dark-bg hover:bg-gray-100 transition-colors"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit
-            </button>
-            <button
-              onClick={onChat}
-              className="flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-gray-500 hover:text-dark-bg hover:bg-gray-100 transition-colors"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              Chat
-            </button>
           </div>
 
           {/* Right: Mobile — hamburger trigger */}
@@ -261,6 +252,19 @@ export function PatientHeaderStrip({
             <MessageSquare className="w-4 h-4 text-blue-500" />
             Chat with Luma
           </button>
+          {!isInChatMode && (
+            <button
+              onClick={() => handleMobileAction(() => {
+                if (hasGenerated) onRegenerate()
+                else onGenerate()
+              })}
+              disabled={generating}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-dark-bg hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 text-amber-600 ${generating ? "animate-spin" : ""}`} />
+              {hasGenerated ? "Regenerate Documentation" : "Generate Documentation"}
+            </button>
+          )}
         </div>
 
         {/* Details */}

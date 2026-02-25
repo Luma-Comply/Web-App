@@ -2,9 +2,7 @@
 
 import { Card } from "@/components/ui/card"
 import {
-  RefreshCw,
   Clock,
-  ChevronRight,
   FileWarning,
 } from "lucide-react"
 import type { CaseData, AppealCase } from "../types"
@@ -13,52 +11,15 @@ import Link from "next/link"
 
 interface SidePanelProps {
   caseData: CaseData
-  isInChatMode: boolean
   appealCases: AppealCase[]
-
-  // Regenerate action
-  onRegenerate: () => void
-  onGenerate: () => void
-  generating: boolean
 }
 
 export function SidePanel({
   caseData,
-  isInChatMode,
   appealCases,
-  onRegenerate,
-  onGenerate,
-  generating,
 }: SidePanelProps) {
   return (
-    <div className="hidden lg:block w-80 flex-shrink-0 space-y-4">
-      {/* Regenerate CTA */}
-      {!isInChatMode && (
-        <Card className="p-4 bg-white rounded-xl border border-gray-200">
-          <button
-            onClick={() => {
-              if (caseData.generated_output) {
-                onRegenerate()
-              } else {
-                onGenerate()
-              }
-            }}
-            disabled={generating}
-            className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors text-left group disabled:opacity-50"
-          >
-            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
-              <RefreshCw className={`w-4 h-4 text-amber-600 ${generating ? 'animate-spin' : ''}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-dark-bg">
-                {caseData.generated_output ? "Regenerate" : "Generate"}
-              </p>
-              <p className="text-[11px] text-gray-400">Re-run payer research</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-400 flex-shrink-0" />
-          </button>
-        </Card>
-      )}
+    <div className="space-y-4 mt-6">
 
       {/* Denial Details (informational) */}
       {caseData.status === "denied" && caseData.denial_category && (

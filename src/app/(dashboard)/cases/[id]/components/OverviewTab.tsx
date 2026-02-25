@@ -23,74 +23,21 @@ export function OverviewTab({ caseData, lcdValidation, checklistEdits, onCheckli
     )
   }
 
-  // --- Recalculate score accounting for addressed checklist items ---
-  const allItems = lcdValidation.checklist?.flatMap(c => c.items) ?? []
-  const addressedIds = new Set(
-    Object.entries(checklistEdits)
-      .filter(([, edit]) => edit.marked_addressed)
-      .map(([id]) => id)
-  )
+  // --- Raw compliance score (same formula as dashboard: found / (found + missing)) ---
+  const assessableTotal = (lcdValidation.foundCount + lcdValidation.missingCount) || 1
+  const complianceRate = Math.round((lcdValidation.foundCount / assessableTotal) * 100)
 
-  // Filter instant denial triggers that haven't been addressed
-  const remainingTriggers = lcdValidation.instantDenialTriggers.filter(label => {
-    // Match trigger to checklist item by label
-    const item = allItems.find(i => i.label === label)
-    if (item) return !addressedIds.has(item.id)
-    // CTP product check trigger (injected directly, not from a checklist item)
-    // Link it to the ctp_on_covered_list checklist item
-    if (label.startsWith("CTP product not found")) {
-      return !addressedIds.has("ctp_on_covered_list")
-    }
-    return true
-  })
-
-  // Filter remaining risk items that haven't been addressed
-  const remainingVeryHigh = allItems.filter(i =>
-    (i.status === "MISSING" || i.status === "PARTIAL") &&
-    i.auditRisk === "VERY_HIGH" &&
-    !addressedIds.has(i.id)
-  )
-  const remainingHigh = allItems.filter(i =>
-    (i.status === "MISSING" || i.status === "PARTIAL") &&
-    i.auditRisk === "HIGH" &&
-    !addressedIds.has(i.id)
-  )
-
-  // Recalculate denial probability based on remaining issues
-  let effectiveDenialProb = 10
-  if (remainingTriggers.length > 0) {
-    effectiveDenialProb = 95
-  } else if (remainingVeryHigh.length > 0) {
-    effectiveDenialProb = 75 + remainingVeryHigh.length * 5
-  } else if (remainingHigh.length >= 3) {
-    effectiveDenialProb = 50 + remainingHigh.length * 5
-  } else if (remainingHigh.length >= 1) {
-    effectiveDenialProb = 25 + remainingHigh.length * 5
-  }
-  effectiveDenialProb = Math.min(effectiveDenialProb, 99)
-
-  const approvalProbability = 100 - effectiveDenialProb
-  const barColor = approvalProbability >= 80
+  // Color based on compliance percentage
+  const barColor = complianceRate >= 80
     ? "bg-green-500"
-    : approvalProbability >= 60
+    : complianceRate >= 60
     ? "bg-amber-500"
     : "bg-coral"
-  const scoreColor = approvalProbability >= 80
+  const scoreColor = complianceRate >= 80
     ? "text-green-600"
-    : approvalProbability >= 60
+    : complianceRate >= 60
     ? "text-amber-600"
     : "text-coral"
-
-  // Risk level label based on recalculated score
-  const riskLabel = remainingTriggers.length > 0
-    ? "Instant Denial"
-    : effectiveDenialProb >= 70
-    ? "Very High Risk"
-    : effectiveDenialProb >= 50
-    ? "High Risk"
-    : effectiveDenialProb >= 30
-    ? "Moderate Risk"
-    : "Low Risk"
 
   return (
     <div className="space-y-6">
@@ -106,20 +53,24 @@ export function OverviewTab({ caseData, lcdValidation, checklistEdits, onCheckli
         {/* Score display */}
         <div className="flex items-baseline gap-2 mb-3">
           <span className={`text-[2.2rem] font-bold leading-none ${scoreColor}`}>
-            {approvalProbability}%
+            {complianceRate}%
           </span>
           <span className="text-[0.78rem] text-dark-bg/50">
-            Est. Approval Rate · <span className={scoreColor}>{riskLabel}</span>
+            Readiness
           </span>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full h-1.5 bg-gray-300/40 rounded-full overflow-hidden mb-5">
+        <div className="w-full h-1.5 bg-gray-300/40 rounded-full overflow-hidden mb-3">
           <div
             className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-            style={{ width: `${approvalProbability}%` }}
+            style={{ width: `${complianceRate}%` }}
           />
         </div>
+
+        <p className="text-[0.65rem] text-gray-500">
+          AI-verified documentation coverage against LCD requirements. Does not guarantee payer approval.
+        </p>
 
       </div>
 

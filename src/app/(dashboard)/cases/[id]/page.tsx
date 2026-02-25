@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, FileText, Search, Clock } from "lucide-react"
+import { LayoutGrid, FileText, Search, Clock, Pencil, MessageSquare, RefreshCw } from "lucide-react"
 import { motion } from "framer-motion"
 import { LumaLogo } from "@/components/LumaLogo"
 import { ChecklistItemEditModal } from "@/components/dashboard/ChecklistItemEditModal"
@@ -174,113 +174,143 @@ function CaseDetailContent() {
         onTabChange={setActiveTab}
         onEdit={docActions.openEditModal}
         onChat={() => detail.setIsChatExpanded(true)}
+        onRegenerate={() => docActions.setRegenerateModalOpen(true)}
+        onGenerate={() => detail.setGenerating(true)}
+        generating={detail.generating}
       />
 
       {/* Workflow Progress Bar — removed per beta feedback (users confused by Draft/Submitted/Decision language) */}
 
-      {/* Main Content: Tabs + Side Panel */}
-      <div className="max-w-[1400px] mx-auto px-6 py-6">
-        <div className="flex gap-6">
-          {/* Tabbed Content Area */}
-          <div className="flex-1 min-w-0">
-            {/* Tab Navigation Bar */}
-            <div
-              className="hidden md:flex items-center gap-0.5 border-b border-gray-300 mb-6 overflow-x-auto scrollbar-hide"
-              role="tablist"
-              aria-label="Case sections"
-            >
-              {([
-                { value: "overview", label: "Overview", icon: LayoutGrid, showBadge: false },
-                { value: "documents", label: "Documents", icon: FileText, showBadge: true },
-                { value: "clinical", label: "Clinical Review", icon: Search, showBadge: false },
-                { value: "activity", label: "Activity", icon: Clock, showBadge: false },
-              ]).map((tab) => {
-                const isActive = activeTab === tab.value
-                const Icon = tab.icon
-                return (
-                  <button
-                    key={tab.value}
-                    onClick={() => setActiveTab(tab.value)}
-                    role="tab"
-                    aria-selected={isActive}
-                    className={`relative overflow-visible flex items-center gap-1.5 px-4 py-3 text-[0.78rem] border-none bg-transparent cursor-pointer whitespace-nowrap transition-colors duration-200 ${
-                      isActive ? "text-dark-bg font-semibold" : "text-gray-500 font-medium hover:text-dark-bg"
-                    }`}
-                  >
-                    <Icon className="w-[15px] h-[15px]" />
-                    {tab.label}
-                    {tab.showBadge && detail.hasGenerated && (detail.suggestedFormsCount + 1) > 0 && (
-                      <span className="text-[0.6rem] font-semibold px-1.5 py-px rounded-full bg-red-600 text-white leading-[1.4]">
-                        {detail.suggestedFormsCount + 1}
-                      </span>
-                    )}
-                    {isActive && (
-                      <motion.div
-                        layoutId="tab-indicator"
-                        className="absolute -bottom-px left-0 right-0 h-[2px] bg-[#1652C5] rounded-t-sm z-10"
-                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Tab Content Panels */}
-            {activeTab === "overview" && (
-              <OverviewTab
-                caseData={caseData}
-                lcdValidation={detail.lcdValidation}
-                checklistEdits={detail.checklistEdits}
-                onChecklistItemClick={detail.handleChecklistItemClick}
-                recommendationEdits={detail.recommendationEdits}
-                onRecommendationClick={detail.handleRecommendationClick}
-              />
-            )}
-
-            {activeTab === "documents" && (
-              <DocumentsTab
-                caseData={caseData}
-                editedOutput={detail.editedOutput}
-                setEditedOutput={detail.setEditedOutput}
-                hasGenerated={detail.hasGenerated}
-                isDocCollapsed={detail.isDocCollapsed}
-                setIsDocCollapsed={detail.setIsDocCollapsed}
-                copied={docActions.copied}
-                onCopy={docActions.copyToClipboard}
-                onDownloadWord={docActions.downloadAsWord}
-                onDownloadPdf={docActions.generatePdf}
-                isInChatMode={detail.isInChatMode}
-                onFormsCountChange={(count) => detail.setSuggestedFormsCount(count)}
-              />
-            )}
-
-            {activeTab === "clinical" && (
-              <ClinicalReviewTab
-                caseData={caseData}
-                lcdValidation={detail.lcdValidation}
-                uploadedDocs={detail.uploadedDocs}
-              />
-            )}
-
-            {activeTab === "activity" && (
-              <ActivityTab
-                caseData={caseData}
-                appealCases={detail.appealCases}
-              />
-            )}
+      {/* Main Content — centered like audit page */}
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Tab Navigation Bar + Actions */}
+        <div
+          className="hidden md:flex items-center border-b border-gray-300 mb-6 overflow-x-auto scrollbar-hide"
+          role="tablist"
+          aria-label="Case sections"
+        >
+          <div className="flex items-center gap-0.5">
+            {([
+              { value: "overview", label: "Overview", icon: LayoutGrid, showBadge: false },
+              { value: "documents", label: "Documents", icon: FileText, showBadge: true },
+              { value: "clinical", label: "Clinical Review", icon: Search, showBadge: false },
+              { value: "activity", label: "Activity", icon: Clock, showBadge: false },
+            ]).map((tab) => {
+              const isActive = activeTab === tab.value
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => setActiveTab(tab.value)}
+                  role="tab"
+                  aria-selected={isActive}
+                  className={`relative overflow-visible flex items-center gap-1.5 px-4 py-3 text-[0.78rem] border-none bg-transparent cursor-pointer whitespace-nowrap transition-colors duration-200 ${
+                    isActive ? "text-dark-bg font-semibold" : "text-gray-500 font-medium hover:text-dark-bg"
+                  }`}
+                >
+                  <Icon className="w-[15px] h-[15px]" />
+                  {tab.label}
+                  {tab.showBadge && detail.hasGenerated && (detail.suggestedFormsCount + 1) > 0 && (
+                    <span className="text-[0.6rem] font-semibold px-1.5 py-px rounded-full bg-red-600 text-white leading-[1.4]">
+                      {detail.suggestedFormsCount + 1}
+                    </span>
+                  )}
+                  {isActive && (
+                    <motion.div
+                      layoutId="tab-indicator"
+                      className="absolute -bottom-px left-0 right-0 h-[2px] bg-[#1652C5] rounded-t-sm z-10"
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    />
+                  )}
+                </button>
+              )
+            })}
           </div>
 
-          {/* Side Panel */}
-          <SidePanel
-            caseData={caseData}
-            isInChatMode={detail.isInChatMode}
-            appealCases={detail.appealCases}
-            onRegenerate={() => docActions.setRegenerateModalOpen(true)}
-            onGenerate={() => detail.setGenerating(true)}
-            generating={detail.generating}
-          />
+          {/* Actions — right-aligned */}
+          <div className="ml-auto flex items-center gap-1 pl-4">
+            <button
+              onClick={docActions.openEditModal}
+              className="flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-gray-500 hover:text-dark-bg hover:bg-gray-100 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit
+            </button>
+            <button
+              onClick={() => detail.setIsChatExpanded(true)}
+              className="flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-gray-500 hover:text-dark-bg hover:bg-gray-100 transition-colors"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Chat
+            </button>
+            {!detail.isInChatMode && (
+              <button
+                onClick={() => {
+                  if (detail.hasGenerated) {
+                    docActions.setRegenerateModalOpen(true)
+                  } else {
+                    detail.setGenerating(true)
+                  }
+                }}
+                disabled={detail.generating}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${detail.generating ? "animate-spin" : ""}`} />
+                {detail.hasGenerated ? "Regenerate" : "Generate"}
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Tab Content Panels */}
+        {activeTab === "overview" && (
+          <OverviewTab
+            caseData={caseData}
+            lcdValidation={detail.lcdValidation}
+            checklistEdits={detail.checklistEdits}
+            onChecklistItemClick={detail.handleChecklistItemClick}
+            recommendationEdits={detail.recommendationEdits}
+            onRecommendationClick={detail.handleRecommendationClick}
+          />
+        )}
+
+        {activeTab === "documents" && (
+          <DocumentsTab
+            caseData={caseData}
+            editedOutput={detail.editedOutput}
+            setEditedOutput={detail.setEditedOutput}
+            hasGenerated={detail.hasGenerated}
+            isDocCollapsed={detail.isDocCollapsed}
+            setIsDocCollapsed={detail.setIsDocCollapsed}
+            copied={docActions.copied}
+            onCopy={docActions.copyToClipboard}
+            onDownloadWord={docActions.downloadAsWord}
+            onDownloadPdf={docActions.generatePdf}
+            isInChatMode={detail.isInChatMode}
+            onFormsCountChange={(count) => detail.setSuggestedFormsCount(count)}
+          />
+        )}
+
+        {activeTab === "clinical" && (
+          <ClinicalReviewTab
+            caseData={caseData}
+            lcdValidation={detail.lcdValidation}
+            uploadedDocs={detail.uploadedDocs}
+          />
+        )}
+
+        {activeTab === "activity" && (
+          <ActivityTab
+            caseData={caseData}
+            appealCases={detail.appealCases}
+          />
+        )}
+
+        {/* Contextual info — only shows for denied cases or cases with appeals */}
+        <SidePanel
+          caseData={caseData}
+          appealCases={detail.appealCases}
+        />
       </div>
 
       {/* --- Modals (rendered outside layout flow) --- */}

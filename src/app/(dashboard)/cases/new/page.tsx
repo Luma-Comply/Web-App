@@ -308,6 +308,12 @@ export default function NewCasePage() {
   ) => {
     const { name, value } = e.target
 
+    // Redirect to standalone audit page when selected
+    if (name === "doc_type" && value === "audit") {
+      router.push("/audit")
+      return
+    }
+
     if (name === "claim_amount") {
       const numericValue = value.replace(/,/g, "")
       setFormData((prev) => ({ ...prev, [name]: numericValue }))
@@ -606,6 +612,7 @@ export default function NewCasePage() {
             >
               <option value="" disabled>Select Document Type</option>
               <option value="biologics_pa">Biologics Prior Authorization</option>
+              <option value="audit">Pre-Audit Documentation Review</option>
               <option value="medical_necessity">Prior Authorization Letter</option>
               <option value="appeal">Appeal Letter</option>
             </select>
