@@ -181,8 +181,8 @@ function CaseDetailContent() {
 
       {/* Workflow Progress Bar — removed per beta feedback (users confused by Draft/Submitted/Decision language) */}
 
-      {/* Main Content — centered like audit page */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
         {/* Tab Navigation Bar + Actions */}
         <div
           className="hidden md:flex items-center border-b border-gray-300 mb-6 overflow-x-auto scrollbar-hide"

@@ -92,7 +92,7 @@ export function PatientHeaderStrip({
           isCompact ? "py-2.5 shadow-sm" : "py-3 md:py-4"
         }`}
       >
-        <div className="max-w-4xl mx-auto px-4 flex items-center justify-between gap-2 md:gap-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-between gap-2 md:gap-6">
           {/* Left: Back + Patient Info */}
           <div className="flex items-center gap-2 md:gap-4 min-w-0">
             <Link href="/dashboard" className="flex-shrink-0">
