@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   ArrowLeft,
   Menu,
@@ -14,7 +23,17 @@ import {
   FileText,
   Search,
   Clock,
+  Plus,
+  ChevronDown,
+  User,
+  Users,
+  CreditCard,
+  LogOut,
+  ExternalLink,
+  Building2,
+  Shield,
 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 import type { CaseData } from "../types"
 import { inferGender } from "../utils"
 
@@ -53,9 +72,40 @@ export function PatientHeaderStrip({
   onGenerate,
   generating,
 }: PatientHeaderStripProps) {
+  const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userInfo, setUserInfo] = useState<{
+    email: string; practiceName: string; isTeamOwner: boolean; isSuperAdmin: boolean
+  } | null>(null)
   const initials = `${(displayFirstName || "?")[0]}${(displayLastName || "?")[0]}`.toUpperCase()
   const displayGender = caseData.patient_gender || inferGender(displayFirstName) || "—"
+
+  // Fetch user info for org dropdown
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return
+      supabase
+        .from("users")
+        .select("practice_name, subscription_tier, is_super_admin")
+        .eq("id", session.user.id)
+        .single()
+        .then(({ data }) => {
+          setUserInfo({
+            email: session.user.email || "",
+            practiceName: data?.practice_name || "",
+            isTeamOwner: data?.subscription_tier === "professional",
+            isSuperAdmin: !!data?.is_super_admin,
+          })
+        })
+    })
+  }, [])
+
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/")
+  }
 
   const docTypeLabel = (() => {
     switch (caseData.doc_type) {
@@ -154,6 +204,90 @@ export function PatientHeaderStrip({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Right: New Case + Org dropdown (desktop) */}
+          <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+            <Button
+              onClick={() => router.push("/cases/new")}
+              size="sm"
+              className="relative overflow-hidden bg-dark-bg hover:bg-dark-bg/90 text-white transition-all duration-300 hover:scale-105 active:scale-100"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Case
+            </Button>
+            {userInfo && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="flex items-center gap-2 hover:bg-gray-100">
+                    <span className="text-sm text-gray-600 max-w-[200px] truncate">{userInfo.practiceName || userInfo.email}</span>
+                    <ChevronDown className="w-4 h-4 text-gray-600" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 bg-white border border-sage-medium/30">
+                  <DropdownMenuItem
+                    onClick={() => router.push("/settings/profile")}
+                    className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  {userInfo.isTeamOwner && (
+                    <>
+                      <DropdownMenuItem
+                        onClick={() => router.push("/settings/team")}
+                        className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        Team
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => router.push("/settings/billing")}
+                        className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                      >
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        Billing
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {userInfo.isSuperAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-2 py-1">Admin</DropdownMenuLabel>
+                      <DropdownMenuItem
+                        onClick={() => window.open("https://clarity.microsoft.com/projects/view/v64a4br39t/dashboard", "_blank")}
+                        className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Clarity Analytics
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => router.push("/admin/enterprise-contacts")}
+                        className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                      >
+                        <Building2 className="mr-2 h-4 w-4" />
+                        Enterprise CRM
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => router.push("/settings/security")}
+                        className="focus:bg-mint/10 focus:text-dark-bg cursor-pointer"
+                      >
+                        <Shield className="mr-2 h-4 w-4" />
+                        Security
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="focus:bg-coral/10 focus:text-coral cursor-pointer"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
           {/* Right: Mobile — hamburger trigger */}

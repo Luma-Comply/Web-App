@@ -24,8 +24,21 @@ import {
   StickyNote,
   Check,
   Pencil,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="relative group/tip inline-flex">
+      <Info className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 transition-colors cursor-help" />
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-lg bg-dark-bg text-white text-xs leading-relaxed px-3 py-2 shadow-lg opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 z-50 normal-case tracking-normal">
+        {text}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-dark-bg" />
+      </span>
+    </span>
+  )
+}
 import type {
   LCDValidationResult,
   ChecklistEdit,
@@ -231,10 +244,11 @@ export function LCDValidationPanel({
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-sage-light/10 transition-colors">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <CardTitle className="text-lg font-sans font-semibold">
                   {getPanelTitle(docType)}
                 </CardTitle>
+                <InfoTip text="AI-powered check of your documentation against payer-specific coverage requirements. Items marked FOUND were verified in your clinical notes; MISSING items need documentation before submission." />
               </div>
               <div className="flex items-center justify-between sm:justify-end gap-2">
                 <span className="text-sm text-gray-500">
@@ -258,26 +272,27 @@ export function LCDValidationPanel({
               docType === "biologics_pa" ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2"
             )}>
               <div className="bg-white rounded-xl p-3 md:p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                  Missing
-                </div>
-                <div className="flex flex-col">
-                  <span
-                    className={cn(
-                      "text-xl font-bold",
-                      validation.missingCount - addressedCount <= 0
-                        ? "text-blue-600"
-                        : "text-red-600",
-                    )}
-                  >
-                    {validation.missingCount}
-                  </span>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1">
+                    Missing
+                    <InfoTip text="Requirements not yet found in your clinical notes. Add documentation for these items to strengthen your submission." />
+                  </div>
                   {addressedCount > 0 && (
-                    <span className="text-xs font-medium text-mint">
+                    <span className="text-[10px] font-semibold text-mint">
                       {addressedCount} addressed
                     </span>
                   )}
                 </div>
+                <span
+                  className={cn(
+                    "text-xl font-bold",
+                    validation.missingCount - addressedCount <= 0
+                      ? "text-blue-600"
+                      : "text-red-600",
+                  )}
+                >
+                  {validation.missingCount}
+                </span>
               </div>
               {/* Wound Type - Only for Biologics PA */}
               {docType === "biologics_pa" && (
@@ -326,8 +341,9 @@ export function LCDValidationPanel({
               {/* CTP Product - Only for Biologics PA */}
               {docType === "biologics_pa" && (
                 <div className="bg-white rounded-xl p-3 md:p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
-                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                    CTP Product
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                    Tissue Product
+                    <InfoTip text="Cellular and/or Tissue-based Product (CTP) coverage status. 'Verify' means the requested product couldn't be auto-confirmed on this LCD's covered list — check with the payer before submitting." />
                   </div>
                   <div
                     className={cn(
@@ -343,7 +359,7 @@ export function LCDValidationPanel({
               {docType === "biologics_pa" && validation.perplexityFindings.lcdEffectiveDate && (
                 <div className="bg-white rounded-xl p-3 md:p-4 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_-1px_rgba(0,0,0,0.06),0px_2px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0px_0px_0px_1px_rgba(0,0,0,0.08),0px_1px_2px_-1px_rgba(0,0,0,0.08),0px_2px_4px_0px_rgba(0,0,0,0.06)] transition-shadow">
                   <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                    LCD Date
+                    Coverage Date
                   </div>
                   <div className="text-sm font-bold text-dark-bg">
                     {validation.perplexityFindings.lcdEffectiveDate}
