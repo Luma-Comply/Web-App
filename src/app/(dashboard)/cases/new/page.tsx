@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
 import { Autocomplete } from "@/components/ui/autocomplete"
+import { AnimatedCheckbox } from "@/components/ui/animated-checkbox"
 import {
   Dialog,
   DialogContent,
@@ -1229,11 +1230,11 @@ Requesting Rinvoq 15mg daily."
 
             {/* Checkbox Agreement */}
             <label className="flex items-start gap-4 cursor-pointer p-4 rounded-lg border border-sage-medium/30 bg-white/50 hover:bg-white/80 transition-colors">
-              <input
-                type="checkbox"
+              <AnimatedCheckbox
                 checked={agreedToTerms}
-                onChange={(e) => setAgreedToTerms(e.target.checked)}
-                className="mt-0.5 w-6 h-6 rounded-md border-2 border-input text-mint focus:ring-ring focus:ring-offset-0 cursor-pointer accent-mint"
+                onChange={setAgreedToTerms}
+                ariaLabel="Confirm clinical notes do not contain PHI identifiers"
+                className="mt-0.5"
               />
               <span className="text-sm text-gray-700 leading-relaxed">
                 I confirm that my clinical notes do not contain PHI identifiers (SSN, full addresses, phone numbers, MRN, DOB, etc.). I understand that I am responsible for de-identifying patient data before submission.

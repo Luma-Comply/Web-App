@@ -132,6 +132,58 @@
   animation: glowPulse 2s ease-in-out infinite;
 }
 
+/* Animated Checkbox (prototype port; mint instead of orange) */
+.animated-checkbox {
+  --ts-1: 300ms;
+  --ts-2: 600ms;
+  --size: 20px;
+  --tick: #fff;
+  --border: #d1d5db;
+  --active: #7EA18D;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 6px;
+  transition: box-shadow var(--ts-1), background var(--ts-1);
+  box-shadow: inset 0 0 0 2px var(--b, var(--border));
+}
+
+.animated-checkbox svg {
+  fill: none;
+  stroke: var(--active);
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  stroke-dasharray: var(--a, 86.12);
+  stroke-dashoffset: var(--o, 86.12);
+  transition: stroke-dasharray var(--ts-2), stroke-dashoffset var(--ts-2);
+}
+
+.animated-checkbox[data-checked="true"] {
+  background: var(--active);
+  --b: var(--active);
+  transition-delay: 0.4s;
+}
+
+.animated-checkbox[data-checked="true"] svg {
+  --a: 16 86.12;
+  --o: 102.22;
+  animation-name: animated-checkbox-fill;
+  animation-delay: var(--ts-1);
+  animation-fill-mode: forwards;
+  animation-timing-function: ease;
+  animation-duration: var(--ts-2);
+}
+
+@keyframes animated-checkbox-fill {
+  0% { stroke: var(--active); }
+  100% { stroke: var(--tick); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-logo-dot,
   .animate-logo-pulse-fast,
